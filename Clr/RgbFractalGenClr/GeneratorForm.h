@@ -1,15 +1,3 @@
-// Issues:
-
-// Crashes when aborting with Paralel Iterations
-// Sometimes crashes when generating with Paralel Iteration
-// Paralel iterations make it like 20x slower instead of faster
-// ven single threaded generation is somehow slower that the managed versions
-
-// TODO:
-
-// Debug Performance
-// Replace Aborts with something more graceful
-
 #pragma once
 #include "FractalGenerator.h"
 #include "DoubleBufferedPanel.h"
@@ -30,7 +18,6 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::SaveFileDialog^ saveGif;
 	private: System::Windows::Forms::Label^ fractalLabel;
 	private: System::Windows::Forms::ComboBox^ fractalSelect;
-
 	private: System::Windows::Forms::TextBox^ resX;
 	private: System::Windows::Forms::TextBox^ resY;
 	private: System::Windows::Forms::CheckBox^ previewBox;
@@ -38,8 +25,6 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::Label^ delayLabel;
 	private: System::Windows::Forms::TextBox^ delayBox;
 	private: System::Windows::Forms::Button^ zoomButton;
-
-
 	private: System::Windows::Forms::Button^ prevButton;
 	private: System::Windows::Forms::Button^ nextButton;
 	private: System::Windows::Forms::Button^ animateButton;
@@ -70,31 +55,21 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::TextBox^ periodMultiplierBox;
 	private: System::Windows::Forms::Label^ periodLabel;
 	private: System::Windows::Forms::Panel^ helpPanel;
-
 	private: System::Windows::Forms::Label^ helpLabel;
-
 	private: System::Windows::Forms::ComboBox^ angleSelect;
 	private: System::Windows::Forms::ComboBox^ colorSelect;
 	private: System::Windows::Forms::ComboBox^ cutSelect;
 	private: System::Windows::Forms::Button^ helpButton;
-
 	private: System::Windows::Forms::Label^ angleLabel;
 	private: System::Windows::Forms::Label^ colorLabel;
 	private: System::Windows::Forms::Label^ cutLabel;
 	private: System::Windows::Forms::Label^ zoomLabel;
 	private: System::Windows::Forms::ComboBox^ spinSelect;
-
 	private: System::Windows::Forms::ComboBox^ hueSelect;
-
 	private: System::Windows::Forms::Label^ spinLabel;
 	private: System::Windows::Forms::Label^ label1;
 	private: System::Windows::Forms::TextBox^ spinSpeedBox;
 	private: System::Windows::Forms::TextBox^ hueSpeedBox;
-
-
-
-
-
 
 	private: System::ComponentModel::IContainer^ components;
 
@@ -117,8 +92,8 @@ namespace RgbFractalGenClr {
 #pragma region Variables
 	private:
 		// Threading
-		FractalGenerator^ generator;
-		CancellationTokenSource^ cancel;
+		FractalGenerator^ generator;		// The core ofthe app, the generator the generates the fractal animations
+		CancellationTokenSource^ cancel;	// Cancellation Token Source
 		Task^ gTask;						// GIF Export Task
 		// Settings
 		bool previewMode = true;			// Preview mode for booting performance while setting up parameters
@@ -130,7 +105,7 @@ namespace RgbFractalGenClr {
 		Bitmap^ currentBitmap = nullptr;	// Displayed Bitmap
 		int currentBitmapIndex;				// Play frame index
 		int fx, fy;							// Memory of window size
-		int controlTabIndex = 0;
+		int controlTabIndex = 0;			// Iterator for tabIndexes - to make sure all the controls tab in the correct order even as i add new ones in the middle
 #pragma endregion
 
 #pragma region Core
@@ -223,63 +198,270 @@ namespace RgbFractalGenClr {
 
 #pragma region Input
 	private:
+		/// <summary>
+		/// Fractal definition selection
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void fractalBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
-		System::Void SelectFractal();
+		/// <summary>
+		/// Fill the Color/Angle/CutFunction comboBoxes with available options for the selected fractal
+		/// </summary>
+		/// <returns></returns>
 		System::Void FillSelects();
+		/// <summary>
+		/// Select child angles definition
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void angleSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Select child colors definition
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		/// <returns></returns>
 		System::Void colorSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Select CutFunction definition
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		/// <returns></returns>
 		System::Void cutSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
+		/// </summary>
+		/// <returns></returns>
 		System::Void FillCutParams();
+		/// <summary>
+		/// Change the CutFunction seed parameter through the textBox typing
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void cutparamBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Change the CutFunction seed parameter through the trackBar scroll
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void cutparamBar_Scroll(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Type X resolution - width
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void resX_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Type Y resolution - height
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void resY_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Toggle the "use the resolution", if unchecked, it will run in preview mode of firced 80x80 resolution regardless of typed resolution
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void previewBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Number Of Animation Frames to reach the center Self Similar (the total frames can be higher if the center child has a different color or rotation)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void periodBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
-		System::Void SelectPeriod();
+		/// <summary>
+		/// Multiplies the number of loop frames, keeping the spin and huecycle the same speed (you can speed up either with options below)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void periodMultiplierBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Zoom direction (-> Forward zoom in, <- Backwards zoom out)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void zoomButton_Click(System::Object^ sender, System::EventArgs^ e);
-		System::Void SelectZoom();
+		/// <summary>
+		/// Default Zoom value on first frame (in skipped frames)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void defaultZoom_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Select the spin mode (clockwise, counterclockwise, or antispin where the child spins in opposite direction)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void spinSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Select the extra spin of symmentry angle per loop (so it spins faster)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void spinSpeedBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Default spin angle on first frame (in degrees)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void defaultAngle_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Select the hue pallete and cycling
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void hueSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Select the extra hue cycling speed of extra full 360° color loops per full animation loop (so it hue cycles spins faster)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void hueSpeedBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Defaul hue angle on first frame (in degrees)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void defaultHue_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// The strenghts (lightness) of the dark void outside between the fractal points
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void ambBar_Scroll(System::Object^ sender, System::EventArgs^ e);
-		System::Void SelectAmb();
+		/// <summary>
+		/// Level of void Noise of the dark void outside between the fractal points
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void noiseBar_Scroll(System::Object^ sender, System::EventArgs^ e);
-		System::Void SelectNoise();
+		/// <summary>
+		/// Saturation Setting - ramp up saturation to maximum if all the wat to the right
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void saturateBar_Scroll(System::Object^ sender, System::EventArgs^ e);
-		System::Void SelectSaturation();
+		/// <summary>
+		/// Detail, how small the split fractal shaped have to get, until they draw a dot of their color to the image buffer (the smaller the finer)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void detailBar_Scroll(System::Object^ sender, System::EventArgs^ e);
-		System::Void SelectDetail();
+		/// <summary>
+		/// Level of blur smear frames (renders multiple fractals of slighlty increased time until the frame deltatime over each other)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void blurBar_Scroll(System::Object^ sender, System::EventArgs^ e);
-		System::Void SelectBlur();
+		/// <summary>
+		/// Iteration Threading - How many iterations deep have Self Similars a new thread
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void parallelBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Sets maximum threads as selected by user (th parallel checkBox and the maxThreads slider)
+		/// </summary>
 		System::Void SelectMaxThreads();
+		/// <summary>
+		/// Drawing Threading - Paralelizes the scanlines of drawing
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void parallelTypeBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Toggles between parallelism of single images and parallelism of batching animation frames
+		/// </summary>
 		System::Void SelectParallelType();
+		/// <summary>
+		/// Maximum number of threads
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void threadsBar_Scroll(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Framerate Delay (for previes and for gif encode, so if encoding gif, it will restart the generation)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void delayBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Select Previous frame to display
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void prevButton_Click(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Select Next frame to display
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void nextButton_Click(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Toggle display animation
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void animateButton_Click(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Toggle level of generation (SingleImage - Animation - GIF)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void encodeButton_Click(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Show readme help
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void helpButton_Click(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Save Frame
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void pngButton_Click(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Save Gif
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void gifButton_Click(System::Object^ sender, System::EventArgs^ e);
-		System::Void screenPanel_Paint(System::Object^ sender, System::Windows::Forms::PaintEventArgs^ e);
+		/// <summary>
+		/// Start/Stop Animation
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		System::Void screenPanel_Click(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Invalidation event of screen display - draws the current display frame bitmap.
+		/// Get called repeatedly with new frame to animate the preview, if animation is toggled
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		System::Void screenPanel_Paint(System::Object^ sender, System::Windows::Forms::PaintEventArgs^ e);
 #pragma endregion
 
 #pragma region Output
 	private:
+		/// <summary>
+		/// User inputed the path and name for saving PNG
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		/// <returns></returns>
 		System::Void savePng_FileOk(System::Object^ sender, System::ComponentModel::CancelEventArgs^ e);
+		/// <summary>
+		/// User inputed the path and name for saving GIF
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		/// <returns></returns>
 		System::Void saveGif_FileOk(System::Object^ sender, System::ComponentModel::CancelEventArgs^ e);
 		/// <summary>
 		/// Exports the animation into a GIF file
+		/// Ackchyually - it just moves the already exported gifX.tmp to you desired location and name
 		/// </summary>
 		/// <returns></returns>
 		System::Void ExportGif();

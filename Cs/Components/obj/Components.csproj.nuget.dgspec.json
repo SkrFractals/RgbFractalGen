@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "H:\\Projects\\RgbFractalGen\\Cs\\Components\\Components.csproj": {}
+    "H:\\GitHubFractal\\RgbFractalGen\\Cs\\Components\\Components.csproj": {}
   },
   "projects": {
-    "H:\\Projects\\RgbFractalGen\\Cs\\Components\\Components.csproj": {
+    "H:\\GitHubFractal\\RgbFractalGen\\Cs\\Components\\Components.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "H:\\Projects\\RgbFractalGen\\Cs\\Components\\Components.csproj",
+        "projectUniqueName": "H:\\GitHubFractal\\RgbFractalGen\\Cs\\Components\\Components.csproj",
         "projectName": "Gif.Components",
-        "projectPath": "H:\\Projects\\RgbFractalGen\\Cs\\Components\\Components.csproj",
+        "projectPath": "H:\\GitHubFractal\\RgbFractalGen\\Cs\\Components\\Components.csproj",
         "packagesPath": "C:\\Users\\vojta\\.nuget\\packages\\",
-        "outputPath": "H:\\Projects\\RgbFractalGen\\Cs\\Components\\obj\\",
+        "outputPath": "H:\\GitHubFractal\\RgbFractalGen\\Cs\\Components\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

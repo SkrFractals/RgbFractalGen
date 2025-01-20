@@ -18,6 +18,7 @@ namespace RgbFractalGenCs {
 	using System.Drawing.Imaging;
 	using Gif.Components;
 	using System.Numerics;
+	using System.DirectoryServices.ActiveDirectory;
 
 	[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 	internal class FractalGenerator {
@@ -70,9 +71,9 @@ namespace RgbFractalGenCs {
 
 		#region Init
 		public FractalGenerator() {
-			debug = defaultHue = defaultZoom = defaultAngle = select = selectAngle = selectColor = selectCut = selectColorPalette = 0;
+			debug = defaultHue = defaultZoom = defaultAngle = selectCut = selectColorPalette = 0;
 			zoom = 1;
-			defaultSpin = -1;
+			selectAngle = selectColor = select = defaultSpin = -1;
 			encode = 2;
 			gifEncoder = null;
 			bitmap = null;
@@ -319,12 +320,14 @@ namespace RgbFractalGenCs {
 				if (gifIndex == 255)
 					gifEncoder = null;
 			}
+			// Initialize the starting default animation values
 			float size = 2400, angle = defaultAngle * (float)Math.PI / 180.0f, hueAngle = defaultHue / 120.0f;
 			byte color = 0;
 			ambnoise = (short)(amb * noise);
 			var spin = defaultSpin;
 			ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 			for (int i = defaultZoom; 0 <= --i; IncrementFrameSize(ref size, period)) ;
+			// Initialize Threading and drawing data
 			rect = new(0, 0, width, height);
 			var batchTasks = Math.Max((short)1, maxTasks);
 			voidQueue = new Queue<(short, short)>[batchTasks];
@@ -333,7 +336,8 @@ namespace RgbFractalGenCs {
 			buffer = new Vector3[batchTasks][][];
 			animationTasks = new Task[batchTasks + 1];
 			for (int i = 0; i <= batchTasks; animationTaskFinished[i++] = 2) ;
-			unsafe {
+
+			//unsafe {
 				while (!cancel.Token.IsCancellationRequested && bitmapsFinished < bitmap.Length) {
 					var generateLength = (encode > 0 ? bitmap.Length : 1);
 					// Wait if no more frames to generate
@@ -400,7 +404,7 @@ namespace RgbFractalGenCs {
 						}
 					}
 				}
-			}
+			//}
 			// Wait for threads to finish
 			WaitForThreads();
 			for (int i = animationTasks.Length; 0 <= --i; animationTasks[i]?.Wait()) ;
@@ -449,6 +453,7 @@ namespace RgbFractalGenCs {
 			var iterTime = new();
 			iterTime.Start();
 #endif
+			// Generate the fractal frame recursively
 			Vector3 colorBlendI = Vector3.Zero, colorBlendH = Vector3.Zero;
 			for (int b = 0; b < selectBlur; ++b) {
 				if (cancel.Token.IsCancellationRequested) {
@@ -471,6 +476,7 @@ namespace RgbFractalGenCs {
 			var voidTime = new();
 			voidTime.Start();
 #endif
+			// Generate the grey void areas
 			float lightNormalizer = 0.1f, voidDepthMax = 1.0f;
 			CalculateVoid(voidQueue[taskIndex], buffT, voidT, ref lightNormalizer, ref voidDepthMax);
 #if CUSTOMDEBUG
@@ -483,8 +489,7 @@ namespace RgbFractalGenCs {
 				animationTaskFinished[taskIndex] = 2;
 				return;
 			}
-
-
+			// Draw the generated pixel to bitmap data
 			DrawBitmap(bitmapIndex, buffT, voidT, lightNormalizer, voidDepthMax);
 #if CUSTOMDEBUG
 			drawTime.Stop();
@@ -499,6 +504,7 @@ namespace RgbFractalGenCs {
 				Log(ref logString, threadString);
 			} finally { Monitor.Exit(taskLock); }
 #endif
+			// Lets the generator know it's finished so it can encode gif it it's allowed to, if not it just lets the form know it can diplay it
 			bitmapState[bitmapIndex] = 2;
 			animationTaskFinished[taskIndex] = 1;
 		}
@@ -602,6 +608,7 @@ namespace RgbFractalGenCs {
 		}
 		private void SwitchParentChild(ref float angle, ref short spin, ref byte color) {
 			if (Math.Abs(spin) > 1) {
+				// reverse angle and spin when antispinning, or else the direction would change when parent and child switches
 				angle = -angle;
 				spin = (short)(-spin);
 			}
@@ -609,14 +616,14 @@ namespace RgbFractalGenCs {
 		}
 		private void IncrementFrameParameters(ref float size, ref float angle, float spin, ref float hueAngle, ref byte color, byte blur) {
 			var blurPeriod = period * blur;
-			// Zoom Rotation
+			// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
 			angle += spin * (periodAngle * (1 + extraSpin)) / (finalPeriodMultiplier * blurPeriod);
-			// Zom Hue Cycle
 			hueAngle += (hueCycleMultiplier + 3 * extraHue) * (float)hueCycle / (finalPeriodMultiplier * blurPeriod);
 			IncrementFrameSize(ref size, blurPeriod);
 		}
 		private void SetupColorBlend(float hueAngle, ref Vector3 colorBlendI, ref Vector3 colorBlendH) {
 			// Prepare Color blending per one dot (hueshifting + iteration correction)
+			// So that the color of the dot will slowly approach the combined colors of its childer before it splits
 			var lerp = hueAngle % 1.0f;
 			switch ((byte)hueAngle % 3) {
 				case 0:
@@ -646,7 +653,7 @@ namespace RgbFractalGenCs {
 			if (cancel.Token.IsCancellationRequested)
 				return;
 			if (amb > 0) {
-				// Void Depth Seed points (no points, no borders)
+				// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
 				float lightMax;
 				for (short y = 1; y < h1; ++y) {
 					var voidY = voidT[y];
@@ -670,7 +677,7 @@ namespace RgbFractalGenCs {
 					queueT.Enqueue((0, x));
 					queueT.Enqueue((h1, x));
 				}
-				// Depth of Void
+				// Depth of Void (fill the void of incrementally larger values of depth, that will generate the grey areas)
 				short voidMax = 0;
 				while (queueT.Count > 0) {
 					(short y, short x) = queueT.Dequeue();
@@ -700,15 +707,9 @@ namespace RgbFractalGenCs {
 			//rgb += ((1.0f - voidAmb) * voidAmb) * new Vector3(rand.Next(ambnoise), rand.Next(ambnoise), rand.Next(ambnoise)) + new Vector3(voidAmb * amb);
 		}
 		unsafe private Vector3 ApplySaturate(Vector3 rgb) {
+			// The saturation equation boosting up the saturation of the pixel (powered by the saturation slider setting)
 			float m, min = MathF.Min(MathF.Min(rgb.X, rgb.Y), rgb.Z), max = MathF.Max(MathF.Max(rgb.X, rgb.Y), rgb.Z);
 			return max <= min ? rgb : ((m = max * saturate / (max - min)) + 1 - saturate) * rgb - new Vector3(min * m);
-
-			//float x, min = MathF.Min(MathF.Min(rgb.X, rgb.Y), rgb.Z), max = (MathF.Max(MathF.Max(rgb.X, rgb.Y), rgb.Z) - min) / 255.0f;
-			//return max <= 0 ? rgb : rgb * (1 - saturate + (x = saturate / max)) - new Vector3(x * min);
-
-			//ApplyNoSaturate(max <= 0 ? rgb : rgb * (1 - saturate + (x = saturate / max)) - new Vector3(x * min), ref p);
-			//float id = 1.0f - d, min = MathF.Min(MathF.Min(rgb.X, rgb.Y), rgb.Z), max = (MathF.Max(MathF.Max(rgb.X, rgb.Y), rgb.Z) - min) / 255.0f;
-			//ApplyNoSaturate(max == 0 ? new Vector3(255.0f * d) + id * rgb : (id + (d /= max)) * rgb - new Vector3(min * d), ref p);
 		}
 		unsafe private void ApplyRGBToBytePointer(Vector3 rgb, ref byte* p) {
 			// Without gamma:
@@ -758,21 +759,21 @@ namespace RgbFractalGenCs {
 		unsafe private void DrawBitmap(short bitmapIndex, Vector3[][] buffT, short[][] voidT, float lightNormalizer, float voidDepthMax) {
 			if (cancel.Token.IsCancellationRequested)
 				return;
-
 			// Make a locked bitmap, remember the locked state
 			byte* p = (byte*)(void*)((bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = new(width, height)).LockBits(rect,
 				ImageLockMode.WriteOnly,
 				System.Drawing.Imaging.PixelFormat.Format24bppRgb)).Scan0);
 			bitmapState[bitmapIndex] = 1;
-
+			// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
+			// Switch between th selected settings such as saturation, noise, image parallelism...
 			if (parallelType && maxGenerationTasks > 1) {
+				// Multi Threaded
 				var stride = 3 * width;
 				ParallelOptions po = new ParallelOptions {
 					MaxDegreeOfParallelism = maxGenerationTasks,
 					CancellationToken = cancel.Token
 				};
 				try {
-					// Multi Threaded
 					if (ambnoise > 0) {
 						var threadRand = new ThreadLocal<Random>(() => new(Guid.NewGuid().GetHashCode()));
 						if (saturate > 0.0) Parallel.For(0, height, po, y => {
@@ -822,6 +823,7 @@ namespace RgbFractalGenCs {
 			}
 		}
 		unsafe private void EncodeGifFrame(short taskIndex) {
+			// Sequentially encode a finished GIF frame, then unlock the bitmap data
 			if (cancel.Token.IsCancellationRequested) {
 				animationTaskFinished[taskIndex] = 2;
 				return;
@@ -861,15 +863,17 @@ namespace RgbFractalGenCs {
 
 		#region Interface
 		internal void StartGenerate() {
+			// start the generator in a separate main thread so that the form can continue being responsive
 			mainTask = Task.Run(() => Generate(), (cancel = new()).Token);
 		}
 		internal void ResetGenerator() {
-			bitmapsFinished = nextBitmap = 0;
 			finalPeriodMultiplier = GetFinalPeriod();
 			// A complex expression to calculate the minimum needed hue shift speed to match the loop:
 			hueCycleMultiplier = (byte)(hueCycle == 0 ? 0 : childColor[0] % 3 == 0 ? 2 : 1 +
 					(childColor[0] % 3 == 1 == (1 == hueCycle) == (1 == zoom) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3 
 			);
+			// setup bitmap data
+			bitmapsFinished = nextBitmap = 0;
 			int frames = debug > 0 ? debug : period * finalPeriodMultiplier;
 			bitmap = new Bitmap[frames];
 			bitmapData = new BitmapData[frames];
@@ -877,12 +881,14 @@ namespace RgbFractalGenCs {
 			//for (int i = frames; 0 <= i; bitmapState[i--] = 0) ;
 		}
 		internal short GetFinalPeriod() {
+			// get the multiplier of the basic period required to get to a seamless loop
 			int m = hueCycle == 0 && childColor[0] > 0 ? periodMultiplier * 3 : periodMultiplier;
 			return (short)(Math.Abs(defaultSpin) > 1 || (defaultSpin == 0 && childAngle[0] < 2 * Math.PI) ? 2 * m : m);
 		}
 		internal void WaitForThreads() {
 			if (imageTasks == null)
 				return;
+			// Wait for image parallelism threads to complete
 			bool noMore;
 			taskSnapshot.Clear();
 			while (true) {
@@ -907,6 +913,7 @@ namespace RgbFractalGenCs {
 		}
 		internal bool SaveGif(string gifPath) {
 			try {
+				// Try to save (move the temp) the gif file
 				if (gifEncoder != null)
 					gifEncoder.Finish();
 				//gifEncoder.Output(gifPath);
@@ -932,12 +939,21 @@ namespace RgbFractalGenCs {
 			}
 			return gifSuccess = false;
 		}
-		internal void SelectFractal(short select) {
-			f = fractals[this.select = select];
+		internal bool SelectFractal(short select) {
+			if (this.select == select)
+				return true;
+			// new fractal definition selected - let the form know to reset and restart me
+			this.select = select;
+			return false;
+		}
+		internal void SetupFractal() {
+			// setup the new fractal definition, with all parameters reset to 0
+			f = fractals[select];
 			logBase = (float)Math.Log(f.childSize);
 			SelectThreadingDepth();
-			selectColor = 0;
-			SelectColor();
+			selectCut = selectAngle = selectColor = -1;
+			if(!SelectColor(0))
+				SelectColor();
 			SelectAngle(0);
 			SelectCutFunction(0);
 		}
@@ -961,7 +977,6 @@ namespace RgbFractalGenCs {
 			} else {
 				(_, byte[] ca) = f.childColor[selectColor];
 				for (int i = f.childCount; 0 <= --i; childColor[i] = ca[i]) ;
-
 				// Setup palette
 				for (int i = 0; i < f.childCount; ++i)
 					childColor[i] = (selectColorPalette == 0) ? childColor[i] : (byte)((3 - childColor[i]) % 3);
@@ -969,16 +984,24 @@ namespace RgbFractalGenCs {
 			// Prepare subiteration color blend
 			InitColorBlend();
 		}
-		internal void SelectAngle(short selectAngle) {
-			(_, childAngle) = f.childAngle[this.selectAngle = selectAngle];
+		internal bool SelectAngle(short selectAngle) {
+			if (this.selectAngle == selectAngle)
+				return true;
+			this.selectAngle = selectAngle;
+			(_, childAngle) = f.childAngle[selectAngle];
 			periodAngle = f.childCount <= 0 ? 0 : childAngle[0] % (2.0f * (float)Math.PI);
+			return false;
 		}
 		internal Fractal.CutFunction GetCutFunction() { return cutFunction; }
-		internal void SelectCutFunction(short selectCut) {
+		internal bool SelectCutFunction(short selectCut) {
+			if (this.selectCut == selectCut) {
+				return true;
+			}
 			this.selectCut = selectCut;
 			if (f.cutFunction == null || f.cutFunction.Length <= 0)
 				cutFunction = null;
 			else (_, cutFunction) = f.cutFunction[selectCut];
+			return false;
 		}
 		private void InitColorBlend() {
 			float[] colorBlendF = [0, 0, 0];
@@ -993,8 +1016,12 @@ namespace RgbFractalGenCs {
 			for (int n = 1, threadCount = 0; (threadCount += n) < maxGenerationTasks; n *= f.childCount)
 				++maxDepth;
 		}
-		internal void SelectDetail(float detail) {
+		internal bool SelectDetail(float detail) {
+			if(this.detail == detail * f.minSize)
+				return true;
+			// detail is different, let the form know to restart me
 			this.detail = detail * f.minSize;
+			return false;
 		}
 		internal int GetBitmapsFinished() { return bitmapsFinished; }
 		internal int GetBitmapsTotal() { return bitmap == null ? 0 : bitmap.Length; }
@@ -1003,6 +1030,9 @@ namespace RgbFractalGenCs {
 		internal bool IsGifReady() { return gifSuccess; }
 		internal Bitmap GetBitmap(int index) { return bitmap == null || bitmap.Length <= index ? null : bitmap[index]; }
 		internal void DebugStart() {
+			// debug for testing, starts the generator with predetermined setting for easy breakpointing
+			// Need to enable the definition on top GeneratorForm.cpp to enable this
+			// if enabled you will be unable to use the settings interface!
 			SelectFractal(44);
 			SelectThreadingDepth();
 			SelectDetail(1);

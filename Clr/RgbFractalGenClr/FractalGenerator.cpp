@@ -26,9 +26,9 @@ namespace RgbFractalGenClr {
 
 #pragma region Generate
 	FractalGenerator::FractalGenerator() {
-		debug = defaultHue = defaultZoom = defaultAngle = select = selectColor = extraSpin = extraHue = 0;
+		debug = defaultHue = defaultZoom = defaultAngle = extraSpin = extraHue = 0;
 		zoom = 1;
-		defaultSpin = -1;
+		selectColor = selectAngle = select = defaultSpin = -1;
 		encode = 2;
 		gifEncoder = nullptr;
 		bitmap = nullptr;
@@ -293,12 +293,14 @@ namespace RgbFractalGenClr {
 			if (gifIndex == 255)
 				DeleteEncoder();
 		}
+		// Initialize the starting default animation values
 		auto size = 2400.0f, angle = defaultAngle * (float)M_PI / 180.0f, hueAngle = defaultHue / 120.0f;
 		uint8_t color = 0;
 		ambnoise = amb * noise;
 		auto spin = defaultSpin;
 		ModFrameParameters(size, angle, spin, hueAngle, color);
 		for (int i = defaultZoom; 0 <= --i; IncrementFrameSize(size, period));
+		// Initialize Threading and drawing data
 		rect = System::Drawing::Rectangle(0, 0, width, height);
 		const int16_t batchTasks = Math::Max(static_cast<int16_t>(1), maxTasks);
 		voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [batchTasks];
@@ -409,6 +411,7 @@ namespace RgbFractalGenClr {
 		Log(threadString, "Init:" + bitmapIndex + " time = " + initElapsed);
 		const auto iterTime{ std::chrono::steady_clock::now() };
 #endif
+		// Generate the fractal frame recursively
 		Vector colorBlendI = zero, colorBlendH = zero;
 		for (int b = 0; b < selectBlur; ++b) {
 			if (cancel->Token.IsCancellationRequested) {
@@ -430,6 +433,7 @@ namespace RgbFractalGenClr {
 		Log(threadString, "Iter:" + bitmapIndex + " time = " + iterElapsed);
 		const auto voidTime{ std::chrono::steady_clock::now() };
 #endif
+		// Generate the grey void areas
 		auto lightNormalizer = 0.1f, voidDepthMax = 1.0f;
 		auto& cbuffT = const_cast<const Vector**&>(buffT);
 		CalculateVoid(*voidQueue[taskIndex], cbuffT, voidT, lightNormalizer, voidDepthMax);
@@ -442,6 +446,7 @@ namespace RgbFractalGenClr {
 			animationTaskFinished[taskIndex] = 2;
 			return;
 		}
+		// Draw the generated pixel to bitmap data
 		DrawBitmap(bitmapIndex, cbuffT, const_cast<const int16_t**&>(voidT), lightNormalizer, voidDepthMax);
 #ifdef CUSTOMDEBUG
 		const auto drawElapsed = (std::chrono::steady_clock::now() - drawTime).count();
@@ -456,6 +461,7 @@ namespace RgbFractalGenClr {
 			Log(logString, threadString);
 		} finally { Monitor::Exit(taskLock); }
 #endif
+		// Lets the generator know it's finished so it can encode gif it it's allowed to, if not it just lets the form know it can diplay it
 		bitmapState[bitmapIndex] = 2;
 		animationTaskFinished[taskIndex] = 1;
 	}
@@ -623,6 +629,7 @@ namespace RgbFractalGenClr {
 	}
 	System::Void FractalGenerator::SwitchParentChild(float& angle, int8_t& spin, uint8_t& color) {
 		if (abs(spin) > 1) {
+			// reverse angle and spin when antispinning, or else the direction would change when parent and child switches
 			angle = -angle;
 			spin = -spin;
 		}
@@ -630,14 +637,14 @@ namespace RgbFractalGenClr {
 	}
 	System::Void FractalGenerator::IncrementFrameParameters(float& size, float& angle, const int8_t& spin, float& hueAngle, uint8_t& color, const uint8_t blur) {
 		const auto blurPeriod = period * blur;
-		// Zoom Rotation
+		// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
 		angle += spin * (periodAngle * (1 + extraSpin)) / (finalPeriodMultiplier * blurPeriod);
-		// Zom Hue Cycle
 		hueAngle += (hueCycleMultiplier + 3 * extraHue) * (float)hueCycle / (finalPeriodMultiplier * blurPeriod);
 		IncrementFrameSize(size, blurPeriod);
 	}
 	System::Void FractalGenerator::SetupColorBlend(const float hueAngle, Vector& colorBlendI, Vector& colorBlendH) {
 		// Prepare Color blending per one dot (hueshifting + iteration correction)
+		// So that the color of the dot will slowly approach the combined colors of its childer before it splits
 		auto lerp = std::fmod(hueAngle, 1.0f);
 		switch ((uint8_t)hueAngle % 3) {
 		case 0:
@@ -663,10 +670,11 @@ namespace RgbFractalGenClr {
 		if (cancel->Token.IsCancellationRequested)
 			return;
 		lightNormalizer = 0.1f;
+		// Old SIMD vector code I couldn't get to work
 		//Vector<float> *buffY;
 		int16_t* voidY, * void0, * voidH, * voidP, * voidM;
 		if (amb > 0) {
-			// Void Depth Seed points (no points, no borders)
+			// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
 			auto& queue = *voidQueue;
 			float lightMax;
 			for (uint16_t y = 1; y < h1; ++y) {
@@ -674,6 +682,7 @@ namespace RgbFractalGenClr {
 				voidY = voidT[y];
 				for (uint16_t x = 1; x < w1; ++x) {
 					auto& buffYX = buffY[x];
+					// Old SIMD vector code I couldn't get to work
 					//lightNormalizer = Math::Max(lightNormalizer, lightMax = Math::Max(buffYX[0], Math::Max(buffYX[1], buffYX[2])));
 					lightNormalizer = Math::Max(lightNormalizer, lightMax = buffYX.Max());
 					if (lightMax > 0) {
@@ -692,7 +701,7 @@ namespace RgbFractalGenClr {
 				queueT.push({ 0, x });
 				queueT.push({ h1, x });
 			}
-			// Depth of Void
+			// Depth of Void (fill the void of incrementally larger values of depth, that will generate the grey areas)
 			int16_t x, y, ym, yp, xm, xp, voidMax = 0;
 			std::pair<int16_t, int16_t> qt;
 			while (!queueT.empty()) {
@@ -712,19 +721,20 @@ namespace RgbFractalGenClr {
 				const auto buffY = buffT[y];
 				for (uint16_t x = 0; x < width; x++) {
 					auto& buffYX = buffY[x];
+					// Old SIMD vector code I couldn't get to work
 					//lightNormalizer = Math::Max(lightNormalizer, Math::Max(buffYX[0], Math::Max(buffYX[1], buffYX[2])));
 					lightNormalizer = Math::Max(lightNormalizer, buffYX.Max());
 				}
 			}
 		lightNormalizer = 160.0f / lightNormalizer;
 	}
-	/*inline System::Void FractalGenerator::ApplyAmbientNoise(Vector<float>& rgb, float voidAmb, std::uniform_real_distribution<float>& dist, std::mt19937& randGen) {
-		rgb += ((1.0f - voidAmb) * voidAmb) * Vector<float>(gcnew array<float>(3) { dist(randGen), dist(randGen), dist(randGen)}) + Vector<float>(voidAmb * amb);
+	// old code that should work with SIMD vectors but couldn't get it to work
+	/*inline System::Void FractalGenerator::ApplyAmbientNoise(Vector<float>& rgb,  const float Amb, const float Noise, std::uniform_real_distribution<float>& dist, std::mt19937& randGen) {
+		rgb += Noise * Vector<float>(gcnew array<float>(3) { dist(randGen), dist(randGen), dist(randGen)}) + Vector<float>(amb);
 	}
 	inline System::Void FractalGenerator::ApplySaturate(Vector<float>& rgb, const float d, uint8_t*& p) {
-		const float id = 1.0f - d, min = Math::Min(Math::Min(rgb[0], rgb[1]), rgb[2]), max = (Math::Max(Math::Max(rgb[0], rgb[1]), rgb[2]) - min) / 255.0f;
-		rgb = max == 0 ? id * rgb + Vector<float>(255.0f * d) : (id + (d / max)) * rgb + Vector<float>(-min * (d / max));
-		ApplyNoSaturate(rgb, p);
+		float m; const float min = Math::Min(Math::Min(rgb[0], rgb[1]), rgb[2]), max = Math::Max(Math::Max(rgb[0], rgb[1]), rgb[2]);
+		return max <= min ? rgb : ((m = max * saturate / (max - min)) + 1 - saturate) * rgb - Vector<float>(min * m);
 	}
 	inline System::Void FractalGenerator::ApplyNoSaturate(Vector<float>& rgb, uint8_t*& p) {
 		p[0] = static_cast<uint8_t>(rgb[2]);	// Blue
@@ -739,10 +749,9 @@ namespace RgbFractalGenClr {
 		return rgb;
 	}
 	Vector FractalGenerator::ApplySaturate(const Vector& rgb) {
-		const auto min = Math::Min(Math::Min(rgb.X, rgb.Y), rgb.Z), max = Math::Max(Math::Max(rgb.X, rgb.Y), rgb.Z);
-		if (max <= min) return rgb;
-		float m = max * saturate / (max - min);
-		return Vector::MultiplyMinus(rgb, m + 1 - saturate, min * m);
+		// The saturation equation boosting up the saturation of the pixel (powered by the saturation slider setting)
+		float m; const auto min = Math::Min(Math::Min(rgb.X, rgb.Y), rgb.Z), max = Math::Max(Math::Max(rgb.X, rgb.Y), rgb.Z);
+		return max <= min ? rgb : Vector::MultiplyMinus(rgb, (m = max * saturate / (max - min)) + 1 - saturate, min * m);
 	}
 	System::Void FractalGenerator::ApplyRGBToBytePointer(const Vector& rgb, uint8_t*& p) {
 		// Without gamma:
@@ -760,13 +769,15 @@ namespace RgbFractalGenClr {
 	inline System::Void FractalGenerator::NoiseSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
 		if (amb <= 0)
 			for (uint16_t x = 0; x < width; ApplyRGBToBytePointer(ApplySaturate(lightNormalizer * buffY[x++]), p));
-		else for (uint16_t x = 0; x < width; ++x) {
+		else {
 			std::random_device rd;
 			std::mt19937 randGen(rd());
 			std::uniform_real_distribution<float> dist(0.0f, ambnoise);
-			const auto voidAmb = voidY[x] / voidDepthMax;
-			//auto rgb = ApplySaturate(lightNormalizer * buffY[x]);
-			ApplyRGBToBytePointer(ApplyAmbientNoise(ApplySaturate(lightNormalizer * buffY[x]), voidAmb * amb, (1.0f - voidAmb) * voidAmb, dist, randGen), p);
+			for (uint16_t x = 0; x < width; ++x) {
+				const auto voidAmb = voidY[x] / voidDepthMax;
+				//auto rgb = ApplySaturate(lightNormalizer * buffY[x]);
+				ApplyRGBToBytePointer(ApplyAmbientNoise(ApplySaturate(lightNormalizer * buffY[x]), voidAmb * amb, (1.0f - voidAmb) * voidAmb, dist, randGen), p);
+			}
 		}
 	}
 	inline System::Void FractalGenerator::NoNoiseSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
@@ -777,12 +788,14 @@ namespace RgbFractalGenClr {
 	inline System::Void FractalGenerator::NoiseNoSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
 		if (amb <= 0)
 			for (uint16_t x = 0; x < width; ApplyRGBToBytePointer(lightNormalizer * buffY[x++], p));
-		else for (uint16_t x = 0; x < width; x++) {
+		else{
 			std::random_device rd;
 			std::mt19937 randGen(rd());
-			std::uniform_real_distribution<float> dist(0.0f, ambnoise);
-			const auto voidAmb = voidY[x] / voidDepthMax;
-			ApplyRGBToBytePointer(ApplyAmbientNoise(lightNormalizer * buffY[x], voidAmb * amb, (1.0f - voidAmb) * voidAmb, dist, randGen), p);
+			std::uniform_real_distribution<float> dist(0.0f, ambnoise); 
+			for (uint16_t x = 0; x < width; x++) {
+				const auto voidAmb = voidY[x] / voidDepthMax;
+				ApplyRGBToBytePointer(ApplyAmbientNoise(lightNormalizer * buffY[x], voidAmb * amb, (1.0f - voidAmb) * voidAmb, dist, randGen), p);
+			}
 		}
 	}
 	inline System::Void FractalGenerator::NoNoiseNoSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
@@ -799,9 +812,11 @@ namespace RgbFractalGenClr {
 			ImageLockMode::WriteOnly,
 			System::Drawing::Imaging::PixelFormat::Format24bppRgb))->Scan0);
 		bitmapState[bitmapIndex] = 1;
-		const auto stride = 3 * width;
+		// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
+		// Switch between th selected settings such as saturation, noise, image parallelism...
 		if (parallelType && maxGenerationTasks > 1) {
 			// Multi Threaded:
+			const auto stride = 3 * width;
 			if (ambnoise > 0) {
 				if (saturate > 0.0) {
 #pragma omp parallel for num_threads(maxGenerationTasks)
@@ -865,6 +880,7 @@ namespace RgbFractalGenClr {
 		}
 	}
 	System::Void FractalGenerator::EncodeGifFrame(const int16_t taskIndex) {
+		// Sequentially encode a finished GIF frame, then unlock the bitmap data
 		if (cancel->Token.IsCancellationRequested) {
 			animationTaskFinished[taskIndex] = 2;
 			return;
@@ -904,15 +920,17 @@ namespace RgbFractalGenClr {
 
 #pragma region Interface
 	System::Void FractalGenerator::StartGenerate() {
+		// start the generator in a separate main thread so that the form can continue being responsive
 		mainTask = Task::Run(gcnew Action(this, &FractalGenerator::Generate), (cancel = gcnew CancellationTokenSource())->Token);
 	}
 	System::Void FractalGenerator::ResetGenerator() {
-		bitmapsFinished = nextBitmap = 0;
 		finalPeriodMultiplier = GetFinalPeriod();
 		// A complex expression to calculate the minimum needed hue shift speed to match the loop:
 		//hueCycleMultiplier = hueCycle == 0 ? 0 : ((childColor[0] % 3) == 0 ? 3 : ((((childColor[0] % 3) == 1) == (1 == hueCycle) == (zoom == 1) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3) + 1);
 		hueCycleMultiplier = hueCycle == 0 ? 0 : childColor[0] % 3 == 0 ? 2 : 1 + 
 			(childColor[0] % 3 == 1 == (1 == hueCycle) == (1 == zoom) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3;
+		// setup bitmap data
+		bitmapsFinished = nextBitmap = 0;
 		uint16_t frames = debug > 0 ? debug : period * finalPeriodMultiplier;
 		bitmap = gcnew array<Bitmap^>(frames);
 		bitmapData = gcnew array<BitmapData^>(frames);
@@ -920,12 +938,14 @@ namespace RgbFractalGenClr {
 		for (int i = frames; 0 <= i; bitmapState[i--] = 0);
 	}
 	uint16_t FractalGenerator::GetFinalPeriod() {
+		// get the multiplier of the basic period required to get to a seamless loop
 		uint16_t m = hueCycle == 0 && childColor[0] > 0 ? periodMultiplier * 3 : periodMultiplier;
 		return Math::Abs(defaultSpin) > 1 || (defaultSpin == 0 && childAngle[0] < 2 * M_PI) ? 2 * m : m;
 	}
 	System::Void FractalGenerator::WaitForThreads() {
 		if (imageTasks == nullptr)
 			return;
+		// Wait for image parallelism threads to complete
 		bool noMore;
 		while (true) {
 			taskSnapshot->Clear();
@@ -952,9 +972,9 @@ namespace RgbFractalGenClr {
 	}
 	bool FractalGenerator::SaveGif(System::String^ gifPath) {
 		try {
+			// Try to save (move the temp) the gif file
 			if (gifEncoder != nullptr)
 				((GifEncoder*)gifEncoder)->close(cancel->Token);
-
 			File::Move(gifTempPath, gifPath);
 		} catch (IOException^ ex) {
 			System::String^ exs = "SaveGif: An error occurred: " + ex->Message;
@@ -977,12 +997,21 @@ namespace RgbFractalGenClr {
 		}
 		return gifSuccess = false;
 	}
-	System::Void FractalGenerator::SelectFractal(const uint16_t select) {
-		f = fractals[this->select = select];
+	bool FractalGenerator::SelectFractal(const uint16_t select) {
+		if (this->select == select)
+			return true;
+		// new fractal definition selected - let the form know to reset and restart me
+		this->select = select;
+		return false;
+	}
+	System::Void FractalGenerator::SetupFractal() {
+		// setup the new fractal definition, with all parameters reset to 0
+		f = fractals[select];
 		logBase = logf(GetFractal()->childSize);
 		SelectThreadingDepth();
-		selectColor = 0;
-		SelectColor();
+		selectCut = selectAngle = selectColor = -1;
+		if(!SelectColor(0))
+			SelectColor();
 		SelectAngle(0);
 		SelectCutFunction(0);
 	}
@@ -1011,14 +1040,21 @@ namespace RgbFractalGenClr {
 			// Prepare subiteration color blend
 		}InitColorBlend();
 	}
-	System::Void FractalGenerator::SelectAngle(const uint16_t selectAngle) {
-		childAngle = f->childAngle == nullptr ? new float[1] { (float)M_PI } : f->childAngle[this->selectAngle = selectAngle].second;
+	bool FractalGenerator::SelectAngle(const uint16_t selectAngle) {
+		if (this->selectAngle == selectAngle)
+			return true;
+		this->selectAngle = selectAngle;
+		childAngle = f->childAngle == nullptr ? new float[1] { (float)M_PI } : f->childAngle[selectAngle].second;
 		periodAngle = f->childCount <= 0 ? 0.0f : std::fmod(childAngle[0], 2.0f * (float)M_PI);
+		return false;
 	}
-	System::Void FractalGenerator::SelectCutFunction(const uint16_t selectCut) {
+	bool FractalGenerator::SelectCutFunction(const uint16_t selectCut) {
+		if (this->selectCut == selectCut)
+			return true;
 		this->selectCut = selectCut;
 		cutFunction = f->cutFunction == nullptr || f->cutFunction->first == "" ? nullptr
 			: &f->cutFunction[selectCut].second;
+		return false;
 	}
 	std::string FractalGenerator::ConvertToStdString(System::String^ managedString) {
 		using namespace System::Runtime::InteropServices;
@@ -1028,6 +1064,9 @@ namespace RgbFractalGenClr {
 		return nativeString;
 	}
 	void FractalGenerator::DebugStart() {
+		// debug for testing, starts the generator with predetermined setting for easy breakpointing
+		// Need to enable the definition on top GeneratorForm.cpp to enable this
+		// if enabled you will be unable to use the settings interface!
 		SelectFractal(44);
 		SelectThreadingDepth();
 		SelectDetail(1);

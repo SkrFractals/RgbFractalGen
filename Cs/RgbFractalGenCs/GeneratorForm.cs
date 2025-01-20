@@ -29,20 +29,20 @@ namespace RgbFractalGenCs {
 
 		#region Variables
 		// Threading
-		private FractalGenerator generator;
+		private FractalGenerator generator;     // The core ofthe app, the generator the generates the fractal animations
 		private CancellationTokenSource cancel; // Cancellation Token Source
 		private Task gTask;                     // CPU gif thread
-												// Settings
+		// Settings
 		private bool previewMode = true;        // Preview mode for booting performance while setting up parameters
 		private bool animated = true;           // Animating preview or paused? (default animating)
 		private bool modifySettings = true;     // Allows for modifying settings without it triggering Aborts and Generates
-		private string gifPath;                 // Gif export path name
-												// Display Variables
+		private string gifPath;					// Gif export path name
+		// Display Variables
 		private DoubleBufferedPanel screenPanel;// Display panel
 		private Bitmap currentBitmap = null;    // Displayed Bitmap
 		private int currentBitmapIndex;         // Play frame index
 		private int fx, fy;                     // Memory of window size
-		private int controlTabIndex = 0;
+		private int controlTabIndex = 0;		// Iterator for tabIndexes - to make sure all the controls tab in the correct order even as i add new ones in the middle
 
 		#endregion
 
@@ -54,10 +54,12 @@ namespace RgbFractalGenCs {
 		/// <param name="e"></param>
 		/// <returns></returns>
 		private void GeneratorForm_Load(object sender, EventArgs e) {
+			// Read the REDME.txt for the help button
 			if (File.Exists("README.txt"))
 				helpLabel.Text = File.ReadAllText("README.txt");
 			helpPanel.Visible = false;
 
+			// Setupd interactable controls (tooltips + tabIndex)
 			SetupControl(fractalSelect, "Select the type of fractal to generate");
 			SetupControl(angleSelect, "Select the children angles definition.");
 			SetupControl(colorSelect, "Select the children colors definition.");
@@ -71,14 +73,12 @@ namespace RgbFractalGenCs {
 			SetupControl(periodMultiplierBox, "Multiplies the frame count, slowing down the rotaion and hue shifts.");
 			SetupControl(zoomButton, "Toggle in which direction you want the fractal zoom . ZoomIn, or <- ZoomOut");
 			SetupControl(defaultZoom, "Type the initial zoom of the first image (in number of skipped frames).");
-			
 			SetupControl(spinSelect, "Choose in which direction you want the zoom animation to spin, or to not spin.");
 			SetupControl(spinSpeedBox, "Type the extra speed on the spinning from the values possible for looping.");
 			SetupControl(defaultAngle, "Type the initial angle of the first image (in degrees).");
 			SetupControl(hueSelect, "Choose the color scheme of the fractal.\nAlso you can make the color hues slowly cycle as the fractal zoom.");
 			SetupControl(hueSpeedBox, "Type the extra speed on the hue shifting from the values possible for looping.\nOnly possible if you have chosen color cycling on the left.");
 			SetupControl(defaultHue, "Type the initial hue angle of the first image (in degrees).");
-			
 			SetupControl(ambBar, "The strength of the ambient grey color in the empty spaces far away between the generated fractal dots.");
 			SetupControl(noiseBar, "The strength of the random noise in the empty spaces far away between the generated fractal dots.");
 			SetupControl(saturateBar, "Enhance the color saturation of the fractal dots.\nUseful when the fractal is too gray, like the Sierpinski Triangle (Triflake).");
@@ -96,33 +96,29 @@ namespace RgbFractalGenCs {
 			SetupControl(pngButton, "Save the currently displayed frame into a PNG file.\nStop the animation and select the frame you wish to export with the buttons above.");
 			SetupControl(gifButton, "Save the full animation into a GIF file.");
 
-			// Init Generator + Fill fractal selection names
+			// Update Input fields to default values - modifySettings is true from constructor so that it doesn't abort and restant the generator over and over
 			generator = new();
 			foreach (Fractal i in generator.GetFractals())
 				fractalSelect.Items.AddRange([i.name]);
-			fractalSelect.SelectedIndex = 0;
-
-			// Update Input fields to default values
 			SelectMaxThreads();
-			SelectFractal();
+			fractalSelect.SelectedIndex = 0;
 			var maxThreads = Environment.ProcessorCount - 2;
 			threadsBar.Maximum = maxThreads;
 			threadsBar.Value = maxThreads;
 			SelectMaxThreads();
-			periodBox_TextChanged(null,null);
+			periodBox_TextChanged(null, null);
 			periodMultiplierBox_TextChanged(null, null);
 			SelectParallelType();
 			delayBox_TextChanged(null, null);
-			SelectZoom();
 			defaultZoom_TextChanged(null, null);
-			spinspeedBox_TextChanged(null, null);
+			spinSpeedBox_TextChanged(null, null);
 			hueSpeedBox_TextChanged(null, null);
 			defaultHue_TextChanged(null, null);
 			hueSelect.SelectedIndex = 0;
-			SelectAmb();
-			SelectNoise();
-			SelectBlur();
-			SelectSaturation();
+			ambBar_Scroll(null, null);
+			noiseBar_Scroll(null, null);
+			blurBar_Scroll(null, null);
+			saturateBar_Scroll(null, null);
 
 			// Setup bitmap and start generation
 			modifySettings = false;
@@ -183,6 +179,9 @@ namespace RgbFractalGenCs {
 		private void ResetGenerator() {
 			if (modifySettings)
 				return;
+			// Resets the generator
+			// (Abort should be called before this or else it will crash)
+			// generator->StartGenerate(); should be called after
 			gifButton.Enabled = false;
 			currentBitmapIndex = 0;
 			generator.ResetGenerator();
@@ -190,22 +189,26 @@ namespace RgbFractalGenCs {
 		private void ResetGenerate() {
 			if (modifySettings)
 				return;
+			// Just restart the generator without resizing (Abort should be called before this or else it will crash)
 			ResetGenerator();
 			generator.StartGenerate();
 		}
 		private void ResizeGenerate() {
+			// Resize and restard generator (Abort should be called before this or else it will crash)
 			if (modifySettings)
 				return;
 			ResizeAll();
 			generator.StartGenerate();
 		}
 		private void AbortGenerate() {
+			// Just Abort and regenerate with nothing inbetween
 			if (modifySettings)
 				return;
 			Abort();
 			ResizeGenerate();
 		}
 		private void SetupControl(Control control, string tip) {
+			// Add tooltip and set the next tabIndex
 			toolTips.SetToolTip(control, tip);
 			control.TabIndex = ++controlTabIndex;
 		}
@@ -244,6 +247,7 @@ namespace RgbFractalGenCs {
 				w = h = 80;
 			if (generator.width == w && generator.height == h) 
 				return false;
+			// resoltion is changed - request the fractal to resize the buffer and restart generation
 			generator.width = w; 
 			generator.height = h;
 			return true;
@@ -277,7 +281,6 @@ namespace RgbFractalGenCs {
 		}
 		private void ResizeScreen() {
 			int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
-
 			int screenHeight = Math.Max(generator.height, Math.Min(Height - bh - 8, (Width - bw - 314) * generator.height / generator.width));
 			screenPanel.SetBounds(305, 4, screenHeight * generator.width / generator.height, screenHeight);
 			screenPanel.Invalidate();
@@ -286,36 +289,43 @@ namespace RgbFractalGenCs {
 
 		#region Input
 		/// <summary>
-		/// Fractal selection
+		/// Fractal definition selection
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void fractalSelect_SelectedIndexChanged(object sender, EventArgs e) {
+			if (generator.SelectFractal((short)(Math.Max(0, fractalSelect.SelectedIndex))))
+				return;
+			// Fractal is different - load it, change the setting and restart generation
 			Abort();
-			SelectFractal();
-			ResetGenerate();
-		}
-		private void SelectFractal() {
-			generator.SelectFractal((short)Math.Max(0, fractalSelect.SelectedIndex));
-			if (modifySettings) {
-				FillSelects();
-			} else {
+			generator.SetupFractal();
+			// Fill the fractal's adjuistable definition combos
+			if (!modifySettings) {
 				modifySettings = true;
 				FillSelects();
+				detailBar_Scroll(null, null);
 				modifySettings = false;
-			}
+			} else FillSelects();
+			// Fill the fractal's adjuistable cutfunction seed combos, and restart generation
 			FillCutParams();
-			SelectDetail();
+			ResetGenerate();
 		}
+		/// <summary>
+		/// Fill the Color/Angle/CutFunction comboBoxes with available options for the selected fractal
+		/// </summary>
+		/// <returns></returns>
 		private void FillSelects() {
+			// Fill angle childred definitnions combobox
 			angleSelect.Items.Clear();
 			foreach (var (name, _) in generator.GetFractal().childAngle)
 				angleSelect.Items.AddRange([name]);
 			angleSelect.SelectedIndex = 0;
+			// Fill color children definitnions combobox
 			colorSelect.Items.Clear();
 			foreach (var (name, _) in generator.GetFractal().childColor)
 				colorSelect.Items.AddRange([name]);
 			colorSelect.SelectedIndex = 0;
+			// Fill cutfunction definitnions combobox
 			cutSelect.Items.Clear();
 			var cf = generator.GetFractal().cutFunction;
 			if (cutSelect.Enabled = cf != null && cf.Length > 0) {
@@ -324,27 +334,54 @@ namespace RgbFractalGenCs {
 				cutSelect.SelectedIndex = 0;
 			}
 		}
+		/// <summary>
+		/// Select child angles definition
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void angleSelect_SelectedIndexChanged(object sender, EventArgs e) {
-			Abort();
-			generator.SelectAngle((short)Math.Max(0, angleSelect.SelectedIndex));
-			ResetGenerate();
+			if (generator.SelectAngle((short)Math.Max(0, angleSelect.SelectedIndex)))
+				return;
+			// Angle children definition is different - change the setting and restart generation
+			AbortGenerate();
 		}
+		/// <summary>
+		/// Select child colors definition
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		/// <returns></returns>
 		private void colorSelect_SelectedIndexChanged(object sender, EventArgs e) {
 			if (generator.SelectColor((short)Math.Max(0, colorSelect.SelectedIndex)))
 				return;
+			// Color children definition is different - change the setting and restart generation
 			Abort();
 			generator.SelectColor();
 			ResetGenerate();
 		}
+		/// <summary>
+		/// Select CutFunction definition
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		/// <returns></returns>
 		private void cutSelect_SelectedIndexChanged(object sender, EventArgs e) {
+			if (generator.SelectCutFunction((short)Math.Max(0, cutSelect.SelectedIndex)))
+				return;
+			// Cutfunction is different - change the setting and restart generation
 			Abort();
-			generator.SelectCutFunction((short)Math.Max(0, cutSelect.SelectedIndex));
 			FillCutParams();
 			ResetGenerate();
 		}
+		/// <summary>
+		/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
+		/// </summary>
+		/// <returns></returns>
 		private void FillCutParams() {
 			var cf = generator.GetCutFunction();
+			// query the number of seedss from the CutFunction
 			var cm = cf == null || cf(0, -1) <= 0 ? 0 : (cf(0, 1 - (1 << 16)) + 1) / cf(0, -1);
+			// set the maximum of the trackBar for the seed to that value
 			if (modifySettings) {
 				cutparamBar.Maximum = cm;
 				cutparamBox.Text = "0";
@@ -358,13 +395,20 @@ namespace RgbFractalGenCs {
 			}
 			cutparamBar.Enabled = cutparamBar.Maximum > 0;
 		}
+		/// <summary>
+		/// Change the CutFunction seed parameter through the textBox typing
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void cutparamBox_TextChanged(object sender, EventArgs e) {
 			short newcutparam;
 			if (!short.TryParse(cutparamBox.Text, out newcutparam) || newcutparam < 0 || newcutparam > cutparamBar.Maximum)
 				newcutparam = 0;
 			if (newcutparam == generator.cutparam)
 				return;
+			// Cutfunction seed is different - change the setting and restart generation
 			Abort();
+			// update the value in the trackBar for the seed
 			if (modifySettings) {
 				cutparamBar.Value = newcutparam;
 			} else {
@@ -375,11 +419,18 @@ namespace RgbFractalGenCs {
 			generator.cutparam = newcutparam;
 			ResetGenerate();
 		}
+		/// <summary>
+		/// Change the CutFunction seed parameter through the trackBar scroll
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void cutparamBar_Scroll(object sender, EventArgs e) {
 			short v = (short)cutparamBar.Value;
 			if (v == generator.cutparam)
 				return;
+			// Cutfunction seed is different - change the setting and restart generation
 			Abort();
+			// update the value in the text box for the seed
 			if (modifySettings) {
 				cutparamBox.Text = v.ToString();
 			} else {
@@ -391,7 +442,7 @@ namespace RgbFractalGenCs {
 			ResetGenerate();
 		}
 		/// <summary>
-		/// X resolution - width
+		/// Type X resolution - width
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
@@ -400,7 +451,7 @@ namespace RgbFractalGenCs {
 				AbortGenerate();
 		}
 		/// <summary>
-		/// Y resolution - height
+		/// Type Y resolution - height
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
@@ -408,12 +459,17 @@ namespace RgbFractalGenCs {
 			if (TryResize())
 				AbortGenerate();
 		}
+		/// <summary>
+		/// Toggle the "use the resolution", if unchecked, it will run in preview mode of firced 80x80 resolution regardless of typed resolution
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void previewBox_CheckedChanged(object sender, EventArgs e) {
 			if(TryResize())
 				AbortGenerate();
 		}
 		/// <summary>
-		/// Number Of Animation Frames to reach the center Self Similar
+		/// Number Of Animation Frames to reach the center Self Similar (the total frames can be higher if the center child has a different color or rotation)
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
@@ -423,36 +479,41 @@ namespace RgbFractalGenCs {
 				newPeriod = 120;
 			if (generator.period == newPeriod)
 				return;
+			// period is different - change the setting and restart generation
 			Abort();
 			generator.period = newPeriod;
 			ResetGenerate();
 		}
+		/// <summary>
+		/// Multiplies the number of loop frames, keeping the spin and huecycle the same speed (you can speed up either with options below)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void periodMultiplierBox_TextChanged(object sender, EventArgs e) {
 			short newPeriod = 1;
 			if (!short.TryParse(periodMultiplierBox.Text, out newPeriod) || newPeriod <= 1)
 				newPeriod = 1;
 			if (generator.periodMultiplier == newPeriod)
 				return;
+			// period is different - change the setting and restart generation
 			Abort();
 			generator.periodMultiplier = newPeriod;
 			ResetGenerate();
 		}
 		/// <summary>
-		/// Zoom direction
+		/// Zoom direction (-> Forward zoom in, <- Backwards zoom out)
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void zoomButton_Click(object sender, EventArgs e) {
+			// zoom is different - change the setting and restart generation
 			Abort();
 			generator.zoom = (short)(-generator.zoom);
-			SelectZoom();
+			zoomButton.Text = "Zoom: " + ((generator.zoom > 0) ? "->" : "<-");
 			ResetGenerate();
 		}
-		private void SelectZoom() {
-			zoomButton.Text = "Zoom: " + ((generator.zoom > 0) ? "->" : "<-");
-		}
 		/// <summary>
-		/// Default Zoom value on first frame (in frames)
+		/// Default Zoom value on first frame (in skipped frames)
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
@@ -467,21 +528,37 @@ namespace RgbFractalGenCs {
 				newZoom -= finalPeriod;
 			if (generator.defaultZoom == newZoom)
 				return;
+			// default zoom is different - change the setting and restart generation
 			Abort();
 			generator.defaultZoom = newZoom;
 			ResetGenerate();
 		}
+		/// <summary>
+		/// Select the spin mode (clockwise, counterclockwise, or antispin where the child spins in opposite direction)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void spinSelect_SelectedIndexChanged(object sender, EventArgs e) {
+			short newSpin = (short)(Math.Max(0, Math.Min(4, spinSelect.SelectedIndex)) - 2);
+			if (generator.defaultSpin == newSpin)
+				return;
+			// spin type is different - change the setting and restart generation
 			Abort();
-			generator.defaultSpin = (short)(Math.Max(0, Math.Min(4, spinSelect.SelectedIndex)) - 2);
+			generator.defaultSpin = newSpin;
 			ResetGenerate();
 		}
-		private void spinspeedBox_TextChanged(object sender, EventArgs e) {
+		/// <summary>
+		/// Select the extra spin of symmentry angle per loop (so it spins faster)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		private void spinSpeedBox_TextChanged(object sender, EventArgs e) {
 			byte newSpeed = 0;
 			if (!byte.TryParse(spinSpeedBox.Text, out newSpeed) || newSpeed < 0)
 				newSpeed = 0;
 			if (generator.extraSpin == newSpeed)
 				return;
+			// spin speed is different - change the setting and restart generation
 			Abort();
 			generator.extraSpin = newSpeed;
 			ResetGenerate();
@@ -501,6 +578,7 @@ namespace RgbFractalGenCs {
 				newAngle -= 360;
 			if (generator.defaultAngle == newAngle)
 				return;
+			// angle is different - change the setting and restart generation
 			Abort();
 			generator.defaultAngle = newAngle;
 			ResetGenerate();
@@ -516,16 +594,23 @@ namespace RgbFractalGenCs {
 			if (generator.SelectColorPalette((byte)(colorChoice % 2)) && newHueCycle == generator.hueCycle)
 				return;
 			Abort();
+			// hue is different - change the setting and restart generation
 			generator.hueCycle = newHueCycle;
 			generator.SelectColor();
 			ResetGenerate();
 		}
+		/// <summary>
+		/// Select the extra hue cycling speed of extra full 360° color loops per full animation loop (so it hue cycles spins faster)
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void hueSpeedBox_TextChanged(object sender, EventArgs e) {
 			byte newSpeed = 0;
 			if (!byte.TryParse(hueSpeedBox.Text, out newSpeed) || newSpeed < 0)
 				newSpeed = 0;
 			if (generator.extraHue == newSpeed)
 				return;
+			// hue speed is different - change the setting and if it's actually huecycling restart generation
 			if (generator.hueCycle != 0) {
 				Abort();
 				generator.extraHue = newSpeed;
@@ -549,73 +634,79 @@ namespace RgbFractalGenCs {
 			if (generator.defaultHue == newHue)
 				return;
 			Abort();
+			// Hue is different - change the setting and restart generation
 			generator.defaultHue = newHue;
 			ResetGenerate();
 		}
 		/// <summary>
-		/// Maximum threading depth
+		/// The strenghts (lightness) of the dark void outside between the fractal points
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void ambBar_Scroll(object sender, EventArgs e) {
+			var newAmb = (short)(ambBar.Value * 4);
+			if (generator.amb == newAmb)
+				return;
 			Abort();
-			SelectAmb();
+			// Ambient is different - change the setting and restart generation
+			generator.amb = newAmb;
 			ResetGenerate();
 		}
-		private void SelectAmb() {
-			generator.amb = (short)(ambBar.Value * 4);
-		}
 		/// <summary>
-		/// Level of void Noise
+		/// Level of void Noise of the dark void outside between the fractal points
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void noiseBar_Scroll(object sender, EventArgs e) {
+			float newNoise = noiseBar.Value * .1f;
+			if (generator.noise == newNoise)
+				return;
 			Abort();
-			SelectNoise();
+			// Moise is different - change the setting and restart generation
+			generator.noise = newNoise;
 			ResetGenerate();
 		}
-		private void SelectNoise() {
-			generator.noise = noiseBar.Value * .1f;
-		}
 		/// <summary>
-		/// Saturation Setting
+		/// Saturation Setting - ramp up saturation to maximum if all the wat to the right
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void saturateBar_Scroll(object sender, EventArgs e) {
+			var newSat = saturateBar.Value * .1f;
+			if (generator.saturate == newSat)
+				return;
 			Abort();
-			SelectSaturation();
+			// Saturation is different - change the setting and restart generation
+			generator.saturate = newSat;
 			ResetGenerate();
 		}
 		private void SelectSaturation() {
-			generator.saturate = saturateBar.Value * .1f;
+			
 		}
 		/// <summary>
-		/// Detail (the smaller the finer)
+		/// Detail, how small the split fractal shaped have to get, until they draw a dot of their color to the image buffer (the smaller the finer)
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void detailBar_Scroll(object sender, EventArgs e) {
-			Abort();
-			SelectDetail();
-			ResetGenerate();
-		}
-		private void SelectDetail() {
-			generator.SelectDetail(detailBar.Value * .1f);
+			var newDetail = detailBar.Value * .1f;
+			if (generator.SelectDetail(newDetail))
+				return;
+			// Detail is different - change the setting and restart generation
+			AbortGenerate();
 		}
 		/// <summary>
-		/// Level of blur smear frames
+		/// Level of blur smear frames (renders multiple fractals of slighlty increased time until the frame deltatime over each other)
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void blurBar_Scroll(object sender, EventArgs e) {
+			if (generator.selectBlur == (byte)blurBar.Value)
+				return;
 			Abort();
-			SelectBlur();
-			ResetGenerate();
-		}
-		private void SelectBlur() {
+			// Blur is different - change the setting and restart generation
 			generator.selectBlur = (byte)blurBar.Value;
+			ResetGenerate();
 		}
 		/// <summary>
 		/// Iteration Threading - How many iterations deep have Self Similars a new thread
@@ -626,6 +717,9 @@ namespace RgbFractalGenCs {
 			SelectMaxThreads();
 			generator.SelectThreadingDepth();
 		}
+		/// <summary>
+		/// Sets maximum threads as selected by user (th parallel checkBox and the maxThreads slider)
+		/// </summary>
 		private void SelectMaxThreads() {
 			generator.maxTasks = (short)(parallelBox.Checked ? threadsBar.Value : -1);
 			generator.maxGenerationTasks = (short)(generator.maxTasks - 1);
@@ -638,6 +732,9 @@ namespace RgbFractalGenCs {
 		private void parallelTypeBox_CheckedChanged(object sender, EventArgs e) {
 			SelectParallelType();
 		}
+		/// <summary>
+		/// Toggles between parallelism of single images and parallelism of batching animation frames
+		/// </summary>
 		private void SelectParallelType() {
 			parallelTypeBox.Text = (generator.parallelType = parallelTypeBox.Checked) ? "...of Images" : "...of Animation Frames";
 		}
@@ -651,7 +748,7 @@ namespace RgbFractalGenCs {
 			generator.SelectThreadingDepth();
 		}
 		/// <summary>
-		/// Framerate Delay
+		/// Framerate Delay (for previes and for gif encode, so if encoding gif, it will restart the generation)
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
@@ -663,6 +760,7 @@ namespace RgbFractalGenCs {
 				return;
 			if (generator.encode == 2)
 				Abort();
+			// Delay is diffenret, change it, and restart the generation if ou were encoding a gif
 			generator.delay = newDelay;
 			int fpsrate = 100 / generator.delay;
 			timer.Interval = generator.delay * 10;
@@ -670,7 +768,6 @@ namespace RgbFractalGenCs {
 			if (generator.encode == 2)
 				ResetGenerate();
 		}
-
 		/// <summary>
 		/// Select Previous frame to display
 		/// </summary>
@@ -707,12 +804,15 @@ namespace RgbFractalGenCs {
 		private void encodeButton_Click(object sender, EventArgs e) {
 			switch (generator.encode = (byte)((generator.encode + 1) % 3)) {
 				case 0:
+					// Only generates one image
 					encodeButton.Text = "Only Image";
 					break;
 				case 1:
+					// Generates an animation for you to see faster, but without encoding a Gif to export
 					encodeButton.Text = "RAM Animation";
 					break;
 				case 2:
+					// Full generation including GIF encoding
 					encodeButton.Text = "Encode GIF";
 					if (!generator.IsGifReady())
 						AbortGenerate();
@@ -725,7 +825,8 @@ namespace RgbFractalGenCs {
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void helpButton_Click(object sender, EventArgs e) {
-			helpPanel.Visible = (!(screenPanel.Visible = !screenPanel.Visible));
+			helpPanel.Visible = screenPanel.Visible;
+			screenPanel.Visible = !screenPanel.Visible;
 		}
 		/// <summary>
 		/// Save Frame
@@ -751,11 +852,18 @@ namespace RgbFractalGenCs {
 		private void screenPanel_Click(object sender, EventArgs e) {
 			animated = !animated;
 		}
+		/// <summary>
+		/// Invalidation event of screen display - draws the current display frame bitmap.
+		/// Get called repeatedly with new frame to animate the preview, if animation is toggled
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private void screenPanel_Paint(object sender, PaintEventArgs e) {
 			if (currentBitmap == null)
 				return;
+			// Faster rendering with crisp pixels
 			e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
-
+			// some safety code to ensure no crashes
 			byte tryAttempt = 0;
 			while (tryAttempt < 5) {
 				try {
@@ -770,6 +878,12 @@ namespace RgbFractalGenCs {
 		#endregion
 
 		#region Output
+		/// <summary>
+		/// User inputed the path and name for saving PNG
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		/// <returns></returns>
 		private void savePng_FileOk(object sender, CancelEventArgs e) {
 			Stream myStream;
 			if ((myStream = savePng.OpenFile()) != null) {
@@ -777,12 +891,23 @@ namespace RgbFractalGenCs {
 				myStream.Close();
 			}
 		}
+		/// <summary>
+		/// User inputed the path and name for saving GIF
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		/// <returns></returns>
 		private void saveGif_FileOk(object sender, CancelEventArgs e) {
 			gifPath = ((SaveFileDialog)sender).FileName;
 			gifButton.Enabled = false;
 			// Gif Export Task
 			gTask = Task.Run(() => ExportGif(), (cancel = new()).Token);
 		}
+		/// <summary>
+		/// Exports the animation into a GIF file
+		/// Ackchyually - it just moves the already exported gifX.tmp to you desired location and name
+		/// </summary>
+		/// <returns></returns>
 		private void ExportGif() {
 			int attempt = 0;
 			while (++attempt <= 10 && !cancel.Token.IsCancellationRequested && generator.SaveGif(gifPath))

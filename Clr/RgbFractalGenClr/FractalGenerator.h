@@ -56,7 +56,8 @@ namespace RgbFractalGenClr {
         List<Task^>^ taskSnapshot;                  // Snapshot for safely checking imageTasks Wait
         // Generation variables
         uint8_t selectColorPalette;
-        uint16_t select, selectColor, selectAngle, selectCut, bitmapsFinished, nextBitmap, finalPeriodMultiplier, hueCycleMultiplier;
+        uint16_t select, selectCut, bitmapsFinished, nextBitmap, finalPeriodMultiplier, hueCycleMultiplier;
+        int16_t selectColor, selectAngle;
         Fractal::CutFunction* cutFunction;
         bool gifSuccess, exportingGif;              // Temp GIF file "gif.tmp" successfuly created | flag only allowing one GIF Encoding thread
         void* gifEncoder;                           // Export GIF encoder
@@ -82,29 +83,6 @@ namespace RgbFractalGenClr {
         System::Void InitFractals();
         System::Void InitBuffer(const int16_t taskIndex);
         System::Void DeleteEncoder();
-       /* inline array<Tuple<String^, array<float>^>^>^ CreateAngleArray(array<Tuple<String^, array<float>^>^>^ angles) {
-            return angles;
-        }
-
-        inline Tuple<String^, array<float>^>^ CreateAngleTuple(String^ key, array<float>^ values) {
-            return gcnew Tuple<String^, array<float>^>(key, values);
-        }
-
-        inline array<Tuple<String^, array<int8_t>^>^>^ CreateColorArray(array<Tuple<String^, array<int8_t>^>^>^ colors) {
-            return colors;
-        }
-
-        inline Tuple<String^, array<int8_t>^>^ CreateColorTuple(String^ key, array<int8_t>^ values) {
-            return gcnew Tuple<String^, array<int8_t>^>(key, values);
-        }
-
-        inline array<Tuple<String^, Fractal::CutFunction^>^>^ CreateCutArray(array<Tuple<String^, Fractal::CutFunction^>^>^ cuts) {
-            return cuts;
-        }
-
-        inline Tuple<String^, Fractal::CutFunction^>^ CreateCutTuple(String^ key, Fractal::CutFunction^ func) {
-            return gcnew Tuple<String^, Fractal::CutFunction^>(key, func);
-        }*/
 #pragma endregion
 
 #pragma region Generate
@@ -160,13 +138,14 @@ namespace RgbFractalGenClr {
         System::Void WaitForThreads();
         System::Void RequestCancel();
         bool SaveGif(System::String^ gifPath);
-        System::Void SelectFractal(const uint16_t select);
+        bool SelectFractal(const uint16_t select);
+        System::Void SetupFractal();
         bool SelectColor(const uint16_t selectColor);
         bool SelectColorPalette(const uint8_t selectColorPalette);
         System::Void SelectColor();
-        System::Void SelectAngle(const uint16_t selectAngle);
+        bool SelectAngle(const uint16_t selectAngle);
         inline Fractal::CutFunction* GetCutFunction() { return cutFunction; }
-        System::Void SelectCutFunction(const uint16_t selectCut);
+        bool SelectCutFunction(const uint16_t selectCut);
         inline System::Void InitColorBlend() {
             // Prepare subiteration color blend
             float* colorBlendF = new float[3];
@@ -181,7 +160,12 @@ namespace RgbFractalGenClr {
             for (auto n = 1, threadCount = 0; (threadCount += n) < maxGenerationTasks; n *= f->childCount)
                 ++maxDepth;
         }
-        inline System::Void SelectDetail(const float detail) { this->detail = detail * f->minSize; }
+        inline bool SelectDetail(const float detail) { 
+            if (this->detail == detail * f->minSize)
+                return true;
+            this->detail = detail * f->minSize;
+            return false;
+        }
         inline int GetBitmapsFinished() { return bitmapsFinished; }
         inline int GetBitmapsTotal() { return bitmap == nullptr ? 0 : (int)(bitmap->Length); }
         inline Fractal** GetFractals() { return fractals; }

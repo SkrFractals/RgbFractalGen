@@ -7,3 +7,13 @@ H:\Projects\RgbFractalGen\Cs\Components\obj\Debug\net8.0\Gif.Components.dll
 H:\Projects\RgbFractalGen\Cs\Components\obj\Debug\net8.0\refint\Gif.Components.dll
 H:\Projects\RgbFractalGen\Cs\Components\obj\Debug\net8.0\Gif.Components.pdb
 H:\Projects\RgbFractalGen\Cs\Components\obj\Debug\net8.0\ref\Gif.Components.dll
+H:\GitHubFractal\RgbFractalGen\Cs\Components\bin\Debug\net8.0\Gif.Components.deps.json
+H:\GitHubFractal\RgbFractalGen\Cs\Components\bin\Debug\net8.0\Gif.Components.dll
+H:\GitHubFractal\RgbFractalGen\Cs\Components\bin\Debug\net8.0\Gif.Components.pdb
+H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Debug\net8.0\Components.GeneratedMSBuildEditorConfig.editorconfig
+H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Debug\net8.0\Components.csproj.CoreCompileInputs.cache
+H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Debug\net8.0\Components.sourcelink.json
+H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Debug\net8.0\Gif.Components.dll
+H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Debug\net8.0\refint\Gif.Components.dll
+H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Debug\net8.0\Gif.Components.pdb
+H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Debug\net8.0\ref\Gif.Components.dll

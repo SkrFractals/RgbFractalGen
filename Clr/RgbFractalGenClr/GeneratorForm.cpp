@@ -798,46 +798,48 @@ namespace RgbFractalGenClr {
 
 #pragma region Core
 	System::Void GeneratorForm::GeneratorForm_Load(System::Object^ sender, System::EventArgs^ e) {
+		// Read the REDME.txt for the help button
 		if (File::Exists("README.txt"))
 			helpLabel->Text = File::ReadAllText("README.txt");
 		helpPanel->Visible = false;
 
-		SetupControl(this->fractalSelect, L"Select the type of fractal to generate");
-		SetupControl(this->angleSelect, L"Select the children angles definition.");
-		SetupControl(this->colorSelect, L"Select the children colors definition.");
-		SetupControl(this->cutSelect, L"Select the cutfunction definition.");
-		SetupControl(this->cutparamBar, L"Select the cutfunction seed.");
-		SetupControl(this->cutparamBox, L"Type the cutfunction seed.");
-		SetupControl(this->resX, L"Type the X resolution of the render (width)");
-		SetupControl(this->resY, L"Type the Y resolution of the render (height)");
-		SetupControl(this->previewBox, L"If checked, the resolution will be only 80x80 for fast preview render.\nUncheck it when you are done with preparing the settings and want to render it in full resolution");
-		SetupControl(this->periodBox, L"How many frames for the self-similar center child to zoom in to the same size as the parent if you are zooming in.\nOr for the parent to zoom out to the same size as the child if you are zooming out.\nThis will equal the number of generated frames of the animation if the center child is the same color.\nOr it will be a third of the number of generated frames of the animation if the center child is a different color.");
-		SetupControl(this->periodMultiplierBox, L"Multiplies the frame count, slowing down the rotaion and hue shifts.");
-		SetupControl(this->zoomButton, L"Toggle in which direction you want the fractal zoom -> ZoomIn, or <- ZoomOut");
-		SetupControl(this->defaultZoom, L"Type the initial zoom of the first image (in number of skipped frames).");
+		// Setupd interactable controls (tooltips + tabIndex)
+		SetupControl(fractalSelect, L"Select the type of fractal to generate");
+		SetupControl(angleSelect, L"Select the children angles definition.");
+		SetupControl(colorSelect, L"Select the children colors definition.");
+		SetupControl(cutSelect, L"Select the cutfunction definition.");
+		SetupControl(cutparamBar, L"Select the cutfunction seed.");
+		SetupControl(cutparamBox, L"Type the cutfunction seed.");
+		SetupControl(resX, L"Type the X resolution of the render (width)");
+		SetupControl(resY, L"Type the Y resolution of the render (height)");
+		SetupControl(previewBox, L"If checked, the resolution will be only 80x80 for fast preview render.\nUncheck it when you are done with preparing the settings and want to render it in full resolution");
+		SetupControl(periodBox, L"How many frames for the self-similar center child to zoom in to the same size as the parent if you are zooming in.\nOr for the parent to zoom out to the same size as the child if you are zooming out.\nThis will equal the number of generated frames of the animation if the center child is the same color.\nOr it will be a third of the number of generated frames of the animation if the center child is a different color.");
+		SetupControl(periodMultiplierBox, L"Multiplies the frame count, slowing down the rotaion and hue shifts.");
+		SetupControl(zoomButton, L"Toggle in which direction you want the fractal zoom -> ZoomIn, or <- ZoomOut");
+		SetupControl(defaultZoom, L"Type the initial zoom of the first image (in number of skipped frames).");
 		SetupControl(spinSelect, L"Choose in which direction you want the zoom animation to spin, or to not spin.");
 		SetupControl(spinSpeedBox, L"Type the extra speed on the spinning from the values possible for looping.");
 		SetupControl(defaultAngle, L"Type the initial angle of the first image (in degrees).");
 		SetupControl(hueSelect, L"Choose the color scheme of the fractal.\nAlso you can make the color hues slowly cycle as the fractal zoom.");
 		SetupControl(hueSpeedBox, L"Type the extra speed on the hue shifting from the values possible for looping.\nOnly possible if you have chosen color cycling on the left.");
 		SetupControl(defaultHue, L"Type the initial hue angle of the first image (in degrees).");
-		SetupControl(this->defaultAngle, L"Type the initial angle of the first image (in degrees).");
-		SetupControl(this->defaultHue, L"Type the initial hue angle of the first image (in degrees).");
-		SetupControl(this->ambBar, L"The strength of the ambient grey color in the empty spaces far away between the generated fractal dots.");
-		SetupControl(this->noiseBar, L"The strength of the random noise in the empty spaces far away between the generated fractal dots.");
-		SetupControl(this->saturateBar, L"Enhance the color saturation of the fractal dots.\nUseful when the fractal is too gray, like the Sierpinski Triangle (Triflake).");
-		SetupControl(this->detailBar, L"Level of Detail (The lower the finer).");
-		SetupControl(this->blurBar, L"Motion blur: Lowest no blur and fast generation, highest 10 smeared frames 10 times slower generation.");
-		SetupControl(this->parallelBox, L"Enable parallelism (and then tune with the Max Threads slider).\nSelect the type of parallelism with the followinf checkBox to the right.");
-		SetupControl(this->parallelTypeBox, L"Type of parallelism to be used if the left checkBox is enabled.\n...Of Images = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong\n...Of Animation Frames = batching animation frames, recommended for Animations with perfect pixels.");
-		SetupControl(this->threadsBar, L"The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
-		SetupControl(this->delayBox, L"A delay between frames in 1/100 of seconds for the preview and exported GIF file.\nThe framerate will be roughly 100/delay");
-		SetupControl(this->prevButton, L"Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
-		SetupControl(this->nextButton, L"Stop the animation and move to the next frame.\nUseful for selecting the exact frame you want to export to PNG file.");
-		SetupControl(this->animateButton, L"Toggle preview animation.\nWill seamlessly loop when the fractal is finished generating.\nClicking on the image does the same thing.");
-		SetupControl(this->encodeButton, L"Only Image - only generates one image\nAnimation RAM - generated an animation without GIF encoding, faster but can't save GIF afterwards\nEncode GIF - encodes GIF while generating an animation - can save a GIF afterwards");
-		SetupControl(this->pngButton, L"Save the currently displayed frame into a PNG file.\nStop the animation and select the frame you wish to export with the buttons above.");
-		SetupControl(this->gifButton, L"Save the full animation into a GIF file.");
+		SetupControl(defaultAngle, L"Type the initial angle of the first image (in degrees).");
+		SetupControl(defaultHue, L"Type the initial hue angle of the first image (in degrees).");
+		SetupControl(ambBar, L"The strength of the ambient grey color in the empty spaces far away between the generated fractal dots.");
+		SetupControl(noiseBar, L"The strength of the random noise in the empty spaces far away between the generated fractal dots.");
+		SetupControl(saturateBar, L"Enhance the color saturation of the fractal dots.\nUseful when the fractal is too gray, like the Sierpinski Triangle (Triflake).");
+		SetupControl(detailBar, L"Level of Detail (The lower the finer).");
+		SetupControl(blurBar, L"Motion blur: Lowest no blur and fast generation, highest 10 smeared frames 10 times slower generation.");
+		SetupControl(parallelBox, L"Enable parallelism (and then tune with the Max Threads slider).\nSelect the type of parallelism with the followinf checkBox to the right.");
+		SetupControl(parallelTypeBox, L"Type of parallelism to be used if the left checkBox is enabled.\n...Of Images = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong\n...Of Animation Frames = batching animation frames, recommended for Animations with perfect pixels.");
+		SetupControl(threadsBar, L"The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
+		SetupControl(delayBox, L"A delay between frames in 1/100 of seconds for the preview and exported GIF file.\nThe framerate will be roughly 100/delay");
+		SetupControl(prevButton, L"Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
+		SetupControl(nextButton, L"Stop the animation and move to the next frame.\nUseful for selecting the exact frame you want to export to PNG file.");
+		SetupControl(animateButton, L"Toggle preview animation.\nWill seamlessly loop when the fractal is finished generating.\nClicking on the image does the same thing.");
+		SetupControl(encodeButton, L"Only Image - only generates one image\nAnimation RAM - generated an animation without GIF encoding, faster but can't save GIF afterwards\nEncode GIF - encodes GIF while generating an animation - can save a GIF afterwards");
+		SetupControl(pngButton, L"Save the currently displayed frame into a PNG file.\nStop the animation and select the frame you wish to export with the buttons above.");
+		SetupControl(gifButton, L"Save the full animation into a GIF file.");
 
 		// Update Input fields to default values
 		generator = gcnew FractalGenerator();
@@ -845,25 +847,23 @@ namespace RgbFractalGenClr {
 			fractalSelect->Items->Add(gcnew String(((*i)->name).c_str()));
 		SelectMaxThreads();
 		fractalSelect->SelectedIndex = 0;
-		//SelectFractal();
 		auto maxThreads = Environment::ProcessorCount - 2;
 		threadsBar->Maximum = maxThreads;
 		threadsBar->Value = maxThreads;
 		SelectMaxThreads();
-		SelectPeriod();
+		periodBox_TextChanged(nullptr, nullptr);
 		periodMultiplierBox_TextChanged(nullptr, nullptr);
 		SelectParallelType();
 		delayBox_TextChanged(nullptr, nullptr);
-		SelectZoom();
 		defaultZoom_TextChanged(nullptr, nullptr);
 		spinSpeedBox_TextChanged(nullptr, nullptr);
 		hueSpeedBox_TextChanged(nullptr, nullptr);
 		defaultHue_TextChanged(nullptr, nullptr);
 		hueSelect->SelectedIndex = 0;
-		SelectAmb();
-		SelectNoise();
-		SelectBlur();
-		SelectSaturation();
+		ambBar_Scroll(nullptr, nullptr);
+		noiseBar_Scroll(nullptr, nullptr);
+		blurBar_Scroll(nullptr, nullptr);
+		saturateBar_Scroll(nullptr, nullptr);
 
 		// Setup bitmap and start generation
 		modifySettings = false;
@@ -918,6 +918,9 @@ namespace RgbFractalGenClr {
 	System::Void GeneratorForm::ResetGenerator() {
 		if (modifySettings)
 			return;
+		// Resets the generator
+		// (Abort should be called before this or else it will crash)
+		// generator->StartGenerate(); should be called after
 		gifButton->Enabled = false;
 		currentBitmapIndex = 0;
 		generator->ResetGenerator();
@@ -926,22 +929,27 @@ namespace RgbFractalGenClr {
 	System::Void GeneratorForm::ResetGenerate() {
 		if (modifySettings)
 			return;
+		// Just restart the generator without resizing
+		// (Abort should be called before this or else it will crash)
 		ResetGenerator();
 		generator->StartGenerate();
 	}
 	System::Void GeneratorForm::ResizeGenerate() {
 		if (modifySettings)
 			return;
+		// Resize and restard generator (Abort should be called before this or else it will crash)
 		ResizeAll();
 		generator->StartGenerate();
 	}
 	System::Void GeneratorForm::AbortGenerate() {
 		if (modifySettings)
 			return;
+		// Just Abort and regenerate with nothing inbetween
 		Abort();
 		ResizeGenerate();
 	}
 	System::Void GeneratorForm::SetupControl(Control^ control, System::String^ tip) {
+		// Add tooltip and set the next tabIndex
 		toolTips->SetToolTip(control, tip);
 		control->TabIndex = ++controlTabIndex;
 	}
@@ -976,6 +984,7 @@ namespace RgbFractalGenClr {
 			w = h = 80;
 		if (generator->width == w && generator->height == h)
 			return false;
+		// resoltion is changed - request the fractal to resize the buffer and restart generation
 		generator->width = w;
 		generator->height = h;
 		return true;
@@ -1016,52 +1025,58 @@ namespace RgbFractalGenClr {
 
 #pragma region Input
 	System::Void GeneratorForm::fractalBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
+		if (generator->SelectFractal(Math::Max(0, fractalSelect->SelectedIndex)))
+			return;
+		// Fractal is different - load it, change the setting and restart generation
 		Abort();
-		SelectFractal();
-		ResetGenerate();
-	}
-	System::Void GeneratorForm::SelectFractal() {
-		generator->SelectFractal((short)Math::Max(0, fractalSelect->SelectedIndex));
-		if (modifySettings) {
-			FillSelects();
-		} else {
+		generator->SetupFractal();
+		// Fill the fractal's adjuistable definition combos
+		if (!modifySettings) {
 			modifySettings = true;
 			FillSelects();
+			detailBar_Scroll(nullptr, nullptr);
 			modifySettings = false;
-		}
+		} else FillSelects();
+		// Fill the fractal's adjuistable cutfunction seed combos, and restart generation
 		FillCutParams();
-		SelectDetail();
+		ResetGenerate();
 	}
-
 #define LoadCombo(S,A,V) S->Items->Clear();auto V = generator->GetFractal()->A;S->Enabled = V != nullptr;if (S->Enabled) {while (V != nullptr && V->first != "")S->Items->Add(gcnew String(((V++)->first).c_str()));S->Enabled = S->Items->Count > 0;if (S->Enabled)S->SelectedIndex = 0;};
-	
-
 	System::Void GeneratorForm::FillSelects() {	
+		// Fill angle childred definitnions combobox
 		LoadCombo(angleSelect, childAngle, a);
+		// Fill color children definitnions combobox
 		LoadCombo(colorSelect, childColor, c);
+		// Fill cutfunction definitnions combobox
 		LoadCombo(cutSelect, cutFunction, f);
 	}
 	System::Void GeneratorForm::angleSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		Abort();
-		generator->SelectAngle((short)Math::Max(0, angleSelect->SelectedIndex));
-		ResetGenerate();
+		if (generator->SelectAngle(Math::Max(0, angleSelect->SelectedIndex)))
+			return;
+		// Angle children definition is different - change the setting and restart generation
+		AbortGenerate();
 	}
 	System::Void GeneratorForm::colorSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
 		if (generator->SelectColor(Math::Max(0, colorSelect->SelectedIndex)))
 			return;
+		// Color children definition is different - change the setting and restart generation
 		Abort();
 		generator->SelectColor();
 		ResetGenerate();
 	}
 	System::Void GeneratorForm::cutSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
+		if (generator->SelectCutFunction(Math::Max(0, cutSelect->SelectedIndex)))
+			return;
+		// Cutfunction is different - change the setting and restart generation
 		Abort();
-		generator->SelectCutFunction((short)Math::Max(0, cutSelect->SelectedIndex));
 		FillCutParams();
 		ResetGenerate();
 	}
 	System::Void GeneratorForm::FillCutParams() {
 		const auto cf = generator->GetCutFunction();
+		// query the number of seedss from the CutFunction
 		const auto cm = cf == nullptr || (*cf)(0, -1) <= 0 ? 0 : ((*cf)(0, 1 - (1 << 16)) + 1) / (*cf)(0, -1);
+		// set the maximum of the trackBar for the seed to that value
 		if (modifySettings) {
 			cutparamBar->Maximum = cm;
 			cutparamBox->Text = "0";
@@ -1081,7 +1096,9 @@ namespace RgbFractalGenClr {
 			newcutparam = 0;
 		if (newcutparam == generator->cutparam)
 			return;
+		// Cutfunction seed is different - change the setting and restart generation
 		Abort();
+		// update the value in the trackBar for the seed
 		if (modifySettings) {
 			cutparamBar->Value = newcutparam;
 		} else {
@@ -1096,7 +1113,9 @@ namespace RgbFractalGenClr {
 		uint16_t v = cutparamBar->Value;
 		if (v == generator->cutparam)
 			return;
+		// Cutfunction seed is different - change the setting and restart generation
 		Abort();
+		// update the value in the text box for the seed
 		if (modifySettings) {
 			cutparamBox->Text = v.ToString();
 		} else {
@@ -1120,16 +1139,12 @@ namespace RgbFractalGenClr {
 			AbortGenerate();
 	}
 	System::Void GeneratorForm::periodBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		Abort();
-		SelectPeriod();
-		ResetGenerate();
-	}
-	System::Void GeneratorForm::SelectPeriod() {
 		uint16_t newPeriod = 1;
 		if (!uint16_t::TryParse(periodBox->Text, newPeriod) || newPeriod <= 0)
 			newPeriod = 120;
 		if (generator->period == newPeriod)
 			return;
+		// period is different - change the setting and restart generation
 		Abort();
 		generator->period = newPeriod;
 		ResetGenerate();
@@ -1140,18 +1155,17 @@ namespace RgbFractalGenClr {
 			newPeriod = 1;
 		if (generator->periodMultiplier == newPeriod)
 			return;
+		// period is different - change the setting and restart generation
 		Abort();
 		generator->periodMultiplier = newPeriod;
 		ResetGenerate();
 	}
 	System::Void GeneratorForm::zoomButton_Click(System::Object^ sender, System::EventArgs^ e) {
+		// zoom is different - change the setting and restart generation
 		Abort();
 		generator->zoom = -generator->zoom;
-		SelectZoom();
-		ResetGenerate();
-	}
-	System::Void GeneratorForm::SelectZoom() {
 		zoomButton->Text = "Zoom: " + ((generator->zoom > 0) ? "->" : "<-");
+		ResetGenerate();
 	}
 	System::Void GeneratorForm::defaultZoom_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		int16_t newZoom = 0;
@@ -1164,13 +1178,18 @@ namespace RgbFractalGenClr {
 			newZoom -= finalPeriod;
 		if (generator->defaultZoom == newZoom)
 			return;
+		// default zoom is different - change the setting and restart generation
 		Abort();
 		generator->defaultZoom = newZoom;
 		ResetGenerate();
 	}
 	System::Void GeneratorForm::spinSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
+		const auto newSpin = Math::Max(0, Math::Min(4, spinSelect->SelectedIndex)) - 2;
+		if (generator->defaultSpin == newSpin)
+			return;
+		// spin type is different - change the setting and restart generation
 		Abort();
-		generator->defaultSpin = Math::Max(0, Math::Min(4, spinSelect->SelectedIndex)) - 2;
+		generator->defaultSpin = newSpin;
 		ResetGenerate();
 	}
 	System::Void GeneratorForm::spinSpeedBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
@@ -1179,6 +1198,7 @@ namespace RgbFractalGenClr {
 			newSpeed = 0;
 		if (generator->extraSpin == newSpeed)
 			return;
+		// spin speed is different - change the setting and restart generation
 		Abort();
 		generator->extraSpin = newSpeed;
 		ResetGenerate();
@@ -1193,6 +1213,7 @@ namespace RgbFractalGenClr {
 			newAngle -= 360;
 		if (generator->defaultAngle == newAngle)
 			return;
+		// angle is different - change the setting and restart generation
 		Abort();
 		generator->defaultAngle = newAngle;
 		ResetGenerate();
@@ -1203,6 +1224,7 @@ namespace RgbFractalGenClr {
 		if (generator->SelectColorPalette(colorChoice % 2) && newHueCycle == generator->hueCycle)
 			return;
 		Abort();
+		// hue is different - change the setting and restart generation
 		generator->hueCycle = newHueCycle;
 		generator->SelectColor();
 		ResetGenerate();
@@ -1213,6 +1235,7 @@ namespace RgbFractalGenClr {
 			newSpeed = 0;
 		if (generator->extraHue == newSpeed)
 			return;
+		// hue speed is different - change the setting and if it's actually huecycling restart generation
 		if (generator->hueCycle != 0) {
 			Abort();
 			generator->extraHue = newSpeed;
@@ -1231,48 +1254,51 @@ namespace RgbFractalGenClr {
 		if (generator->defaultHue == newHue)
 			return;
 		Abort();
+		// Hue is different - change the setting and restart generation
 		generator->defaultHue = newHue;
 		ResetGenerate();
 	}
 	System::Void GeneratorForm::ambBar_Scroll(System::Object^ sender, System::EventArgs^ e) {
+		const auto newAmb = (short)(ambBar->Value * 4);
+		if (generator->amb == newAmb)
+			return;
 		Abort();
-		SelectAmb();
+		// Ambient is different - change the setting and restart generation
+		generator->amb = newAmb;
 		ResetGenerate();
-	}
-	System::Void GeneratorForm::SelectAmb() {
-		generator->amb = ambBar->Value * 4;
 	}
 	System::Void GeneratorForm::noiseBar_Scroll(System::Object^ sender, System::EventArgs^ e) {
+		const auto newNoise = noiseBar->Value * .1f;
+		if (generator->noise == newNoise)
+			return;
 		Abort();
-		SelectNoise();
+		// Noise is different - change the setting and restart generation
+		generator->noise = newNoise;
 		ResetGenerate();
-	}
-	System::Void GeneratorForm::SelectNoise() {
-		generator->noise = noiseBar->Value * .1f;
 	}
 	System::Void GeneratorForm::saturateBar_Scroll(System::Object^ sender, System::EventArgs^ e) {
+		const auto newSat = saturateBar->Value * .1f;
+		if (generator->saturate == newSat)
+			return;
 		Abort();
-		SelectSaturation();
+		// Saturation is different - change the setting and restart generation
+		generator->saturate = newSat;
 		ResetGenerate();
-	}
-	System::Void GeneratorForm::SelectSaturation() {
-		generator->saturate = saturateBar->Value * .1f;
 	}
 	System::Void GeneratorForm::detailBar_Scroll(System::Object^ sender, System::EventArgs^ e) {
-		Abort();
-		SelectDetail();
-		ResetGenerate();
-	}
-	System::Void GeneratorForm::SelectDetail() {
-		generator->SelectDetail(detailBar->Value * .1f);
+		const auto newDetail = detailBar->Value * .1f;
+		if (generator->SelectDetail(newDetail))
+			return;
+		// Detail is different - change the setting and restart generation
+		AbortGenerate();
 	}
 	System::Void GeneratorForm::blurBar_Scroll(System::Object^ sender, System::EventArgs^ e) {
+		if (generator->selectBlur == blurBar->Value)
+			return;
 		Abort();
-		SelectBlur();
-		ResetGenerate();
-	}
-	System::Void GeneratorForm::SelectBlur() {
+		// Blur is different - change the setting and restart generation
 		generator->selectBlur = blurBar->Value;
+		ResetGenerate();
 	}
 	System::Void GeneratorForm::parallelBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e) {
 		SelectMaxThreads();
@@ -1300,6 +1326,7 @@ namespace RgbFractalGenClr {
 			return;
 		if (generator->encode == 2)
 			Abort();
+		// Delay is diffenret, change it, and restart the generation if ou were encoding a gif
 		generator->delay = newDelay;
 		int fpsrate = 100 / generator->delay;
 		timer->Interval = generator->delay * 10;
@@ -1323,12 +1350,15 @@ namespace RgbFractalGenClr {
 	System::Void GeneratorForm::encodeButton_Click(System::Object^ sender, System::EventArgs^ e) {
 		switch (generator->encode = (generator->encode + 1) % 3) {
 		case 0:
+			// Only generates one image
 			encodeButton->Text = "Only Image";
 			break;
 		case 1:
+			// Generates an animation for you to see faster, but without encoding a Gif to export
 			encodeButton->Text = "RAM Animation";
 			break;
 		case 2:
+			// Full generation including GIF encoding
 			encodeButton->Text = "Encode GIF";
 			if (!generator->IsGifReady())
 				AbortGenerate();
@@ -1348,7 +1378,9 @@ namespace RgbFractalGenClr {
 	System::Void GeneratorForm::screenPanel_Paint(System::Object^ sender, System::Windows::Forms::PaintEventArgs^ e) {
 		if (currentBitmap == nullptr)
 			return;
+		// Faster rendering with crisp pixels
 		e->Graphics->InterpolationMode = System::Drawing::Drawing2D::InterpolationMode::NearestNeighbor;
+		// some safety code to ensure no crashes
 		uint8_t tryAttempt = 0;
 		while (tryAttempt < 5) {
 			try {

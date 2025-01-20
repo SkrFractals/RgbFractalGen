@@ -665,7 +665,7 @@
 			spinSpeedBox.Size = new System.Drawing.Size(62, 23);
 			spinSpeedBox.TabIndex = 43;
 			spinSpeedBox.Text = "0";
-			spinSpeedBox.TextChanged += spinspeedBox_TextChanged;
+			spinSpeedBox.TextChanged += spinSpeedBox_TextChanged;
 			// 
 			// hueSpeedBox
 			// 
