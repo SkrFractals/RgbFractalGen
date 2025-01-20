@@ -1,0 +1,35 @@
+v1.72
+-Added comboBoxes for colorpalette/huecycling and spin select.
+-Added comboBoxes for extra spin speed and extra huecycle speed.
+-fixed backwards zoom out switching parent-child color wrong
+
+v1.71
+-fixed and enabled period multiplier
+
+v1.71
+-I noticed that my supersaturation slider wasn't really doing much of anything, so i rederived the equation and indeed found i derived it wrong, now it's fixed and works as intened, makign the fractals nicely bright and saturated
+
+v1.7
+-Expanded cutfunctions and their parameters
+-Allowed to select and combine different child angles and child colors, this together with functions lets you make like a million different fractals.
+-Added Help button showing readme.txt
+-Some examples of all the new different fractals it can make are in the attachment
+
+v1.64
+-fixed some bugs, especially in CppManaged
+-Flip Horizontal is now redundat (can be achieved by selecting a complementary cutFunction seed and 180 defaultAngle), so it has been removed
+-In its place is now defaultHue allowing you to shift the hue of the fractal.
+-More Color options, allowing BGR variants that imo look nicer than the original RGB palette because the child color mix together with parents to give nicer hues of red green and blue.
+-fixed and fully automated the prediction of loop frames, removed the Frames/3 checkBox that did this manually, and replaced it with extra period multiplier
+-allowed to write to a different temp gif file if it fails to open
+
+v1.6
+-Simplified and documented fractal definitions for easier making and adding new fractals
+-New parameters: Default Zoom, Default Spin, Horizonal Flip
+-New Modes: Only Image, Parallel Animation Frames
+-Fixed fractal point color light normalization. (dark when thin, overflowing when dense)
+-Parametrized CutFunction - instead of having a lot of individual variations of cuttings, I aded a slider that lets you choose from a vast larger number of variation possibilities with one fractal, kinda like choosing a seed number for rules.
+-Antispin seting - looks trippy with some fractals where it fits, example gif in attachments.
+
+v1.4
+-added motion blur feature
