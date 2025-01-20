@@ -5,13 +5,13 @@ RGB Self-Similar Fractal GIF Loop Generator
 Known issues:
 
 General:
--Rare unexpected crashes/halts in generation
+- Rare unexpected crashes/halts in generation
 
 Clr:
--has some trouble encoding/saving GIFs
+- has some trouble encoding/saving GIFs
 
 Cpp:
--threading doesn't work at all, if I don't make it work in a while I might just upload it for some volunteer to debug it...
+- threading doesn't work at all, if I don't make it work in a while I might just upload it for some volunteer to debug it...
 
 ---------------------------------------------------------------------------------------------------------
 
