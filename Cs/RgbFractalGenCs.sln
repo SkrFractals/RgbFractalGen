@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32804.467
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RgbFractalGenCs", "RgbFractalGenCs\RgbFractalGenCs.csproj", "{58F3F9C2-AC36-44E6-A73C-E9FF62FC6EB8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Components", "Components\Components.csproj", "{1C3A03CA-5E55-4CC4-9746-194A4188960A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{58F3F9C2-AC36-44E6-A73C-E9FF62FC6EB8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58F3F9C2-AC36-44E6-A73C-E9FF62FC6EB8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58F3F9C2-AC36-44E6-A73C-E9FF62FC6EB8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58F3F9C2-AC36-44E6-A73C-E9FF62FC6EB8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1C3A03CA-5E55-4CC4-9746-194A4188960A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1C3A03CA-5E55-4CC4-9746-194A4188960A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1C3A03CA-5E55-4CC4-9746-194A4188960A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1C3A03CA-5E55-4CC4-9746-194A4188960A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EE68B833-5407-45EF-A66C-23FD9F4099D9}
+	EndGlobalSection
+EndGlobal

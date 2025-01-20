@@ -1,0 +1,4 @@
+H:\Projects\RgbFractalGen\Cs\Components\bin\Release\Gif.Components.dll
+H:\Projects\RgbFractalGen\Cs\Components\obj\Release\Components.csproj.AssemblyReference.cache
+H:\Projects\RgbFractalGen\Cs\Components\obj\Release\Components.csproj.CoreCompileInputs.cache
+H:\Projects\RgbFractalGen\Cs\Components\obj\Release\Gif.Components.dll
