@@ -35,7 +35,7 @@ namespace RgbFractalGenClr {
 		bitmap = nullptr;
 		gifSuccess = false;
 		taskSnapshot = gcnew System::Collections::Generic::List<Task^>();
-		emptyFloat = new float[1] { 0 };
+		emptyFloat = new float[1] { static_cast<float>(M_PI) };
 		InitFractals();
 	}
 	void FractalGenerator::InitFractals() {
