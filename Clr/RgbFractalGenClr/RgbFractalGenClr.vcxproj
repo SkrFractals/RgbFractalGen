@@ -133,6 +133,7 @@
     <ClInclude Include="giflib\gif_hash.h" />
     <ClInclude Include="giflib\gif_lib.h" />
     <ClInclude Include="giflib\gif_lib_private.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="Vector.h" />
   </ItemGroup>
   <ItemGroup>
@@ -167,6 +168,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="RgbFractalGenClr.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="icon.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

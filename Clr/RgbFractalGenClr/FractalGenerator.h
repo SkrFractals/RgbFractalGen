@@ -55,9 +55,9 @@ namespace RgbFractalGenClr {
         uint8_t* animationTaskFinished;			    // States of Animation Tasks
         List<Task^>^ taskSnapshot;                  // Snapshot for safely checking imageTasks Wait
         // Generation variables
-        uint8_t selectColorPalette;
-        uint16_t select, selectCut, bitmapsFinished, nextBitmap, finalPeriodMultiplier, hueCycleMultiplier;
-        int16_t selectColor, selectAngle;
+        int8_t selectColorPalette;
+        uint16_t bitmapsFinished, nextBitmap, finalPeriodMultiplier, hueCycleMultiplier;
+        int16_t select, selectColor, selectAngle, selectCut, allocatedWidth, allocatedHeight, allocatedTasks, allocatedFrames;
         Fractal::CutFunction* cutFunction;
         bool gifSuccess, exportingGif;              // Temp GIF file "gif.tmp" successfuly created | flag only allowing one GIF Encoding thread
         void* gifEncoder;                           // Export GIF encoder
@@ -65,6 +65,7 @@ namespace RgbFractalGenClr {
         Vector* colorBlend;                         // Color blend of a selected fractal for more seamless loop (between single color to the sum of children)
         System::Drawing::Rectangle rect;            // Bitmap rectangle TODO implement
         System::String^ gifTempPath;
+        float* emptyFloat;
 
     public:
         // Settings
@@ -81,6 +82,8 @@ namespace RgbFractalGenClr {
         FractalGenerator();
     private:
         System::Void InitFractals();
+        System::Void DeleteBuffer(const uint16_t taskIndex);
+        System::Void NewBuffer(const uint16_t taskIndex);
         System::Void InitBuffer(const int16_t taskIndex);
         System::Void DeleteEncoder();
 #pragma endregion

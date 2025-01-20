@@ -1259,7 +1259,7 @@ namespace RgbFractalGenClr {
 		ResetGenerate();
 	}
 	System::Void GeneratorForm::ambBar_Scroll(System::Object^ sender, System::EventArgs^ e) {
-		const auto newAmb = (short)(ambBar->Value * 4);
+		const auto newAmb = (uint16_t)(ambBar->Value * 4);
 		if (generator->amb == newAmb)
 			return;
 		Abort();
@@ -1305,8 +1305,8 @@ namespace RgbFractalGenClr {
 		generator->SelectThreadingDepth();
 	}
 	System::Void GeneratorForm::SelectMaxThreads() {
-		generator->maxTasks = (short)(parallelBox->Checked ? threadsBar->Value : -1);
-		generator->maxGenerationTasks = (short)(generator->maxTasks - 1);
+		generator->maxTasks = (int16_t)(parallelBox->Checked ? threadsBar->Value : -1);
+		generator->maxGenerationTasks = generator->maxTasks - 1;
 	}
 	System::Void GeneratorForm::parallelTypeBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e) {
 		SelectParallelType();

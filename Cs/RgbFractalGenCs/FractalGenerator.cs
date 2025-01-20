@@ -19,6 +19,7 @@ namespace RgbFractalGenCs {
 	using Gif.Components;
 	using System.Numerics;
 	using System.DirectoryServices.ActiveDirectory;
+	using static System.Runtime.InteropServices.JavaScript.JSType;
 
 	[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 	internal class FractalGenerator {
@@ -51,8 +52,8 @@ namespace RgbFractalGenCs {
 		private byte[] animationTaskFinished;           // States of Animation Tasks
 		List<Task> taskSnapshot;                        // Snapshot for safely checking imageTasks Wait
 		// Generation variables
-		private byte hueCycleMultiplier, selectColorPalette;
-		private short select, selectColor, selectAngle, selectCut, bitmapsFinished, nextBitmap, ambnoise, finalPeriodMultiplier;
+		private byte hueCycleMultiplier;
+		private short select, selectColor, selectColorPalette, selectAngle, selectCut, bitmapsFinished, nextBitmap, ambnoise, finalPeriodMultiplier, allocatedWidth, allocatedHeight, allocatedTasks, allocatedFrames;
 		private Fractal.CutFunction cutFunction;
 		private bool gifSuccess, exportingGif;          // Temp GIF file "gif.tmp" successfuly created | flag only allowing one GIF Encoding thread
 		private AnimatedGifEncoder gifEncoder;          // Export GIF encoder
@@ -62,7 +63,7 @@ namespace RgbFractalGenCs {
 		private string gifTempPath;
 		private Random random = new();                  // Random generator
 		// Settings
-		internal bool third, parallelType;
+		internal bool parallelType;
 		internal float detail, noise, saturate;
 		internal byte selectBlur, encode, extraHue, extraSpin;
 		internal short zoom, defaultSpin, hueCycle, maxDepth, periodMultiplier;
@@ -71,9 +72,9 @@ namespace RgbFractalGenCs {
 
 		#region Init
 		public FractalGenerator() {
-			debug = defaultHue = defaultZoom = defaultAngle = selectCut = selectColorPalette = 0;
+			debug = defaultHue = defaultZoom = defaultAngle = extraSpin = extraHue = 0;
 			zoom = 1;
-			selectAngle = selectColor = select = defaultSpin = -1;
+			select = selectColor = selectAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = defaultSpin = selectColorPalette = - 1;
 			encode = 2;
 			gifEncoder = null;
 			bitmap = null;
@@ -264,24 +265,27 @@ namespace RgbFractalGenCs {
 				], []
 				)
 				];
+			int maxChildren = 1;
+			foreach (var i in fractals) {
+				if (i.childCount > maxChildren)
+					maxChildren = i.childCount;
+			}
+			childColor = new byte[maxChildren];
+		}
 
-			//tetraflake.Copy("TetraTriflake_Holes", 13, null, null, null),
+		private void NewBuffer(short taskIndex) {
+			var voidT = voidDepth[taskIndex] = new short[height][];
+			var buffT = buffer[taskIndex] = new Vector3[height][];
+			for (var y = 0; y < height; voidT[y++] = new short[width]) {
+				var buffY = buffT[y] = new Vector3[width];
+				for (var x = 0; x < width; buffY[x++] = Vector3.Zero) ;
+			}
 		}
 		private void InitBuffer(short taskIndex) {
-			if (buffer[taskIndex] == null) {
-				voidQueue[taskIndex] = new();
-				var voidT = voidDepth[taskIndex] = new short[height][];
-				var buffT = buffer[taskIndex] = new Vector3[height][];
-				for (var y = 0; y < height; voidT[y++] = new short[width]) {
-					var buffY = buffT[y] = new Vector3[width];
-					for (var x = 0; x < width; buffY[x++] = Vector3.Zero) ;
-				}
-			} else {
-				var buffT = buffer[taskIndex];
-				for (var y = 0; y < height; ++y) {
-					var buffY = buffT[y];
-					for (var x = 0; x < width; buffY[x++] = Vector3.Zero) ;
-				}
+			var buffT = buffer[taskIndex];
+			for (var y = 0; y < height; ++y) {
+				var buffY = buffT[y];
+				for (var x = 0; x < width; buffY[x++] = Vector3.Zero) ;
 			}
 		}
 		#endregion
@@ -327,88 +331,104 @@ namespace RgbFractalGenCs {
 			var spin = defaultSpin;
 			ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 			for (int i = defaultZoom; 0 <= --i; IncrementFrameSize(ref size, period)) ;
-			// Initialize Threading and drawing data
-			rect = new(0, 0, width, height);
-			var batchTasks = Math.Max((short)1, maxTasks);
-			voidQueue = new Queue<(short, short)>[batchTasks];
-			animationTaskFinished = new byte[batchTasks + 1];
-			voidDepth = new short[batchTasks][][];
-			buffer = new Vector3[batchTasks][][];
-			animationTasks = new Task[batchTasks + 1];
-			for (int i = 0; i <= batchTasks; animationTaskFinished[i++] = 2) ;
 
-			//unsafe {
-				while (!cancel.Token.IsCancellationRequested && bitmapsFinished < bitmap.Length) {
-					var generateLength = (encode > 0 ? bitmap.Length : 1);
-					// Wait if no more frames to generate
-					if (bitmapsFinished >= generateLength)
-						continue;
-					// Image parallelism
-					imageTasks = parallelType ? new ConcurrentBag<Task>() : null;
-					// Animation Parallelism Task Count
-					var animationTaskCount = parallelType ? (short)0 : Math.Min(batchTasks, (short)generateLength);
-					if (animationTaskCount <= 0) {
-						// No Animation Parallelism:
-						if (nextBitmap < generateLength) {
+			// Initialize buffers (delete and reset if size changed)
+			var batchTasks = Math.Max((short)1, maxTasks);
+			if (batchTasks != allocatedTasks) {
+				rect = new(0, 0, allocatedWidth = width, allocatedHeight = height);
+				voidDepth = new short[batchTasks][][];
+				voidQueue = new Queue<(short, short)>[batchTasks];
+				animationTasks = new Task[batchTasks + 1];
+				animationTaskFinished = new byte[batchTasks + 1];
+				buffer = new Vector3[batchTasks][][];
+				for (short t = 0; t < batchTasks; NewBuffer(t++))
+					voidQueue[t] = new();
+			}
+			if (height != allocatedHeight) {
+				rect = new(0, 0, allocatedWidth = width, allocatedHeight = height);
+				for (short t = 0; t < batchTasks; NewBuffer(t++)) ;
+			}
+			if (width != allocatedWidth) {
+				rect = new(0, 0, allocatedWidth = width, height);
+				for (int t = 0; t < batchTasks; ++t) {
+					var voidT = voidDepth[t];
+					var buffT = buffer[t];
+					for (short y = 0; y < height; voidT[y++] = new short[width]) 
+						buffT[y] = new Vector3[width];
+				}
+			}
+			for (int t = 0; t <= batchTasks; animationTaskFinished[t++] = 2)
+				animationTasks[t] = null;
+			// Generate the images
+			while (!cancel.Token.IsCancellationRequested && bitmapsFinished < bitmap.Length) {
+				var generateLength = (encode > 0 ? bitmap.Length : 1);
+				// Wait if no more frames to generate
+				if (bitmapsFinished >= generateLength)
+					continue;
+				// Image parallelism
+				imageTasks = parallelType ? new ConcurrentBag<Task>() : null;
+				// Animation Parallelism Task Count
+				var animationTaskCount = parallelType ? (short)0 : Math.Min(batchTasks, (short)generateLength);
+				if (animationTaskCount <= 0) {
+					// No Animation Parallelism:
+					if (nextBitmap < generateLength) {
+						ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
+						GenerateThread(nextBitmap++, 0, size, angle, spin, hueAngle, color);
+						IncrementFrameParameters(ref size, ref angle, spin, ref hueAngle, ref color, 1);
+						animationTaskFinished[0] = 2;
+					}
+					if (FinishTask(1))
+						TryGif(1);
+				} else {
+					// Animation parallelism: Spawn initial tasks
+					while (0 <= --animationTaskCount) {
+						if (animationTaskFinished[animationTaskCount] >= 2 && nextBitmap < generateLength) {
+							animationTaskFinished[animationTaskCount] = 0;
 							ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
-							GenerateThread(nextBitmap++, 0, size, angle, spin, hueAngle, color);
+							var _bitmap = nextBitmap++;
+							var _task = animationTaskCount;
+							var _size = size;
+							var _angle = angle;
+							var _spin = spin;
+							var _hueAngle = hueAngle;
+							var _color = color;
+							//GenerateThread(_bitmap, _task, _size, _angle, _hueAngle, _color);
+							animationTasks[_task] = (Task.Run(() => GenerateThread(_bitmap, _task, _size, _angle, _spin, _hueAngle, _color)));
 							IncrementFrameParameters(ref size, ref angle, spin, ref hueAngle, ref color, 1);
-							animationTaskFinished[0] = 2;
 						}
-						if (FinishTask(1))
-							TryGif(1);
-					} else {
-						// Animation parallelism: Spawn initial tasks
-						while (0 <= --animationTaskCount) {
-							if (animationTaskFinished[animationTaskCount] >= 2 && nextBitmap < generateLength) {
-								animationTaskFinished[animationTaskCount] = 0;
-								ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
-								var _bitmap = nextBitmap++;
-								var _task = animationTaskCount;
-								var _size = size;
-								var _angle = angle;
-								var _spin = spin;
-								var _hueAngle = hueAngle;
-								var _color = color;
-								//GenerateThread(_bitmap, _task, _size, _angle, _hueAngle, _color);
-								animationTasks[_task] = (Task.Run(() => GenerateThread(_bitmap, _task, _size, _angle, _spin, _hueAngle, _color)));
-								IncrementFrameParameters(ref size, ref angle, spin, ref hueAngle, ref color, 1);
-							}
-						}
-						// Animation parallelism: Continue/Finish Animation and Gif tasks
-						bool tasksRemaining = true;
-						while (tasksRemaining) {
-							tasksRemaining = false;
-							// Check every task
-							for (var task = 0; task < batchTasks; ++task) {
-								if (FinishTask(task)) {
-									TryGif((short)task);
-									if (animationTaskFinished[task] >= 2 && nextBitmap < generateLength) {
-										// Start another task when previous was finished
-										animationTaskFinished[task] = 0;
-										ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
-										var _bitmap = nextBitmap++;
-										var _task = (short)task;
-										var _size = size;
-										var _angle = angle;
-										var _spin = spin;
-										var _hueAngle = hueAngle;
-										var _color = color;
-										//GenerateThread(_bitmap, _task, _size, _angle, _hueAngle, _color);
-										animationTasks[_task] = (Task.Run(() => GenerateThread(_bitmap, _task, _size, _angle, _spin, _hueAngle, _color)));
-										tasksRemaining = true; // A task finished, but started another one - keep checking before new master loop
-										IncrementFrameParameters(ref size, ref angle, spin, ref hueAngle, ref color, 1);
-									}
-								} else tasksRemaining = true; // A task not finished yet - keep checking before new master loop
-							}
+					}
+					// Animation parallelism: Continue/Finish Animation and Gif tasks
+					bool tasksRemaining = true;
+					while (tasksRemaining) {
+						tasksRemaining = false;
+						// Check every task
+						for (var task = 0; task < batchTasks; ++task) {
+							if (FinishTask(task)) {
+								TryGif((short)task);
+								if (animationTaskFinished[task] >= 2 && nextBitmap < generateLength) {
+									// Start another task when previous was finished
+									animationTaskFinished[task] = 0;
+									ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
+									var _bitmap = nextBitmap++;
+									var _task = (short)task;
+									var _size = size;
+									var _angle = angle;
+									var _spin = spin;
+									var _hueAngle = hueAngle;
+									var _color = color;
+									//GenerateThread(_bitmap, _task, _size, _angle, _hueAngle, _color);
+									animationTasks[_task] = (Task.Run(() => GenerateThread(_bitmap, _task, _size, _angle, _spin, _hueAngle, _color)));
+									tasksRemaining = true; // A task finished, but started another one - keep checking before new master loop
+									IncrementFrameParameters(ref size, ref angle, spin, ref hueAngle, ref color, 1);
+								}
+							} else tasksRemaining = true; // A task not finished yet - keep checking before new master loop
 						}
 					}
 				}
-			//}
+			}
 			// Wait for threads to finish
 			WaitForThreads();
-			for (int i = animationTasks.Length; 0 <= --i; animationTasks[i]?.Wait()) ;
-
+			for (int i = animationTasks.Length; 0 <= --i; animationTasks[i]?.Wait());
 			// Unlock unfinished bitmaps:
 			for (int i = 0; i < bitmap.Length; ++i)
 				if (bitmapState[i] > 0 && bitmapState[i] < 4) {
@@ -416,7 +436,6 @@ namespace RgbFractalGenCs {
 						bitmap[i]?.UnlockBits(bitmapData[i]);
 					} catch (Exception) { }
 				}
-
 			// Save the temp GIF file
 			if (encode >= 2 && gifEncoder != null && gifEncoder.Finish())
 				gifSuccess = true;
@@ -874,11 +893,12 @@ namespace RgbFractalGenCs {
 			);
 			// setup bitmap data
 			bitmapsFinished = nextBitmap = 0;
-			int frames = debug > 0 ? debug : period * finalPeriodMultiplier;
-			bitmap = new Bitmap[frames];
-			bitmapData = new BitmapData[frames];
-			bitmapState = new byte[frames + 1];
-			//for (int i = frames; 0 <= i; bitmapState[i--] = 0) ;
+			short frames = (short)(debug > 0 ? debug : period * finalPeriodMultiplier);
+			if (frames != allocatedFrames) {
+				bitmap = new Bitmap[allocatedFrames = frames];
+				bitmapData = new BitmapData[frames];
+				bitmapState = new byte[frames + 1];
+			}
 		}
 		internal short GetFinalPeriod() {
 			// get the multiplier of the basic period required to get to a seamless loop
@@ -971,10 +991,7 @@ namespace RgbFractalGenCs {
 		}
 		internal void SelectColor() {
 			// Setup colors
-			childColor = new byte[Math.Max(1, f.childCount)];
-			if (f.childCount <= 0) {
-				childColor = [0];
-			} else {
+			if (f.childCount > 0) {
 				(_, byte[] ca) = f.childColor[selectColor];
 				for (int i = f.childCount; 0 <= --i; childColor[i] = ca[i]) ;
 				// Setup palette

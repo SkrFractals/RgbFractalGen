@@ -15,6 +15,7 @@
 #define BE { "", new uint8_t[0] { } }
 #define CE { "", nullptr }
 
+
 namespace RgbFractalGenClr {
 
 #ifdef CUSTOMDEBUG
@@ -28,12 +29,13 @@ namespace RgbFractalGenClr {
 	FractalGenerator::FractalGenerator() {
 		debug = defaultHue = defaultZoom = defaultAngle = extraSpin = extraHue = 0;
 		zoom = 1;
-		selectColor = selectAngle = select = defaultSpin = -1;
+		select = selectColor = selectAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = defaultSpin = selectColorPalette = -1;
 		encode = 2;
 		gifEncoder = nullptr;
 		bitmap = nullptr;
 		gifSuccess = false;
 		taskSnapshot = gcnew System::Collections::Generic::List<Task^>();
+		emptyFloat = new float[1] { 0 };
 		InitFractals();
 	}
 	void FractalGenerator::InitFractals() {
@@ -238,22 +240,35 @@ namespace RgbFractalGenClr {
 				}, nullptr
 			), nullptr
 		};
+		int maxChildren = 1;
+		for (Fractal** i = fractals; *i != nullptr; ++i)
+			if ((*i)->childCount > maxChildren)
+				maxChildren = (*i)->childCount;
+		childColor = new uint8_t[maxChildren];
+	}
+	System::Void FractalGenerator::DeleteBuffer(const uint16_t taskIndex) {
+		const auto& buffT = buffer[taskIndex];
+		const auto& voidT = voidDepth[taskIndex];
+		for (auto y = 0; y < height; ++y) {
+			delete buffT[y];
+			delete voidT[y];
+		}
+		delete[] buffT;
+		delete[] voidT;
+	}
+	System::Void FractalGenerator::NewBuffer(const uint16_t taskIndex) {
+		const auto& voidT = voidDepth[taskIndex] = new int16_t * [height];
+		const auto& buffT = buffer[taskIndex] = new Vector * [height];
+		for (auto y = 0; y < height; voidT[y++] = new int16_t[width]) {
+			const auto& buffY = buffT[y] = new Vector[width];
+			for (auto x = 0; x < width; buffY[x++] = zero);
+		}
 	}
 	System::Void FractalGenerator::InitBuffer(int16_t taskIndex) {
-		if (buffer[taskIndex] == nullptr) {
-			voidQueue[taskIndex] = new std::queue<std::pair<int16_t, int16_t>>();
-			const auto& voidT = voidDepth[taskIndex] = new short* [height];
-			const auto& buffT = buffer[taskIndex] = new Vector * [height];
-			for (auto y = 0; y < height; voidT[y++] = new short[width]) {
-				const auto& buffY = buffT[y] = new Vector[width];
-				for (auto x = 0; x < width; buffY[x++] = zero);
-			}
-		} else {
-			const auto& buffT = buffer[taskIndex];
-			for (auto y = 0; y < height; ++y) {
-				const auto& buffY = buffT[y];
-				for (auto x = 0; x < width; buffY[x++] = zero);
-			}
+		const auto& buffT = buffer[taskIndex];
+		for (auto y = 0; y < height; ++y) {
+			const auto& buffY = buffT[y];
+			for (auto x = 0; x < width; buffY[x++] = zero);
 		}
 	}
 	System::Void FractalGenerator::DeleteEncoder() {
@@ -300,17 +315,50 @@ namespace RgbFractalGenClr {
 		auto spin = defaultSpin;
 		ModFrameParameters(size, angle, spin, hueAngle, color);
 		for (int i = defaultZoom; 0 <= --i; IncrementFrameSize(size, period));
-		// Initialize Threading and drawing data
-		rect = System::Drawing::Rectangle(0, 0, width, height);
+		// Initialize buffers (delete and reset if size changed)
 		const int16_t batchTasks = Math::Max(static_cast<int16_t>(1), maxTasks);
-		voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [batchTasks];
-		animationTaskFinished = new uint8_t[batchTasks + 1];
-		voidDepth = new int16_t * *[batchTasks];
-		buffer = new Vector * *[batchTasks];
-		for (int i = 0; i < batchTasks; buffer[i++] = nullptr);
-		animationTasks = gcnew array<Task^>(batchTasks + 1);
-		for (int i = 0; i <= batchTasks; animationTaskFinished[i++] = 2)
-			animationTasks[i] = nullptr;
+		if (batchTasks != allocatedTasks) {
+			if (allocatedTasks >= 0) {
+				// Delete old task arrays
+				for (int t = 0; t < batchTasks; ++t) {
+					DeleteBuffer(t);
+					delete[] voidQueue[t];
+				}
+				delete[] buffer;
+				delete[] voidDepth;
+				delete[] voidQueue;
+				delete[] animationTaskFinished;
+				//delete[] animationTasks;
+			}
+			rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, allocatedHeight = height);
+			voidDepth = new int16_t * *[batchTasks];
+			voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [batchTasks];
+			animationTasks = gcnew array<Task^>(batchTasks + 1);
+			animationTaskFinished = new uint8_t[batchTasks + 1];
+			buffer = new Vector * *[allocatedTasks = batchTasks];
+			for (int t = 0; t < batchTasks; NewBuffer(t++))
+				voidQueue[t] = new std::queue<std::pair<int16_t, int16_t>>();
+		}
+		if (height != allocatedHeight) {
+			rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, allocatedHeight = height);
+			for (int t = 0; t < batchTasks; NewBuffer(t++)) 
+				DeleteBuffer(t);
+		}
+		if (width != allocatedWidth) {
+			for (int t = 0; t < batchTasks; ++t) {
+				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, height);
+				const auto& buffT = buffer[t];
+				const auto& voidT = voidDepth[t];
+				for (auto y = 0; y < height; voidT[y++] = new int16_t[width]) {
+					delete buffT[y];
+					delete voidT[y];
+					buffT[y] = new Vector[width];
+				}
+			}
+		}
+		for (int t = 0; t <= batchTasks; animationTaskFinished[t++] = 2) 
+			animationTasks[t] = nullptr;
+		// Generate the images
 		while (!cancel->Token.IsCancellationRequested && bitmapsFinished < bitmap->Length) {
 			const auto generateLength = (encode > 0 ? static_cast<int16_t>(bitmap->Length) : static_cast<int16_t>(1));
 			// Wait if no more frames to generate
@@ -319,7 +367,7 @@ namespace RgbFractalGenClr {
 			// Image parallelism
 			imageTasks = parallelType ? gcnew ConcurrentBag<Task^>() : nullptr;
 			// Animation Parallelism Task Count
-			auto animationTaskCount = parallelType ? static_cast<int16_t>(0) : Math::Min(batchTasks, (short)generateLength);
+			auto animationTaskCount = parallelType ? static_cast<int16_t>(0) : Math::Min(batchTasks, generateLength);
 			if (animationTaskCount <= 0) {
 				// No Animation Parallelism:
 				if (nextBitmap < generateLength) {
@@ -350,7 +398,7 @@ namespace RgbFractalGenClr {
 					// Check every task
 					for (int16_t task = 0; task < batchTasks; ++task) {
 						if (FinishTask(task)) {
-							TryGif((short)task);
+							TryGif(task);
 							if (animationTaskFinished[task] >= 2 && nextBitmap < generateLength) {
 								// Start another task when previous was finished
 								animationTaskFinished[task] = 0;
@@ -808,6 +856,9 @@ namespace RgbFractalGenClr {
 		if (cancel->Token.IsCancellationRequested)
 			return;
 		// Make a locked bitmap, remember the locked state
+		//bitmap[bitmapIndex] = gcnew Bitmap(width, height);
+		//bitmapData[bitmapIndex] = bitmap[bitmapIndex]->LockBits(rect, ImageLockMode::WriteOnly, System::Drawing::Imaging::PixelFormat::Format24bppRgb);
+		//uint8_t* p = (uint8_t*)(void*)(bitmapData[bitmapIndex]->Scan0);
 		uint8_t* p = (uint8_t*)(void*)((bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = gcnew Bitmap(width, height))->LockBits(rect,
 			ImageLockMode::WriteOnly,
 			System::Drawing::Imaging::PixelFormat::Format24bppRgb))->Scan0);
@@ -932,9 +983,13 @@ namespace RgbFractalGenClr {
 		// setup bitmap data
 		bitmapsFinished = nextBitmap = 0;
 		uint16_t frames = debug > 0 ? debug : period * finalPeriodMultiplier;
+		if (frames != allocatedFrames) {
+			if (allocatedFrames >= 0)
+				delete[] bitmapState;
+			bitmapState = new uint8_t[(allocatedFrames = frames) + 1];
+		}
 		bitmap = gcnew array<Bitmap^>(frames);
 		bitmapData = gcnew array<BitmapData^>(frames);
-		bitmapState = new uint8_t[frames + 1];
 		for (int i = frames; 0 <= i; bitmapState[i--] = 0);
 	}
 	uint16_t FractalGenerator::GetFinalPeriod() {
@@ -1029,16 +1084,14 @@ namespace RgbFractalGenClr {
 	}
 	System::Void FractalGenerator::SelectColor() {
 		// Setup colors
-		childColor = new uint8_t[Math::Max(static_cast<int8_t>(1), f->childCount)];
-		if (f->childCount <= 0) {
-			childColor[0] = 0;
-		} else {
+		if (f->childCount > 0) {
 			for (int i = f->childCount; 0 <= --i; childColor[i] = f->childColor[selectColor].second[i]);
 			// Setup palette
 			for (int i = 0; i < f->childCount; ++i)
 				childColor[i] = selectColorPalette == 0 ? childColor[i] : (3 - childColor[i]) % 3;
-			// Prepare subiteration color blend
-		}InitColorBlend();
+		}
+		// Prepare subiteration color blend
+		InitColorBlend();
 	}
 	bool FractalGenerator::SelectAngle(const uint16_t selectAngle) {
 		if (this->selectAngle == selectAngle)
