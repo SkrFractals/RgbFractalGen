@@ -1,3 +1,6 @@
+v1.73
+-automatic resizing of the fractal preview if its smaller than the window
+
 v1.72
 -Added comboBoxes for colorpalette/huecycling and spin select.
 -Added comboBoxes for extra spin speed and extra huecycle speed.
