@@ -27,7 +27,7 @@ namespace RgbFractalGenClr {
 
 #pragma region Generate
 	FractalGenerator::FractalGenerator() {
-		debug = defaultHue = defaultZoom = defaultAngle = extraSpin = extraHue = 0;
+		cutparam = debug = defaultHue = defaultZoom = defaultAngle = extraSpin = extraHue = 0;
 		zoom = 1;
 		select = selectColor = selectAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = defaultSpin = selectColorPalette = -1;
 		encode = 2;
@@ -249,7 +249,7 @@ namespace RgbFractalGenClr {
 	System::Void FractalGenerator::DeleteBuffer(const uint16_t taskIndex) {
 		const auto& buffT = buffer[taskIndex];
 		const auto& voidT = voidDepth[taskIndex];
-		for (auto y = 0; y < height; ++y) {
+		for (auto y = 0; y < allocatedHeight; ++y) {
 			delete buffT[y];
 			delete voidT[y];
 		}
@@ -340,21 +340,25 @@ namespace RgbFractalGenClr {
 				voidQueue[t] = new std::queue<std::pair<int16_t, int16_t>>();
 		}
 		if (height != allocatedHeight) {
-			rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, allocatedHeight = height);
-			for (int t = 0; t < batchTasks; NewBuffer(t++)) 
+			for (int t = 0; t < batchTasks; NewBuffer(t++))
 				DeleteBuffer(t);
+			allocatedHeight = height;
+			allocatedWidth = width;
 		}
 		if (width != allocatedWidth) {
 			for (int t = 0; t < batchTasks; ++t) {
-				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, height);
 				const auto& buffT = buffer[t];
 				const auto& voidT = voidDepth[t];
-				for (auto y = 0; y < height; voidT[y++] = new int16_t[width]) {
+				for (auto y = 0; y < allocatedHeight; voidT[y++] = new int16_t[width]) {
 					delete buffT[y];
 					delete voidT[y];
 					buffT[y] = new Vector[width];
 				}
+				for (auto y = allocatedHeight; y < height; voidT[y++] = new int16_t[width])
+					buffT[y] = new Vector[width];
+
 			}
+			allocatedWidth = width;
 		}
 		for (int t = 0; t <= batchTasks; animationTaskFinished[t++] = 2) 
 			animationTasks[t] = nullptr;
@@ -368,7 +372,7 @@ namespace RgbFractalGenClr {
 			imageTasks = parallelType ? gcnew ConcurrentBag<Task^>() : nullptr;
 			// Animation Parallelism Task Count
 			auto animationTaskCount = parallelType ? static_cast<int16_t>(0) : Math::Min(batchTasks, generateLength);
-			if (animationTaskCount <= 0) {
+			if (animationTaskCount <= 1) {
 				// No Animation Parallelism:
 				if (nextBitmap < generateLength) {
 					ModFrameParameters(size, angle, spin, hueAngle, color);
@@ -1120,13 +1124,15 @@ namespace RgbFractalGenClr {
 		// debug for testing, starts the generator with predetermined setting for easy breakpointing
 		// Need to enable the definition on top GeneratorForm.cpp to enable this
 		// if enabled you will be unable to use the settings interface!
-		SelectFractal(44);
+		SelectFractal(2);
+		SetupFractal();
 		SelectThreadingDepth();
 		SelectDetail(1);
 		debug = 7;
-		width = 1920;
-		height = 1080;
-		parallelType = false;
+		width = 80;
+		height = 80;
+		parallelType = true;
+		maxTasks = 0;
 		maxDepth = -1;//= 2;
 		maxGenerationTasks = maxTasks = -1;// 10;
 		saturate = 1.0f;
