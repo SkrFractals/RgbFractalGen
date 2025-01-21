@@ -77,6 +77,8 @@ namespace RgbFractalGenCs {
 		private string gifTempPath;						// Temporary GIF file name
 		private Random random = new();                  // Random generator
 
+		private bool[] taskStarted;
+
 		// Settings
 		internal float detail, noise, saturate;
 		internal byte selectBlur, encode, extraHue, extraSpin, parallelType;
@@ -358,15 +360,22 @@ namespace RgbFractalGenCs {
 				applyMaxGenerationTasks = maxGenerationTasks;
 				var batchTasks = Math.Max((short)1, applyMaxTasks = maxTasks);
 				if (batchTasks != allocatedTasks) {
+					if (allocatedTasks >= 0) 
+						for (int t = 0; t < allocatedTasks; ++t) 
+							if (taskStarted[t]) 
+								Join(t);
 					rect = new(0, 0, allocatedWidth = width, allocatedHeight = height);
 					tuples = new (float, float, float, float, float, byte, int)[Math.Max(1, applyMaxGenerationTasks * 8)];
 					voidDepth = new short[batchTasks][][];
 					voidQueue = new Queue<(short, short)>[batchTasks];
 					parallelTasks = new Task[batchTasks + 1];
+					taskStarted = new bool[batchTasks + 1];
 					parallelTaskFinished = new byte[batchTasks + 1];
 					buffer = new Vector3[batchTasks][][];
 					for (short t = 0; t < batchTasks; NewBuffer(t++))
 						voidQueue[t] = new();
+					for (int t = 0; t <= batchTasks; parallelTaskFinished[t++] = 2) ;
+//						parallelTasks[t] = null;
 				}
 				if (height != allocatedHeight) {
 					rect = new(0, 0, allocatedWidth = width, allocatedHeight = height);
@@ -381,9 +390,6 @@ namespace RgbFractalGenCs {
 							buffT[y] = new Vector3[width];
 					}
 				}
-				for (int t = 0; t <= batchTasks; parallelTaskFinished[t++] = 2)
-					parallelTasks[t] = null;
-
 				var generateLength = (encode > 0 ? bitmap.Length : 1);
 				// Wait if no more frames to generate
 				if (bitmapsFinished >= generateLength)
@@ -417,6 +423,7 @@ namespace RgbFractalGenCs {
 							var _hueAngle = hueAngle;
 							var _color = color;
 							//GenerateThread(_bitmap, _task, _size, _angle, _hueAngle, _color);
+							Start(_task);
 							animationTasks[_task] = (Task.Run(() => GenerateThread(_bitmap, _task, _size, _angle, _spin, _hueAngle, _color)));
 							IncrementFrameParameters(ref size, ref angle, spin, ref hueAngle, ref color, 1);
 						}
@@ -441,6 +448,7 @@ namespace RgbFractalGenCs {
 									var _hueAngle = hueAngle;
 									var _color = color;
 									//GenerateThread(_bitmap, _task, _size, _angle, _hueAngle, _color);
+									Start(_task);
 									parallelTasks[_task] = (Task.Run(() => GenerateImage(_bitmap, _task, _size, _angle, _spin, _hueAngle, _color)));
 									tasksRemaining = true; // A task finished, but started another one - keep checking before new master loop
 									IncrameParameters(ref size, ref angle, spin, ref hueAngle, ref color, 1);
@@ -452,7 +460,7 @@ namespace RgbFractalGenCs {
 			}
 			// Wait for threads to finish
 			//WaitForThreads();
-			for (int i = parallelTasks.Length; 0 <= --i; parallelTasks[i]?.Wait()) ;
+			for (int i = parallelTasks.Length; 0 <= --i; Join(i)) ;
 			// Unlock unfinished bitmaps:
 			for (int i = 0; i < bitmap.Length; ++i)
 				if (bitmapState[i] > 0 && bitmapState[i] < 4) {
@@ -641,6 +649,7 @@ namespace RgbFractalGenCs {
 								parallelTaskFinished[task] = 0;
 								var t = task;
 								var i = index++;
+								Start(task);
 								parallelTasks[task] = (Task.Run(() => Task_OfDepth(R, t, i)));
 								index %= max;
 								count = (max + insertTo - index) % max;
@@ -845,8 +854,7 @@ namespace RgbFractalGenCs {
 		}
 		private bool FinishTask(int taskIndex) {
 			if (parallelTaskFinished[taskIndex] == 1) {
-				parallelTasks[taskIndex]?.Wait();
-				parallelTasks[taskIndex] = null;
+				Join(taskIndex);
 				parallelTaskFinished[taskIndex] = 2;
 			}
 			return parallelTaskFinished[taskIndex] >= 2;
@@ -858,6 +866,7 @@ namespace RgbFractalGenCs {
 				exportingGif = true;
 				parallelTaskFinished[taskIndex] = 0;
 				bitmapState[bitmapsFinished] = 3;
+				Start(taskIndex);
 				parallelTasks[taskIndex] = (Task.Run(() => GenerateGif(taskIndex)));
 			} else {
 				bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
@@ -1242,5 +1251,26 @@ namespace RgbFractalGenCs {
 		//GetTempGif();
 		internal Fractal.CutFunction GetCutFunction() { return cutFunction; }
 		#endregion
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		void Join(int i) {
+			if (taskStarted[i]) {
+				if (parallelTasks[i] != null) {
+					parallelTasks[i].Wait();
+					parallelTasks[i] = null;
+				}// else { }
+			}// else { }
+			taskStarted[i] = false;
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		void Start(int i) {
+			if (taskStarted[i]) {
+				if (parallelTasks[i] != null) {
+					parallelTasks[i].Wait();
+					parallelTasks[i] = null;
+				}// else { }
+			}// else { }
+			taskStarted[i] = true;
+		}
+
 	}
 }

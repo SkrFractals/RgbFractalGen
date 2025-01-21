@@ -333,6 +333,14 @@ namespace RgbFractalGenClr {
 			const int16_t batchTasks = Math::Max(static_cast<int16_t>(1), applyMaxTasks = maxTasks);
 			if (batchTasks != allocatedTasks) {
 				if (allocatedTasks >= 0) {
+					for (int t = 0; t < allocatedTasks; ++t) {
+						if (taskStarted[t]) {
+#ifdef PARALLELDEBUG
+							Debug::WriteLine("GenerateAnimation task still running: " + t);
+#endif
+							Join(t);
+						}
+					}
 					// Delete old task arrays
 					for (int t = 0; t < allocatedTasks; ++t) {
 						DeleteBuffer(t);
@@ -343,17 +351,21 @@ namespace RgbFractalGenClr {
 					delete[] voidQueue;
 					delete[] parallelTaskFinished;
 					delete[] tuples;
-					//delete[] animationTasks;
+					delete[] taskStarted;
+					//delete[] parallelTasks;
 				}
 				tuples = new std::tuple<float, float, float, float, float, uint8_t, int>[Math::Max(1, applyMaxGenerationTasks * 8)];
 				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, allocatedHeight = height);
 				voidDepth = new int16_t * *[batchTasks];
 				voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [batchTasks];
 				parallelTasks = gcnew array<Task^>(batchTasks + 1);
+				taskStarted = new bool[batchTasks + 1];
 				parallelTaskFinished = new uint8_t[batchTasks + 2];
 				buffer = new Vector * *[allocatedTasks = batchTasks];
 				for (int t = 0; t < batchTasks; NewBuffer(t++))
 					voidQueue[t] = new std::queue<std::pair<int16_t, int16_t>>();
+				for (int t = 0; t <= batchTasks; parallelTaskFinished[t++] = 2)
+					parallelTasks[t] = nullptr;
 			}
 			if (height != allocatedHeight) {
 				for (int t = 0; t < batchTasks; NewBuffer(t++))
@@ -375,8 +387,7 @@ namespace RgbFractalGenClr {
 				}
 				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, height);
 			}
-			for (int t = 0; t <= batchTasks; parallelTaskFinished[t++] = 2)
-				parallelTasks[t] = nullptr;
+			
 			const auto generateLength = (encode > 0 ? static_cast<int16_t>(bitmap->Length) : static_cast<int16_t>(1));
 			// Wait if no more frames to generate
 			if (bitmapsFinished >= generateLength)
@@ -402,6 +413,7 @@ namespace RgbFractalGenClr {
 					if (animationTaskFinished[animationTaskCount] >= 2 && nextBitmap < generateLength) {
 						animationTaskFinished[animationTaskCount] = 0;
 						ModFrameParameters(size, angle, spin, hueAngle, color);
+						Start(animationTaskCount);
 						animationTasks[animationTaskCount] = Task::Factory->StartNew(
 							gcnew Action<Object^>(this, &FractalGenerator::GenerateThreadTask),
 							gcnew array<System::Object^>{ nextBitmap++, animationTaskCount, size, angle, spin, hueAngle, color }
@@ -421,6 +433,7 @@ namespace RgbFractalGenClr {
 								// Start another task when previous was finished
 								parallelTaskFinished[task] = 0;
 								ModFrameParameters(size, angle, spin, hueAngle, color);
+								Start(task);
 								parallelTasks[task] = Task::Factory->StartNew(
 									gcnew Action<Object^>(this, &FractalGenerator::Task_Animation),
 									gcnew array<System::Object^>{ nextBitmap++, task, size, angle, spin, hueAngle, color }
@@ -435,9 +448,7 @@ namespace RgbFractalGenClr {
 		}
 		// Wait for threads to finish
 			//WaitForThreads();
-		for (int i = allocatedTasks; i >= 0; --i)
-			if (parallelTasks[i] != nullptr)
-				parallelTasks[i]->Wait();
+		for (int i = allocatedTasks; i >= 0; Join(i++));
 		// Unlock unfinished bitmaps:
 		for (int i = 0; i < bitmap->Length; ++i)
 			if (bitmapState[i] > 0 && bitmapState[i] < 4 && bitmap[i] != nullptr) {
@@ -599,6 +610,7 @@ namespace RgbFractalGenClr {
 						if (parallelTaskFinished[task] >= 2 && count > 0 && !cancel->Token.IsCancellationRequested) {
 							// Start another task when previous was finished
 							parallelTaskFinished[task] = 0;
+							Start(task);
 							parallelTasks[task] = Task::Factory->StartNew(
 								gcnew Action<Object^>(this, &FractalGenerator::Task_OfDepth),
 								gcnew array<System::Object^>{ R, task, index++ }
@@ -827,9 +839,8 @@ namespace RgbFractalGenClr {
 	}
 	bool FractalGenerator::FinishTask(int16_t taskIndex) {
 		if (parallelTaskFinished[taskIndex] == 1) {
-			if (parallelTasks[taskIndex] != nullptr)
-				parallelTasks[taskIndex]->Wait();
-			parallelTasks[taskIndex] = nullptr;
+			Join(taskIndex);
+			
 			parallelTaskFinished[taskIndex] = 2;
 		}
 		return parallelTaskFinished[taskIndex] >= 2;
@@ -841,6 +852,7 @@ namespace RgbFractalGenClr {
 			exportingGif = true;
 			parallelTaskFinished[taskIndex] = 0;
 			bitmapState[bitmapsFinished] = 3;
+			Start(taskIndex);
 			parallelTasks[taskIndex] = Task::Factory->StartNew(
 				gcnew Action<Object^>(this, &FractalGenerator::Task_Gif),
 				gcnew array<System::Object^>{ taskIndex }
@@ -1225,5 +1237,50 @@ namespace RgbFractalGenClr {
 		return nativeString;
 	}
 #pragma endregion
+
+
+	inline void FractalGenerator::Join(int i) {
+		if (taskStarted[i]) {
+			if (parallelTasks[i] != nullptr) {
+#ifdef PARALLELDEBUG
+				Debug::WriteLine("join" + i);
+#endif
+				parallelTasks[i]->Wait();
+				parallelTasks[i] = nullptr;
+			} else {
+#ifdef PARALLELDEBUG
+				Debug::WriteLine("ERROR not joinable " + i);
+#endif
+			}
+		} else {
+#ifdef PARALLELDEBUG
+			Debug::WriteLine("ERROR join: task not running " + i);
+#endif
+		}
+		taskStarted[i] = false;
+	}
+
+	inline void FractalGenerator::Start(int i) {
+		if (taskStarted[i]) {
+#ifdef PARALLELDEBUG
+			Debug::WriteLine("ERROR start: task already running " + i);
+#endif
+
+			if (parallelTasks[i] != nullptr) {
+				parallelTasks[i]->Wait();
+				parallelTasks[i] = nullptr;
+			} else {
+#ifdef PARALLELDEBUG
+				Debug::WriteLine("ERROR not joinable " + i);
+#endif
+			}
+		} else {
+#ifdef PARALLELDEBUG
+			Debug::WriteLine("start" + i);
+#endif
+		}
+		taskStarted[i] = true;
+	}
+
 
 }

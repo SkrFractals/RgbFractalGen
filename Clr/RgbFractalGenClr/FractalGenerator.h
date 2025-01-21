@@ -72,6 +72,8 @@ namespace RgbFractalGenClr {
         System::String^ gifTempPath;                // Temporary GIF file name
         float* emptyFloat;
 
+        bool* taskStarted;
+
     public:
         // Settings
         float detail, noise, saturate;
@@ -214,6 +216,9 @@ namespace RgbFractalGenClr {
         inline Fractal::CutFunction* GetCutFunction() { return cutFunction; }
         std::string ConvertToStdString(System::String^ managedString);
 #pragma endregion
+
+        inline void Join(int i);
+        inline void Start(int i);
 
     };
 }
