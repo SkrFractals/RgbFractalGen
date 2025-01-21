@@ -39,7 +39,7 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::Label^ threadsLabel;
 	private: System::Windows::Forms::TrackBar^ threadsBar;
 	private: System::Windows::Forms::CheckBox^ parallelBox;
-	private: System::Windows::Forms::CheckBox^ parallelTypeBox;
+
 	private: System::Windows::Forms::Label^ statusLabel;
 	private: System::Windows::Forms::Label^ infoLabel;
 	private: System::Windows::Forms::Button^ pngButton;
@@ -70,6 +70,7 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::Label^ label1;
 	private: System::Windows::Forms::TextBox^ spinSpeedBox;
 	private: System::Windows::Forms::TextBox^ hueSpeedBox;
+	private: System::Windows::Forms::ComboBox^ parallelTypeBox;
 
 	private: System::ComponentModel::IContainer^ components;
 
@@ -99,6 +100,7 @@ namespace RgbFractalGenClr {
 		bool previewMode = true;			// Preview mode for booting performance while setting up parameters
 		bool animated = true;				// Animating preview or paused? (default animating)
 		bool modifySettings = true;			// Allows for modifying settings without it triggering Aborts and Generates
+		int16_t width = -1, height = -1;
 		System::String^ gifPath = "";		// Gif export path name
 		// Display  Variables
 		DoubleBufferedPanel^ screenPanel;	// Display panel
@@ -369,7 +371,8 @@ namespace RgbFractalGenClr {
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void parallelTypeBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
+		System::Void parallelTypeBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
+		//System::Void parallelTypeBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Toggles between parallelism of single images and parallelism of batching animation frames
 		/// </summary>
@@ -472,6 +475,7 @@ namespace RgbFractalGenClr {
 		/// <returns></returns>
 		//std::string ConvertToStdString(System::String^ managedString);
 #pragma endregion
+
 
 };
 }

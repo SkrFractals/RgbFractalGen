@@ -32,17 +32,18 @@ namespace RgbFractalGenCs {
 		private FractalGenerator generator;     // The core ofthe app, the generator the generates the fractal animations
 		private CancellationTokenSource cancel; // Cancellation Token Source
 		private Task gTask;                     // CPU gif thread
-		// Settings
+												// Settings
 		private bool previewMode = true;        // Preview mode for booting performance while setting up parameters
 		private bool animated = true;           // Animating preview or paused? (default animating)
 		private bool modifySettings = true;     // Allows for modifying settings without it triggering Aborts and Generates
-		private string gifPath;					// Gif export path name
-		// Display Variables
+		private short width = -1, height = -1;
+		private string gifPath;                 // Gif export path name
+												// Display Variables
 		private DoubleBufferedPanel screenPanel;// Display panel
 		private Bitmap currentBitmap = null;    // Displayed Bitmap
 		private int currentBitmapIndex;         // Play frame index
 		private int fx, fy;                     // Memory of window size
-		private int controlTabIndex = 0;		// Iterator for tabIndexes - to make sure all the controls tab in the correct order even as i add new ones in the middle
+		private int controlTabIndex = 0;        // Iterator for tabIndexes - to make sure all the controls tab in the correct order even as i add new ones in the middle
 
 		#endregion
 
@@ -85,7 +86,7 @@ namespace RgbFractalGenCs {
 			SetupControl(detailBar, "Level of Detail (The lower the finer).");
 			SetupControl(blurBar, "Motion blur: Lowest no blur and fast generation, highest 10 smeared frames 10 times slower generation.");
 			SetupControl(parallelBox, "Enable parallelism (and then tune with the Max Threads slider).\nSelect the type of parallelism with the followinf checkBox to the right.");
-			SetupControl(parallelTypeBox, "Type of parallelism to be used if the left checkBox is enabled.\n...Of Images = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong\n...Of Animation Frames = batching animation frames, recommended for Animations with perfect pixels.");
+			SetupControl(parallelTypeBox, "Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong");
 			SetupControl(threadsBar, "The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
 			SetupControl(delayBox, "A delay between frames in 1/100 of seconds for the preview and exported GIF file.\nThe framerate will be roughly 100/delay");
 			SetupControl(prevButton, "Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
@@ -119,9 +120,11 @@ namespace RgbFractalGenCs {
 			noiseBar_Scroll(null, null);
 			blurBar_Scroll(null, null);
 			saturateBar_Scroll(null, null);
+			parallelTypeBox.SelectedIndex = 0;
 
 			// Setup bitmap and start generation
 			modifySettings = false;
+			TryResize();
 			ResizeAll();
 			gTask = null;
 
@@ -135,7 +138,7 @@ namespace RgbFractalGenCs {
 		/// <returns></returns>
 		private void timer_Tick(object sender, EventArgs e) {
 			// Fetch the state of generated bitmaps
-			int b = generator.GetBitmapsFinished(), bt = generator.GetBitmapsTotal();
+			int b = generator.GetBitmapsFinished(), bt = generator.GetFrames();
 			if (bt <= 0)
 				return;
 			// Only Allow GIF Export when generation is finished
@@ -216,13 +219,11 @@ namespace RgbFractalGenCs {
 
 		#region Size
 		private void ResizeAll() {
-			TryResize();
+			generator.width = width;
+			generator.height = height;
 			// Update the size of the window and display
 			SetMinimumSize();
-			SetClientSizeCore(
-				generator.width + 314,
-				Math.Max(generator.height + 8, 300)
-			);
+			SetClientSizeCore(width + 314, Math.Max(height + 8, 300));
 			ResizeScreen();
 			WindowSizeRefresh();
 #if CUSTOMDEBUGTEST
@@ -237,20 +238,16 @@ namespace RgbFractalGenCs {
 		/// <returns>Changed</returns>
 		private bool TryResize() {
 			previewMode = !previewBox.Checked;
-			short w = 8, h = 8;
-			if (!short.TryParse(resX.Text, out w) || w <= 8)
-				generator.width = 8;
-			if (!short.TryParse(resY.Text, out h) || h <= 8)
-				generator.height = 8;
-			previewBox.Text = "Resolution: " + w.ToString() + "x" + h.ToString();
+			width = 8;
+			height = 8;
+			if (!short.TryParse(resX.Text, out width) || width <= 8)
+				width = 8;
+			if (!short.TryParse(resY.Text, out height) || height <= 8)
+				height = 8;
+			previewBox.Text = "Resolution: " + width.ToString() + "x" + height.ToString();
 			if (previewMode)
-				w = h = 80;
-			if (generator.width == w && generator.height == h) 
-				return false;
-			// resoltion is changed - request the fractal to resize the buffer and restart generation
-			generator.width = w; 
-			generator.height = h;
-			return true;
+				width = height = 80;
+			return generator.width != width || generator.height != height;
 		}
 		private void WindowSizeRefresh() {
 			if (fx == Width && fy == Height)
@@ -260,8 +257,8 @@ namespace RgbFractalGenCs {
 			SetMinimumSize();
 			int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
 			SetClientSizeCore(
-				Math.Max(/*ClientSize.Width*/Width - bw, 314 + Math.Max(screenPanel.Width, generator.width)),
-				Math.Max(/*ClientSize.Height*/Height - bh, 8 + Math.Max(screenPanel.Height, generator.height))
+				Math.Max(/*ClientSize.Width*/Width - bw, 314 + Math.Max(screenPanel.Width, width)),
+				Math.Max(/*ClientSize.Height*/Height - bh, 8 + Math.Max(screenPanel.Height, height))
 			);
 			SizeAdapt();
 		}
@@ -274,15 +271,15 @@ namespace RgbFractalGenCs {
 			// bh = Height - ClientHeight = 39
 			int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
 			MinimumSize = new(
-				Math.Max(1100, bw + generator.width + 284),
-				Math.Max(900, bh + Math.Max(460, generator.height + 8))
+				Math.Max(1100, bw + width + 284),
+				Math.Max(900, bh + Math.Max(460, height + 8))
 			);
 			//debugLabel.Text = debugLabel.Text + " " + MinimumSize.Height.ToString();
 		}
 		private void ResizeScreen() {
 			int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
-			int screenHeight = Math.Max(generator.height, Math.Min(Height - bh - 8, (Width - bw - 314) * generator.height / generator.width));
-			screenPanel.SetBounds(305, 4, screenHeight * generator.width / generator.height, screenHeight);
+			int screenHeight = Math.Max(height, Math.Min(Height - bh - 8, (Width - bw - 314) * height / width));
+			screenPanel.SetBounds(305, 4, screenHeight * width / height, screenHeight);
 			screenPanel.Invalidate();
 		}
 		#endregion
@@ -356,7 +353,7 @@ namespace RgbFractalGenCs {
 				return;
 			// Color children definition is different - change the setting and restart generation
 			Abort();
-			generator.SelectColor();
+			generator.SetupColor();
 			ResetGenerate();
 		}
 		/// <summary>
@@ -447,7 +444,7 @@ namespace RgbFractalGenCs {
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void resX_TextChanged(object sender, EventArgs e) {
-			if(TryResize())
+			if (TryResize())
 				AbortGenerate();
 		}
 		/// <summary>
@@ -465,7 +462,7 @@ namespace RgbFractalGenCs {
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		private void previewBox_CheckedChanged(object sender, EventArgs e) {
-			if(TryResize())
+			if (TryResize())
 				AbortGenerate();
 		}
 		/// <summary>
@@ -596,7 +593,7 @@ namespace RgbFractalGenCs {
 			Abort();
 			// hue is different - change the setting and restart generation
 			generator.hueCycle = newHueCycle;
-			generator.SelectColor();
+			generator.SetupColor();
 			ResetGenerate();
 		}
 		/// <summary>
@@ -681,7 +678,7 @@ namespace RgbFractalGenCs {
 			ResetGenerate();
 		}
 		private void SelectSaturation() {
-			
+
 		}
 		/// <summary>
 		/// Detail, how small the split fractal shaped have to get, until they draw a dot of their color to the image buffer (the smaller the finer)
@@ -729,14 +726,14 @@ namespace RgbFractalGenCs {
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		private void parallelTypeBox_CheckedChanged(object sender, EventArgs e) {
+		private void parallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) {
 			SelectParallelType();
 		}
 		/// <summary>
 		/// Toggles between parallelism of single images and parallelism of batching animation frames
 		/// </summary>
 		private void SelectParallelType() {
-			parallelTypeBox.Text = (generator.parallelType = parallelTypeBox.Checked) ? "...of Images" : "...of Animation Frames";
+			generator.parallelType = (byte)parallelTypeBox.SelectedIndex;
 		}
 		/// <summary>
 		/// Maximum number of threads
@@ -915,6 +912,7 @@ namespace RgbFractalGenCs {
 			gTask = null;
 		}
 		#endregion
+
 
 	}
 }

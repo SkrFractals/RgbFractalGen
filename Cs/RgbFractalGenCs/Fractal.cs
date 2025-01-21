@@ -646,4 +646,14 @@ public static int Beamtree_OuterBeam(int index, int inFlags) {
 		}*/
 		#endregion
 	}
+
+	internal class VecRefWrapper {
+		internal Vector3[][] buffT;
+		internal Vector3 H, I;
+		internal VecRefWrapper(Vector3[][] buffT, Vector3 I, Vector3 H) {
+			this.buffT = buffT;
+			this.H = H; this.I = I;
+		}
+	
+	}
 }

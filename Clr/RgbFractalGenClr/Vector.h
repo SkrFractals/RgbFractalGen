@@ -79,4 +79,21 @@ public:
 		v.Z = Z;
 		return v;
 	}
+	void FromVector(const Vector& V) {
+		X = V.X;
+		Y = V.Y;
+		Z = V.Z;
+	}
 };
+
+public ref struct VecRefWrapper {
+	Vector**& T;
+	ManagedVector^ I;
+	ManagedVector^ H;
+	//uint16_t Tasks;
+	VecRefWrapper(Vector**& buffT, ManagedVector^ blendI, ManagedVector^ blendH) : T(buffT) {
+		I = blendI;
+		H = blendH;
+	}
+};
+

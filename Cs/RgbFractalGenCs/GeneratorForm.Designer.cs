@@ -45,7 +45,6 @@
 			saturateBar = new System.Windows.Forms.TrackBar();
 			threadsBar = new System.Windows.Forms.TrackBar();
 			parallelBox = new System.Windows.Forms.CheckBox();
-			parallelTypeBox = new System.Windows.Forms.CheckBox();
 			pngButton = new System.Windows.Forms.Button();
 			gifButton = new System.Windows.Forms.Button();
 			blurBar = new System.Windows.Forms.TrackBar();
@@ -82,6 +81,7 @@
 			hueLabel = new System.Windows.Forms.Label();
 			spinSpeedBox = new System.Windows.Forms.TextBox();
 			hueSpeedBox = new System.Windows.Forms.TextBox();
+			parallelTypeBox = new System.Windows.Forms.ComboBox();
 			((System.ComponentModel.ISupportInitialize)ambBar).BeginInit();
 			((System.ComponentModel.ISupportInitialize)noiseBar).BeginInit();
 			((System.ComponentModel.ISupportInitialize)detailBar).BeginInit();
@@ -314,20 +314,6 @@
 			parallelBox.Text = "Parallel Generation...";
 			parallelBox.UseVisualStyleBackColor = true;
 			parallelBox.CheckedChanged += parallelBox_CheckedChanged;
-			// 
-			// parallelTypeBox
-			// 
-			parallelTypeBox.AutoSize = true;
-			parallelTypeBox.Checked = true;
-			parallelTypeBox.CheckState = System.Windows.Forms.CheckState.Checked;
-			parallelTypeBox.Location = new System.Drawing.Point(155, 661);
-			parallelTypeBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
-			parallelTypeBox.Name = "parallelTypeBox";
-			parallelTypeBox.Size = new System.Drawing.Size(89, 19);
-			parallelTypeBox.TabIndex = 26;
-			parallelTypeBox.Text = "...Of Images";
-			parallelTypeBox.UseVisualStyleBackColor = true;
-			parallelTypeBox.CheckedChanged += parallelTypeBox_CheckedChanged;
 			// 
 			// pngButton
 			// 
@@ -676,11 +662,22 @@
 			hueSpeedBox.Text = "0";
 			hueSpeedBox.TextChanged += hueSpeedBox_TextChanged;
 			// 
+			// parallelTypeBox
+			// 
+			parallelTypeBox.FormattingEnabled = true;
+			parallelTypeBox.Items.AddRange(new object[] { "Of Animation", "Of Depth", "Of Recursion" });
+			parallelTypeBox.Location = new System.Drawing.Point(159, 659);
+			parallelTypeBox.Name = "parallelTypeBox";
+			parallelTypeBox.Size = new System.Drawing.Size(143, 23);
+			parallelTypeBox.TabIndex = 21;
+			parallelTypeBox.SelectedIndexChanged += parallelTypeBox_SelectedIndexChanged;
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			ClientSize = new System.Drawing.Size(1086, 858);
+			Controls.Add(parallelTypeBox);
 			Controls.Add(hueSpeedBox);
 			Controls.Add(spinSpeedBox);
 			Controls.Add(hueLabel);
@@ -729,7 +726,6 @@
 			Controls.Add(threadsBar);
 			Controls.Add(threadsLabel);
 			Controls.Add(parallelBox);
-			Controls.Add(parallelTypeBox);
 			Controls.Add(statusLabel);
 			Controls.Add(infoLabel);
 			Controls.Add(pngButton);
@@ -769,7 +765,6 @@
 		private System.Windows.Forms.Button nextButton;
 		private System.Windows.Forms.Button animateButton;
 		private System.Windows.Forms.CheckBox parallelBox;
-		private System.Windows.Forms.CheckBox parallelTypeBox;
 		private System.Windows.Forms.Label statusLabel;
 		private System.Windows.Forms.Label infoLabel;
 		private System.Windows.Forms.Button pngButton;
@@ -810,6 +805,7 @@
 		private System.Windows.Forms.Label hueLabel;
 		private System.Windows.Forms.TextBox spinSpeedBox;
 		private System.Windows.Forms.TextBox hueSpeedBox;
+		private System.Windows.Forms.ComboBox parallelTypeBox;
 	}
 }
 
