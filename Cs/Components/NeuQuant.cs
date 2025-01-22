@@ -11,7 +11,7 @@
 // $History:		$  
 //  
 //===============================================================================
-#endregion 
+#endregion
 
 #region Java
 /* NeuQuant Neural-Net Quantization Algorithm
@@ -38,7 +38,6 @@
 #endregion
 
 using System;
-using System.Numerics;
 using System.Threading;
 
 namespace Gif.Components {
@@ -50,7 +49,7 @@ namespace Gif.Components {
 		protected static readonly int prime2 = 491;
 		protected static readonly int prime3 = 487;
 		protected static readonly int prime4 = 503;
-		protected static readonly int minpicturebytes = ( 3 * prime4 );
+		protected static readonly int minpicturebytes = (3 * prime4);
 		/* minimum size for input image */
 		/* Program Skeleton
 		   ----------------
@@ -72,9 +71,9 @@ namespace Gif.Components {
 
 		/* defs for freq and bias */
 		protected static readonly int intbiasshift = 16; /* bias for fractions */
-		protected static readonly int intbias = (((int) 1) << intbiasshift);
+		protected static readonly int intbias = (((int)1) << intbiasshift);
 		protected static readonly int gammashift = 10; /* gamma = 1024 */
-		protected static readonly int gamma = (((int) 1) << gammashift);
+		protected static readonly int gamma = (((int)1) << gammashift);
 		protected static readonly int betashift = 10;
 		protected static readonly int beta = (intbias >> betashift); /* beta = 1/1024 */
 		protected static readonly int betagamma = (intbias << (gammashift - betashift));
@@ -82,21 +81,21 @@ namespace Gif.Components {
 		/* defs for decreasing radius factor */
 		protected static readonly int initrad = (netsize >> 3); /* for 256 cols, radius starts */
 		protected static readonly int radiusbiasshift = 6; /* at 32.0 biased by 6 bits */
-		protected static readonly int radiusbias = (((int) 1) << radiusbiasshift);
+		protected static readonly int radiusbias = (((int)1) << radiusbiasshift);
 		protected static readonly int initradius = (initrad * radiusbias); /* and decreases by a */
 		protected static readonly int radiusdec = 30; /* factor of 1/30 each cycle */
 
 		/* defs for decreasing alpha factor */
 		protected static readonly int alphabiasshift = 10; /* alpha starts at 1.0 */
-		protected static readonly int initalpha = (((int) 1) << alphabiasshift);
+		protected static readonly int initalpha = (((int)1) << alphabiasshift);
 
 		protected int alphadec; /* biased by 10 bits */
 
 		/* radbias and alpharadbias used for radpower calculation */
 		protected static readonly int radbiasshift = 8;
-		protected static readonly int radbias = (((int) 1) << radbiasshift);
+		protected static readonly int radbias = (((int)1) << radbiasshift);
 		protected static readonly int alpharadbshift = (alphabiasshift + radbiasshift);
-		protected static readonly int alpharadbias = (((int) 1) << alpharadbshift);
+		protected static readonly int alpharadbias = (((int)1) << alpharadbshift);
 
 		/* Types and Global Variables
 		-------------------------- */
@@ -155,13 +154,13 @@ namespace Gif.Components {
 			int k = 0;
 			for (int i = 0; i < netsize; ++i) {
 				int j = index[i];
-				map[k++] = (byte) (network[j][0]);
-				map[k++] = (byte) (network[j][1]);
-				map[k++] = (byte) (network[j][2]);
+				map[k++] = (byte)(network[j][0]);
+				map[k++] = (byte)(network[j][1]);
+				map[k++] = (byte)(network[j][2]);
 			}
 			return map;
 		}
-	
+
 		/* Insertion sort of network and building of netindex[0..255] (to do after unbias)
 		   ------------------------------------------------------------------------------- */
 		public bool Inxbuild(CancellationToken token) {
@@ -212,7 +211,7 @@ namespace Gif.Components {
 				netindex[j] = maxnetpos; /* really 256 */
 			return false;
 		}
-	
+
 		/* Main Learning Loop
 		   ------------------ */
 		unsafe public bool Learn(CancellationToken token) {
@@ -265,13 +264,13 @@ namespace Gif.Components {
 			return false;
 			//fprintf(stderr,"finished 1D learning: readonly alpha=%f !\n",((float)alpha)/initalpha);
 		}
-	
+
 		/* Search for BGR values 0..255 (after net is unbiased) and return colour index
 		   ---------------------------------------------------------------------------- */
 		public int Map(int r, int g, int b) {
 			int i = netindex[g], /* index on g */
 				j = i - 1, /* start at netindex[g] and work outwards */
-				dist, a, best = -1, 
+				dist, a, best = -1,
 				bestd = 1000; /* biggest possible dist is 256*3 */
 			int[] p;
 			while (i < netsize || j >= 0) {
@@ -317,11 +316,11 @@ namespace Gif.Components {
 			if (Learn(token))
 				return null;
 			Unbiasnet();
-			if(Inxbuild(token))
+			if (Inxbuild(token))
 				return null;
 			return ColorMap();
 		}
-	
+
 		/* Unbias network to give byte values 0..255 and record position i to prepare for sort
 		   ----------------------------------------------------------------------------------- */
 		public void Unbiasnet() {
@@ -333,7 +332,7 @@ namespace Gif.Components {
 				ni[3] = i; /* record colour no */
 			}
 		}
-	
+
 		/* Move adjacent neurons by precomputed alpha*(1-((i-j)^2/[r]^2)) in radpower[|i-j|]
 		   --------------------------------------------------------------------------------- */
 		protected void Alterneigh(int rad, int i, int b, int g, int r) {
@@ -351,7 +350,7 @@ namespace Gif.Components {
 						p[0] -= (a * (p[0] - b)) / alpharadbias;
 						p[1] -= (a * (p[1] - g)) / alpharadbias;
 						p[2] -= (a * (p[2] - r)) / alpharadbias;
-					} catch (Exception) {} // prevents 1.3 miscompilation
+					} catch (Exception) { } // prevents 1.3 miscompilation
 				}
 				if (k > lo) {
 					p = network[k--];
@@ -359,11 +358,11 @@ namespace Gif.Components {
 						p[0] -= (a * (p[0] - b)) / alpharadbias;
 						p[1] -= (a * (p[1] - g)) / alpharadbias;
 						p[2] -= (a * (p[2] - r)) / alpharadbias;
-					} catch (Exception) {}
+					} catch (Exception) { }
 				}
 			}
 		}
-	
+
 		/* Move neuron i towards biased (b,g,r) by factor alpha
 		   ---------------------------------------------------- */
 		protected void Altersingle(int alpha, int i, int b, int g, int r) {
@@ -373,7 +372,7 @@ namespace Gif.Components {
 			n[1] -= (alpha * (n[1] - g)) / initalpha;
 			n[2] -= (alpha * (n[2] - r)) / initalpha;
 		}
-	
+
 		/* Search for biased BGR values
 		   ---------------------------- */
 		protected int Contest(int b, int g, int r) {

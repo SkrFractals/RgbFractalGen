@@ -1,3 +1,8 @@
+v1.8
+-major code cleanup
+-bloom feature
+-timeout and threaded settings changes so it doesn't freeze as you change the settings
+
 v1.73
 -automatic resizing of the fractal preview if its smaller than the window
 -the generator will not restart if you reselect the same setting that was already set

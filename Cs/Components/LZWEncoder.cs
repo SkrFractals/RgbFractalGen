@@ -11,7 +11,7 @@
 // $History:		$  
 //  
 //===============================================================================
-#endregion 
+#endregion
 
 #region Java
 //==============================================================================
@@ -105,7 +105,7 @@ namespace Gif.Components {
 		int cur_accum = 0;
 		int cur_bits = 0;
 
-		int [] masks =
+		int[] masks =
 		{
 			0x0000,
 			0x0001,
@@ -138,7 +138,7 @@ namespace Gif.Components {
 			pixAry = pixels;
 			initCodeSize = Math.Max(2, color_depth);
 		}
-	
+
 		// Add a character to the end of the current packet, and if it is 254
 		// characters, flush the packet to disk.
 		void Add(byte c, Stream outs) {
@@ -146,7 +146,7 @@ namespace Gif.Components {
 			if (a_count >= 254)
 				Flush(outs);
 		}
-	
+
 		// Clear out the hash table
 
 		// table clear for block compress
@@ -156,13 +156,13 @@ namespace Gif.Components {
 			clear_flg = true;
 			Output(ClearCode, outs);
 		}
-	
+
 		// reset code table
 		void ResetCodeTable(int hsize) {
 			for (int i = 0; i < hsize; ++i)
 				htab[i] = -1;
 		}
-	
+
 		void Compress(int init_bits, Stream outs) {
 			int fcode;
 			int i;
@@ -230,10 +230,10 @@ namespace Gif.Components {
 			Output(ent, outs);
 			Output(EOFCode, outs);
 		}
-	
+
 		//----------------------------------------------------------------------------
-		public void Encode( Stream os) {
-			os.WriteByte( Convert.ToByte( initCodeSize) ); // write "initial code size" byte
+		public void Encode(Stream os) {
+			os.WriteByte(Convert.ToByte(initCodeSize)); // write "initial code size" byte
 
 			remaining = imgW * imgH; // reset navigation variables
 			curPixel = 0;
@@ -242,28 +242,28 @@ namespace Gif.Components {
 
 			os.WriteByte(0); // write block terminator
 		}
-	
+
 		// Flush the packet to disk, and reset the accumulator
 		void Flush(Stream outs) {
 			if (a_count > 0) {
-				outs.WriteByte( Convert.ToByte( a_count ));
+				outs.WriteByte(Convert.ToByte(a_count));
 				outs.Write(accum, 0, a_count);
 				a_count = 0;
 			}
 		}
-	
+
 		int MaxCode(int n_bits) {
 			return (1 << n_bits) - 1;
 		}
-	
+
 		//----------------------------------------------------------------------------
 		// Return the next pixel from the image
 		//----------------------------------------------------------------------------
 		private int NextPixel() {
-            int upperBound = pixAry.GetUpperBound(0);
-            return (curPixel <= upperBound) ? (pixAry[curPixel++] & 0xff) : EOF;
-        }
-	
+			int upperBound = pixAry.GetUpperBound(0);
+			return (curPixel <= upperBound) ? (pixAry[curPixel++] & 0xff) : EOF;
+		}
+
 		void Output(int code, Stream outs) {
 			cur_accum &= masks[cur_bits];
 
@@ -275,7 +275,7 @@ namespace Gif.Components {
 			cur_bits += n_bits;
 
 			while (cur_bits >= 8) {
-				Add((byte) (cur_accum & 0xff), outs);
+				Add((byte)(cur_accum & 0xff), outs);
 				cur_accum >>= 8;
 				cur_bits -= 8;
 			}
@@ -291,7 +291,7 @@ namespace Gif.Components {
 			if (code == EOFCode) {
 				// At EOF, write the rest of the buffer.
 				while (cur_bits > 0) {
-					Add((byte) (cur_accum & 0xff), outs);
+					Add((byte)(cur_accum & 0xff), outs);
 					cur_accum >>= 8;
 					cur_bits -= 8;
 				}
