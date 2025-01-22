@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\giflib">
+      <UniqueIdentifier>{4270a027-ce2b-4008-9ecf-1b66c79bcc2a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\algorithm">
+      <UniqueIdentifier>{7a7d304e-f4a2-4b2f-a056-35d8db102421}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\giflib">
+      <UniqueIdentifier>{59f4f448-9c93-400d-b7f9-925e1152fc01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\algorithm">
+      <UniqueIdentifier>{a157c448-cf03-41e4-9091-7c430054f78f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DoubleBufferedPanel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Fractal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GifEncoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="giflib\gif_hash.h">
+      <Filter>Header Files\giflib</Filter>
+    </ClInclude>
+    <ClInclude Include="giflib\gif_lib.h">
+      <Filter>Header Files\giflib</Filter>
+    </ClInclude>
+    <ClInclude Include="giflib\gif_lib_private.h">
+      <Filter>Header Files\giflib</Filter>
+    </ClInclude>
+    <ClInclude Include="algorithm\NeuQuant.h">
+      <Filter>Header Files\algorithm</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratorForm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FractalGenerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Vector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DoubleBufferedPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Fractal.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GifEncoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="giflib\dgif_lib.cpp">
+      <Filter>Source Files\giflib</Filter>
+    </ClCompile>
+    <ClCompile Include="giflib\egif_lib.cpp">
+      <Filter>Source Files\giflib</Filter>
+    </ClCompile>
+    <ClCompile Include="giflib\gif_err.cpp">
+      <Filter>Source Files\giflib</Filter>
+    </ClCompile>
+    <ClCompile Include="giflib\gif_hash.cpp">
+      <Filter>Source Files\giflib</Filter>
+    </ClCompile>
+    <ClCompile Include="giflib\gifalloc.cpp">
+      <Filter>Source Files\giflib</Filter>
+    </ClCompile>
+    <ClCompile Include="giflib\openbsd-reallocarray.cpp">
+      <Filter>Source Files\giflib</Filter>
+    </ClCompile>
+    <ClCompile Include="algorithm\NeuQuant.cpp">
+      <Filter>Source Files\algorithm</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratorForm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FractalGenerator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="RgbFractalGenCpp.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="icon.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="README.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+  </ItemGroup>
+</Project>
