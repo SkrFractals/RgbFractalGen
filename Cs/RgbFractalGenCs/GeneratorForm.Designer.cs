@@ -80,6 +80,7 @@
 			blurBox = new System.Windows.Forms.TextBox();
 			bloomBox = new System.Windows.Forms.TextBox();
 			threadsBox = new System.Windows.Forms.TextBox();
+			abortBox = new System.Windows.Forms.TextBox();
 			helpPanel.SuspendLayout();
 			SuspendLayout();
 			// 
@@ -181,10 +182,10 @@
 			// 
 			// delayBox
 			// 
-			delayBox.Location = new System.Drawing.Point(17, 463);
+			delayBox.Location = new System.Drawing.Point(114, 463);
 			delayBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			delayBox.Name = "delayBox";
-			delayBox.Size = new System.Drawing.Size(67, 23);
+			delayBox.Size = new System.Drawing.Size(66, 23);
 			delayBox.TabIndex = 28;
 			delayBox.Text = "5";
 			delayBox.TextChanged += DelayBox_TextChanged;
@@ -300,12 +301,12 @@
 			// delayLabel
 			// 
 			delayLabel.AutoSize = true;
-			delayLabel.Location = new System.Drawing.Point(92, 466);
+			delayLabel.Location = new System.Drawing.Point(191, 466);
 			delayLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			delayLabel.Name = "delayLabel";
-			delayLabel.Size = new System.Drawing.Size(39, 15);
+			delayLabel.Size = new System.Drawing.Size(67, 15);
 			delayLabel.TabIndex = 0;
-			delayLabel.Text = "Delay:";
+			delayLabel.Text = "Abort/ FPS:";
 			// 
 			// voidLabel
 			// 
@@ -559,6 +560,7 @@
 			parallelTypeBox.Name = "parallelTypeBox";
 			parallelTypeBox.Size = new System.Drawing.Size(123, 23);
 			parallelTypeBox.TabIndex = 27;
+			parallelTypeBox.Text = "Parallelism Type";
 			parallelTypeBox.SelectedIndexChanged += ParallelTypeBox_SelectedIndexChanged;
 			// 
 			// ambBox
@@ -624,11 +626,22 @@
 			threadsBox.Text = "0";
 			threadsBox.TextChanged += Parallel_Changed;
 			// 
+			// abortBox
+			// 
+			abortBox.Location = new System.Drawing.Point(17, 463);
+			abortBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+			abortBox.Name = "abortBox";
+			abortBox.Size = new System.Drawing.Size(66, 23);
+			abortBox.TabIndex = 45;
+			abortBox.Text = "500";
+			abortBox.TextChanged += abortBox_TextChanged;
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			ClientSize = new System.Drawing.Size(1086, 610);
+			Controls.Add(abortBox);
 			Controls.Add(threadsBox);
 			Controls.Add(bloomBox);
 			Controls.Add(blurBox);
@@ -746,6 +759,7 @@
 		private System.Windows.Forms.TextBox blurBox;
 		private System.Windows.Forms.TextBox bloomBox;
 		private System.Windows.Forms.TextBox threadsBox;
+		private System.Windows.Forms.TextBox abortBox;
 	}
 }
 

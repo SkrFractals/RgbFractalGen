@@ -14,6 +14,7 @@
 #define FE { "", new float[0] { } }
 #define BE { "", new uint8_t[0] { } }
 #define CE { "", nullptr }
+#define FrameParams width * .5f, height * .5f, angle, Math::Abs(spin) > 1 ? 2 * angle : 0, size, color, -cutparam
 #define IterationBody\
 	if (cancel->Token.IsCancellationRequested) return;\
 	const auto newFlags = CalculateFlags(i, inFlags);\
@@ -46,9 +47,6 @@ namespace RgbFractalGenClr {
 		gifSuccess = false;
 		taskSnapshot = gcnew System::Collections::Generic::List<Task^>();
 		emptyFloat = new float[1] { static_cast<float>(M_PI) };
-		InitFractalDefinitions();
-	}
-	void FractalGenerator::InitFractalDefinitions() {
 		// Constants
 		const float pi = static_cast<float>(M_PI), pi23 = 2 * pi / 3, pi43 = 4 * pi / 3, SYMMETRIC = 2 * pi,
 			stt = sqrt(.75f), sqrt2 = sqrt(2.0f),
@@ -280,13 +278,6 @@ namespace RgbFractalGenClr {
 			for (auto x = 0; x < width; buffY[x++] = zero);
 		}
 	}
-	System::Void FractalGenerator::InitBuffer(int16_t taskIndex) {
-		const auto& buffT = buffer[taskIndex];
-		for (auto y = 0; y < height; ++y) {
-			const auto& buffY = buffT[y];
-			for (auto x = 0; x < width; buffY[x++] = zero);
-		}
-	}
 #pragma endregion
 
 #pragma region Generate_Tasks
@@ -321,8 +312,14 @@ namespace RgbFractalGenClr {
 		// Initialize the starting default animation values
 		auto size = 2400.0f, angle = defaultAngle * (float)M_PI / 180.0f, hueAngle = defaultHue / 120.0f;
 		uint8_t color = 0;
+		widthBorder = width - 2;
+		heightBorder = height - 2;
+		bloom1 = bloom + 1;
+		upleftStart = -bloom;
+		rightEnd = widthBorder + bloom1;
+		downEnd = heightBorder + bloom1;
 		ambnoise = amb * noise;
-		auto spin = defaultSpin;
+		int8_t spin = (int8_t)defaultSpin;
 		ModFrameParameters(size, angle, spin, hueAngle, color);
 		for (int i = defaultZoom; 0 <= --i; IncFrameSize(size, period));
 		
@@ -354,8 +351,8 @@ namespace RgbFractalGenClr {
 					delete[] taskStarted;
 					//delete[] parallelTasks;
 				}
-				tuples = new std::tuple<float, float, float, float, float, uint8_t, int>[Math::Max(1, applyMaxGenerationTasks * 8)];
 				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, allocatedHeight = height);
+				tuples = new std::tuple<float, float, float, float, float, uint8_t, int>[Math::Max(1, applyMaxGenerationTasks * 8)];
 				voidDepth = new int16_t * *[batchTasks];
 				voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [batchTasks];
 				parallelTasks = gcnew array<Task^>(batchTasks + 1);
@@ -387,7 +384,6 @@ namespace RgbFractalGenClr {
 				}
 				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, height);
 			}
-			
 			const auto generateLength = (encode > 0 ? static_cast<int16_t>(bitmap->Length) : static_cast<int16_t>(1));
 			// Wait if no more frames to generate
 			if (bitmapsFinished >= generateLength)
@@ -401,26 +397,13 @@ namespace RgbFractalGenClr {
 				if (nextBitmap < generateLength) {
 					ModFrameParameters(size, angle, spin, hueAngle, color);
 					GenerateImage(nextBitmap++, batchTasks, size, angle, spin, hueAngle, color);
-					IncFrameParameters(size, angle, spin, hueAngle, color, 1);
+					IncFrameParameters(size, angle, spin, hueAngle, 1);
 					parallelTaskFinished[batchTasks] = 2;
 				}
 				const auto gifTaskIndex = Math::Max(static_cast<int16_t>(0), applyMaxGenerationTasks);
 				if (FinishTask(gifTaskIndex))
 					TryGif(gifTaskIndex);
 			} else {
-				// Animation parallelism: Spawn initial tasks
-				/*while (0 <= --animationTaskCount) {
-					if (animationTaskFinished[animationTaskCount] >= 2 && nextBitmap < generateLength) {
-						animationTaskFinished[animationTaskCount] = 0;
-						ModFrameParameters(size, angle, spin, hueAngle, color);
-						Start(animationTaskCount);
-						animationTasks[animationTaskCount] = Task::Factory->StartNew(
-							gcnew Action<Object^>(this, &FractalGenerator::GenerateThreadTask),
-							gcnew array<System::Object^>{ nextBitmap++, animationTaskCount, size, angle, spin, hueAngle, color }
-						);
-						IncrementFrameParameters(size, angle, spin, hueAngle, color, 1);
-					}
-				}*/
 				// Animation parallelism: Continue/Finish Animation and Gif tasks
 				bool tasksRemaining = true;
 				while (tasksRemaining) {
@@ -438,7 +421,7 @@ namespace RgbFractalGenClr {
 									gcnew Action<Object^>(this, &FractalGenerator::Task_Animation),
 									gcnew array<System::Object^>{ nextBitmap++, task, size, angle, spin, hueAngle, color }
 								);
-								IncFrameParameters(size, angle, spin, hueAngle, color, 1);
+								IncFrameParameters(size, angle, spin, hueAngle, 1);
 								tasksRemaining = true; // A task finished, but started another one - keep checking before new master loop
 							}
 						} else tasksRemaining = true; // A task not finished yet - keep checking before new master loop
@@ -448,7 +431,7 @@ namespace RgbFractalGenClr {
 		}
 		// Wait for threads to finish
 			//WaitForThreads();
-		for (int i = allocatedTasks; i >= 0; Join(i++));
+		for (int i = allocatedTasks; i >= 0; Join(i--));
 		// Unlock unfinished bitmaps:
 		for (int i = 0; i < bitmap->Length; ++i)
 			if (bitmapState[i] > 0 && bitmapState[i] < 4 && bitmap[i] != nullptr) {
@@ -481,43 +464,79 @@ namespace RgbFractalGenClr {
 		const auto initTime{ std::chrono::steady_clock::now() };
 #endif
 		int16_t bufferIndex = taskIndex % applyMaxTasks;
-		InitBuffer(bufferIndex);
 		auto& buffT = buffer[bufferIndex];
+		for (auto y = 0; y < height; ++y) {
+			const auto& buffY = buffT[y];
+			for (auto x = 0; x < width; buffY[x++] = zero);
+		}
 		auto& voidT = voidDepth[bufferIndex];
 #ifdef CUSTOMDEBUG
 		const auto initElapsed = (std::chrono::steady_clock::now() - initTime).count();
 		Log(threadString, "Init:" + bitmapIndex + " time = " + initElapsed);
 		const auto iterTime{ std::chrono::steady_clock::now() };
 #endif
+		if (cancel->Token.IsCancellationRequested) {
+			parallelTaskFinished[taskIndex] = 2;
+			return;
+		}
 		// Generate the fractal frame recursively
 		VecRefWrapper^ R = gcnew VecRefWrapper(buffT, gcnew ManagedVector(0,0,0), gcnew ManagedVector(0, 0, 0));
 		for (int b = 0; b < selectBlur; ++b) {
+			ModFrameParameters(size, angle, spin, hueAngle, color);
+			// Prepare Color blending per one dot (hueshifting + iteration correction)
+			// So that the color of the dot will slowly approach the combined colors of its childer before it splits
+			auto lerp = std::fmod(hueAngle, 1.0f);
+			switch ((uint8_t)hueAngle % 3) {
+			case 0:
+				R->I->FromVector(Vector::Lerp(unitX, unitY, lerp));
+				R->H->FromVector(Vector::Lerp(*colorBlend, Y(*colorBlend), lerp));
+				break;
+			case 1:
+				R->I->FromVector(Vector::Lerp(unitY, unitZ, lerp));
+				R->H->FromVector(Vector::Lerp(Y(*colorBlend), Z(*colorBlend), lerp));
+				break;
+			case 2:
+				R->I->FromVector(Vector::Lerp(unitZ, unitX, lerp));
+				R->H->FromVector(Vector::Lerp(Z(*colorBlend), *colorBlend, lerp));
+				break;
+			}
+			if(applyMaxGenerationTasks <= 1)
+				GenerateDots_SingleTask(R, FrameParams);
+			else switch (applyParallelType) {
+			case 0:
+				GenerateDots_SingleTask(R, FrameParams);
+				break;
+			case 1:
+				tuples[0] = { FrameParams };
+				GenerateDots_OfDepth(R);
+				break;
+			case 2:
+				GenerateDots_OfRecursion(R, FrameParams, 0);
+				if (imageTasks == nullptr)
+					return;
+				// Wait for image parallelism threads to complete
+				bool noMore;
+				while (true) {
+					taskSnapshot->Clear();
+					for each (Task ^ task in imageTasks)
+						taskSnapshot->Add(task);
+					for each (Task ^ task in taskSnapshot)
+						task->Wait();
+					noMore = true;
+					for each (Task ^ task in imageTasks)
+						if (!taskSnapshot->Contains(task))
+							noMore = false;
+					if (noMore)
+						break;
+					//Thread::Sleep(10);
+				}
+				break;
+			}
+			IncFrameParameters(size, angle, spin, hueAngle, selectBlur);
 			if (cancel->Token.IsCancellationRequested) {
 				parallelTaskFinished[taskIndex] = 2;
 				return;
 			}
-			ModFrameParameters(size, angle, spin, hueAngle, color);
-			SetupFrameColorBlend(hueAngle, R);
-			if(applyMaxGenerationTasks <= 1)
-				GenerateDots_SingleTask(R, width * .5f, height * .5f, angle, Math::Abs(spin) > 1 ? 2 * angle : 0, size, color, -cutparam);
-			else switch (applyParallelType) {
-			case 0:
-				GenerateDots_SingleTask(R, width * .5f, height * .5f, angle, Math::Abs(spin) > 1 ? 2 * angle : 0, size, color, -cutparam);
-				break;
-			case 1:
-				tuples[0] = { width * .5f, height * .5f, angle, Math::Abs(spin) > 1 ? 2 * angle : 0, size, color, -cutparam };
-				GenerateDots_OfDepth(R);
-				break;
-			case 2:
-				GenerateDots_OfRecursion(R, width * .5f, height * .5f, angle, Math::Abs(spin) > 1 ? 2 * angle : 0, size, color, -cutparam, 0);
-				WaitForRecursiveTasks();
-				break;
-			}
-			IncFrameParameters(size, angle, spin, hueAngle, color, selectBlur);
-		}
-		if (cancel->Token.IsCancellationRequested) {
-			parallelTaskFinished[taskIndex] = 2;
-			return;
 		}
 #ifdef CUSTOMDEBUG
 		const auto iterElapsed = (std::chrono::steady_clock::now() - iterTime).count();
@@ -526,19 +545,160 @@ namespace RgbFractalGenClr {
 #endif
 		// Generate the grey void areas
 		auto lightNormalizer = 0.1f, voidDepthMax = 1.0f;
-		auto& cbuffT = const_cast<const Vector**&>(buffT);
-		GenerateVoid(*voidQueue[bufferIndex], cbuffT, voidT, lightNormalizer, voidDepthMax);
+		auto& queueT = *voidQueue[bufferIndex];
+		int16_t voidYX;
+		const auto w1 = width - 1, h1 = height - 1;
+		lightNormalizer = 0.1f;
+		// Old SIMD vector code I couldn't get to work
+		//Vector<float> *buffY;
+		int16_t* voidY, * void0, * voidH, * voidP, * voidM;
+		if (amb > 0) {
+			// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
+			auto& queue = *voidQueue;
+			float lightMax;
+			for (uint16_t y = 1; y < h1; ++y) {
+				if (cancel->Token.IsCancellationRequested) {
+					parallelTaskFinished[taskIndex] = 2;
+					std::swap(queueT, std::queue<std::pair<int16_t, int16_t>>()); // Fast swap-and-drop
+					return;
+				}
+				const auto buffY = buffT[y];
+				voidY = voidT[y];
+				for (uint16_t x = 1; x < w1; ++x) {
+					auto& buffYX = buffY[x];
+					// Old SIMD vector code I couldn't get to work
+					//lightNormalizer = Math::Max(lightNormalizer, lightMax = Math::Max(buffYX[0], Math::Max(buffYX[1], buffYX[2])));
+					lightNormalizer = Math::Max(lightNormalizer, lightMax = buffYX.Max());
+					if (lightMax > 0) {
+						voidY[x] = 0;
+						queueT.push({ y, x });
+					} else voidY[x] = -1;
+				}
+				voidY[0] = voidY[w1] = 0;
+				queueT.push({ y, 0 });
+				queueT.push({ y, w1 });
+			}
+			void0 = voidT[0];
+			voidH = voidT[h1];
+			for (uint16_t x = 0; x < width; ++x) {
+				void0[x] = voidH[x] = 0;
+				queueT.push({ 0, x });
+				queueT.push({ h1, x });
+			}
+			// Depth of Void (fill the void of incrementally larger values of depth, that will generate the grey areas)
+			int16_t x, y, ym, yp, xm, xp, voidMax = 0;
+			std::pair<int16_t, int16_t> qt;
+			while (!queueT.empty()) {
+				qt = queueT.front();
+				queueT.pop();
+				y = qt.first, ym = y - 1, yp = y + 1, x = qt.second, xm = x - 1, xp = x + 1;
+				voidY = voidT[y];
+				voidMax = Math::Max(voidMax, voidYX = voidY[x] + 1);
+				if (xp < width && (voidY[xp] == -1)) { voidY[xp] = voidYX; queueT.push({ y, xp }); }
+				if (yp < height && ((voidP = voidT[yp])[x] == -1)) { voidP[x] = voidYX;  queueT.push({ yp, x }); }
+				if (xm >= 0 && (voidY[xm] == -1)) { voidY[xm] = voidYX; queueT.push({ y, xm }); }
+				if (ym >= 0 && ((voidM = voidT[ym])[x] == -1)) { voidM[x] = voidYX;  queueT.push({ ym, x }); }
+			}
+			voidDepthMax = voidMax;
+		} else
+			for (uint16_t y = 0; y < height; y++) {
+				if (cancel->Token.IsCancellationRequested) {
+					parallelTaskFinished[taskIndex] = 2;
+					std::swap(queueT, std::queue<std::pair<int16_t, int16_t>>()); // Fast swap-and-drop
+					return;
+				}
+				const auto buffY = buffT[y];
+				for (uint16_t x = 0; x < width; x++) {
+					auto& buffYX = buffY[x];
+					// Old SIMD vector code I couldn't get to work
+					//lightNormalizer = Math::Max(lightNormalizer, Math::Max(buffYX[0], Math::Max(buffYX[1], buffYX[2])));
+					lightNormalizer = Math::Max(lightNormalizer, buffYX.Max());
+				}
+			}
+		lightNormalizer = 160.0f / lightNormalizer;
+		if (cancel->Token.IsCancellationRequested) {
+			parallelTaskFinished[taskIndex] = 2;
+			return;
+		}
 #ifdef CUSTOMDEBUG
 		const auto voidElapsed = (std::chrono::steady_clock::now() - voidTime).count();
 		Log(threadString, "Void:" + bitmapIndex + " time = " + voidElapsed);
 		const auto drawTime{ std::chrono::steady_clock::now() };
 #endif
-		if (cancel->Token.IsCancellationRequested) {
-			parallelTaskFinished[taskIndex] = 2;
-			return;
-		}
 		// Draw the generated pixel to bitmap data
-		GenerateBitmap(bitmapIndex, cbuffT, const_cast<const int16_t**&>(voidT), lightNormalizer, voidDepthMax);
+		// Make a locked bitmap, remember the locked state
+		uint8_t* p = (uint8_t*)(void*)((bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = gcnew Bitmap(width, height))
+										->LockBits(rect, ImageLockMode::WriteOnly, System::Drawing::Imaging::PixelFormat::Format24bppRgb))->Scan0);
+		bitmapState[bitmapIndex] = 1;
+		// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
+		// Switch between th selected settings such as saturation, noise, image parallelism...
+
+		const auto& cbuffT = const_cast<const Vector**&>(buffT);
+		const auto& cvoidT = const_cast<const int16_t**&>(voidT);
+		if (applyParallelType > 0 && applyMaxGenerationTasks > 1) {
+			// Multi Threaded:
+			const auto stride = 3 * width;
+			if (ambnoise > 0) {
+				if (saturate > 0.0) {
+#pragma omp parallel for num_threads(applyMaxGenerationTasks)
+					for (int16_t y = 0; y < height; ++y) {
+						if (cancel->Token.IsCancellationRequested)
+							continue;
+						auto rp = p + y * stride;
+						NoiseSaturate(cbuffT[y], cvoidT[y], rp, lightNormalizer, voidDepthMax);
+					}
+				} else {
+#pragma omp parallel for num_threads(applyMaxGenerationTasks)
+					for (int16_t y = 0; y < height; ++y) {
+						if (cancel->Token.IsCancellationRequested)
+							continue;
+						uint8_t* rp = p + y * stride;
+						NoiseNoSaturate(cbuffT[y], cvoidT[y], rp, lightNormalizer, voidDepthMax);
+					}
+				}
+			} else {
+				if (saturate > 0.0) {
+#pragma omp parallel for num_threads(applyMaxGenerationTasks)
+					for (int16_t y = 0; y < height; ++y) {
+						if (cancel->Token.IsCancellationRequested)
+							continue;
+						auto rp = p + y * stride;
+						NoNoiseSaturate(cbuffT[y], cvoidT[y], rp, lightNormalizer, voidDepthMax);
+					}
+				} else {
+#pragma omp parallel for num_threads(applyMaxGenerationTasks)
+					for (int16_t y = 0; y < height; ++y) {
+						if (cancel->Token.IsCancellationRequested)
+							continue;
+						auto rp = p + y * stride;
+						NoNoiseNoSaturate(cbuffT[y], cvoidT[y], rp, lightNormalizer, voidDepthMax);
+					}
+				}
+			}
+		} else {
+			// Single Threaded:
+			if (ambnoise > 0) {
+				if (saturate > 0.0) for (uint16_t y = 0; y < height; ++y) {
+					if (cancel->Token.IsCancellationRequested)
+						continue;
+					NoiseSaturate(cbuffT[y], cvoidT[y], p, lightNormalizer, voidDepthMax);
+				} else for (uint16_t y = 0; y < height; ++y) {
+					if (cancel->Token.IsCancellationRequested)
+						continue;
+					NoiseNoSaturate(cbuffT[y], cvoidT[y], p, lightNormalizer, voidDepthMax);
+				}
+			} else {
+				if (saturate > 0.0) for (uint16_t y = 0; y < height; ++y) {
+					if (cancel->Token.IsCancellationRequested)
+						continue;
+					NoNoiseSaturate(cbuffT[y], cvoidT[y], p, lightNormalizer, voidDepthMax);
+				} else for (uint16_t y = 0; y < height; ++y) {
+					if (cancel->Token.IsCancellationRequested)
+						continue;
+					NoNoiseNoSaturate(cbuffT[y], cvoidT[y], p, lightNormalizer, voidDepthMax);
+				}
+			}
+		}
 #ifdef CUSTOMDEBUG
 		const auto drawElapsed = (std::chrono::steady_clock::now() - drawTime).count();
 		Log(threadString, "Draw:" + bitmapIndex + " time = " + voidElapsed);
@@ -656,187 +816,9 @@ namespace RgbFractalGenClr {
 			}
 		}
 	}
-	System::Void FractalGenerator::GenerateVoid(std::queue<std::pair<int16_t, int16_t>>& queueT, const Vector**& buffT, int16_t**& voidT, float& lightNormalizer, float& voidDepthMax) {
-		int16_t voidYX;
-		const auto w1 = width - 1, h1 = height - 1;
-		if (cancel->Token.IsCancellationRequested)
-			return;
-		lightNormalizer = 0.1f;
-		// Old SIMD vector code I couldn't get to work
-		//Vector<float> *buffY;
-		int16_t* voidY, * void0, * voidH, * voidP, * voidM;
-		if (amb > 0) {
-			// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
-			auto& queue = *voidQueue;
-			float lightMax;
-			for (uint16_t y = 1; y < h1; ++y) {
-				const auto buffY = buffT[y];
-				voidY = voidT[y];
-				for (uint16_t x = 1; x < w1; ++x) {
-					auto& buffYX = buffY[x];
-					// Old SIMD vector code I couldn't get to work
-					//lightNormalizer = Math::Max(lightNormalizer, lightMax = Math::Max(buffYX[0], Math::Max(buffYX[1], buffYX[2])));
-					lightNormalizer = Math::Max(lightNormalizer, lightMax = buffYX.Max());
-					if (lightMax > 0) {
-						voidY[x] = 0;
-						queueT.push({ y, x });
-					} else voidY[x] = -1;
-				}
-				voidY[0] = voidY[w1] = 0;
-				queueT.push({ y, 0 });
-				queueT.push({ y, w1 });
-			}
-			void0 = voidT[0];
-			voidH = voidT[h1];
-			for (uint16_t x = 0; x < width; ++x) {
-				void0[x] = voidH[x] = 0;
-				queueT.push({ 0, x });
-				queueT.push({ h1, x });
-			}
-			// Depth of Void (fill the void of incrementally larger values of depth, that will generate the grey areas)
-			int16_t x, y, ym, yp, xm, xp, voidMax = 0;
-			std::pair<int16_t, int16_t> qt;
-			while (!queueT.empty()) {
-				qt = queueT.front();
-				queueT.pop();
-				y = qt.first, ym = y - 1, yp = y + 1, x = qt.second, xm = x - 1, xp = x + 1;
-				voidY = voidT[y];
-				voidMax = Math::Max(voidMax, voidYX = voidY[x] + 1);
-				if (xp < width && (voidY[xp] == -1)) { voidY[xp] = voidYX; queueT.push({ y, xp }); }
-				if (yp < height && ((voidP = voidT[yp])[x] == -1)) { voidP[x] = voidYX;  queueT.push({ yp, x }); }
-				if (xm >= 0 && (voidY[xm] == -1)) { voidY[xm] = voidYX; queueT.push({ y, xm }); }
-				if (ym >= 0 && ((voidM = voidT[ym])[x] == -1)) { voidM[x] = voidYX;  queueT.push({ ym, x }); }
-			}
-			voidDepthMax = voidMax;
-		} else
-			for (uint16_t y = 0; y < height; y++) {
-				const auto buffY = buffT[y];
-				for (uint16_t x = 0; x < width; x++) {
-					auto& buffYX = buffY[x];
-					// Old SIMD vector code I couldn't get to work
-					//lightNormalizer = Math::Max(lightNormalizer, Math::Max(buffYX[0], Math::Max(buffYX[1], buffYX[2])));
-					lightNormalizer = Math::Max(lightNormalizer, buffYX.Max());
-				}
-			}
-		lightNormalizer = 160.0f / lightNormalizer;
-	}
-	System::Void FractalGenerator::GenerateBitmap(uint16_t bitmapIndex, const Vector**& buffT, const int16_t**& voidT, const float lightNormalizer, const float voidDepthMax) {
-		if (cancel->Token.IsCancellationRequested)
-			return;
-		// Make a locked bitmap, remember the locked state
-		//bitmap[bitmapIndex] = gcnew Bitmap(width, height);
-		//bitmapData[bitmapIndex] = bitmap[bitmapIndex]->LockBits(rect, ImageLockMode::WriteOnly, System::Drawing::Imaging::PixelFormat::Format24bppRgb);
-		//uint8_t* p = (uint8_t*)(void*)(bitmapData[bitmapIndex]->Scan0);
-		uint8_t* p = (uint8_t*)(void*)((bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = gcnew Bitmap(width, height))->LockBits(rect,
-																																ImageLockMode::WriteOnly,
-																																System::Drawing::Imaging::PixelFormat::Format24bppRgb))->Scan0);
-		bitmapState[bitmapIndex] = 1;
-		// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
-		// Switch between th selected settings such as saturation, noise, image parallelism...
-		if (applyParallelType > 0 && applyMaxGenerationTasks > 1) {
-			// Multi Threaded:
-			const auto stride = 3 * width;
-			if (ambnoise > 0) {
-				if (saturate > 0.0) {
-#pragma omp parallel for num_threads(applyMaxGenerationTasks)
-					for (int16_t y = 0; y < height; ++y) {
-						if (cancel->Token.IsCancellationRequested)
-							continue;
-						auto rp = p + y * stride;
-						NoiseSaturate(buffT[y], voidT[y], rp, lightNormalizer, voidDepthMax);
-					}
-				} else {
-#pragma omp parallel for num_threads(applyMaxGenerationTasks)
-					for (int16_t y = 0; y < height; ++y) {
-						if (cancel->Token.IsCancellationRequested)
-							continue;
-						uint8_t* rp = p + y * stride;
-						NoiseNoSaturate(buffT[y], voidT[y], rp, lightNormalizer, voidDepthMax);
-					}
-				}
-			} else {
-				if (saturate > 0.0) {
-#pragma omp parallel for num_threads(applyMaxGenerationTasks)
-					for (int16_t y = 0; y < height; ++y) {
-						if (cancel->Token.IsCancellationRequested)
-							continue;
-						auto rp = p + y * stride;
-						NoNoiseSaturate(buffT[y], voidT[y], rp, lightNormalizer, voidDepthMax);
-					}
-				} else {
-#pragma omp parallel for num_threads(applyMaxGenerationTasks)
-					for (int16_t y = 0; y < height; ++y) {
-						if (cancel->Token.IsCancellationRequested)
-							continue;
-						auto rp = p + y * stride;
-						NoNoiseNoSaturate(buffT[y], voidT[y], rp, lightNormalizer, voidDepthMax);
-					}
-				}
-			}
-		} else {
-			// Single Threaded:
-			if (ambnoise > 0) {
-				if (saturate > 0.0) for (uint16_t y = 0; y < height; ++y) {
-					if (cancel->Token.IsCancellationRequested)
-						continue;
-					NoiseSaturate(buffT[y], voidT[y], p, lightNormalizer, voidDepthMax);
-				} else for (uint16_t y = 0; y < height; ++y) {
-					if (cancel->Token.IsCancellationRequested)
-						continue;
-					NoiseNoSaturate(buffT[y], voidT[y], p, lightNormalizer, voidDepthMax);
-				}
-			} else {
-				if (saturate > 0.0) for (uint16_t y = 0; y < height; ++y) {
-					if (cancel->Token.IsCancellationRequested)
-						continue;
-					NoNoiseSaturate(buffT[y], voidT[y], p, lightNormalizer, voidDepthMax);
-				} else for (uint16_t y = 0; y < height; ++y) {
-					if (cancel->Token.IsCancellationRequested)
-						continue;
-					NoNoiseNoSaturate(buffT[y], voidT[y], p, lightNormalizer, voidDepthMax);
-				}
-			}
-		}
-	}
-	System::Void FractalGenerator::GenerateGif(const int16_t taskIndex) {
-		// Sequentially encode a finished GIF frame, then unlock the bitmap data
-		if (cancel->Token.IsCancellationRequested) {
-			parallelTaskFinished[taskIndex] = 2;
-			return;
-		}
-#ifdef CUSTOMDEBUG
-		System::String^ threadString = "";
-		const auto gifTime{ std::chrono::steady_clock::now() };
-#endif
-		// Save Frame to a temp GIF
-		if (encode >= 2
-			&& !cancel->Token.IsCancellationRequested
-			&& gifEncoder != nullptr
-			&& !((GifEncoder*)gifEncoder)->push(cancel->Token, GifEncoder::PIXEL_FORMAT_BGR, (uint8_t*)(void*)(bitmapData[bitmapsFinished]->Scan0), width, height, delay)) {
-#ifdef CUSTOMDEBUG
-			Log(threadString, "Error writing gif frame.");
-#endif
-			DeleteEncoder();
-		}
-#ifdef CUSTOMDEBUG
-		const auto gifElapsed = (std::chrono::steady_clock::now() - gifTime).count();
-		Log(threadString, "Gifs:" + bitmapsFinished + " time = " + gifElapsed);
-		Monitor::Enter(taskLock);
-		try {
-			gifTimes += gifElapsed;
-			Log(logString, threadString);
-		} finally {
-			Monitor::Exit(taskLock);
-		}
-#endif
-		//Save BMP to RAM
-		if (bitmapState[bitmapsFinished] < 4) {
-			bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]); // Lets me generate next one, and lets the GeneratorForm know that this one is ready
-			bitmapState[bitmapsFinished++] = 4;
-		}
-		exportingGif = false;
-		parallelTaskFinished[taskIndex] = 1;
-	}
+	//System::Void FractalGenerator::GenerateVoid(std::queue<std::pair<int16_t, int16_t>>& queueT, const Vector**& buffT, int16_t**& voidT, float& lightNormalizer, float& voidDepthMax) {}
+	//System::Void FractalGenerator::GenerateBitmap(uint16_t bitmapIndex, const Vector**& buffT, const int16_t**& voidT, const float lightNormalizer, const float voidDepthMax) {}
+	//System::Void FractalGenerator::GenerateGif(const int16_t taskIndex) {}
 	bool FractalGenerator::FinishTask(int16_t taskIndex) {
 		if (parallelTaskFinished[taskIndex] == 1) {
 			Join(taskIndex);
@@ -848,7 +830,11 @@ namespace RgbFractalGenClr {
 	System::Void FractalGenerator::TryGif(int16_t taskIndex) {
 		if (bitmapState[bitmapsFinished] != 2)
 			return;
-		if (gifEncoder != nullptr && !exportingGif && !cancel->Token.IsCancellationRequested && maxTasks == applyMaxTasks) {
+		if (gifEncoder != nullptr
+			&& !exportingGif 
+			&& !cancel->Token.IsCancellationRequested 
+			&& maxTasks == applyMaxTasks
+		) {
 			exportingGif = true;
 			parallelTaskFinished[taskIndex] = 0;
 			bitmapState[bitmapsFinished] = 3;
@@ -860,26 +846,6 @@ namespace RgbFractalGenClr {
 		} else {
 			bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]);
 			bitmapState[bitmapsFinished++] = 4;
-		}
-	}
-	System::Void FractalGenerator::WaitForRecursiveTasks() {
-		if (imageTasks == nullptr)
-			return;
-		// Wait for image parallelism threads to complete
-		bool noMore;
-		while (true) {
-			taskSnapshot->Clear();
-			for each (Task ^ task in imageTasks)
-				taskSnapshot->Add(task);
-			for each (Task ^ task in taskSnapshot)
-				task->Wait();
-			noMore = true;
-			for each (Task ^ task in imageTasks)
-				if (!taskSnapshot->Contains(task))
-					noMore = false;
-			if (noMore)
-				break;
-			//Thread::Sleep(10);
 		}
 	}
 #pragma endregion
@@ -1014,7 +980,43 @@ namespace RgbFractalGenClr {
 		// Unpack arguments
 		const auto args = (array<System::Object^>^)obj;
 		const int16_t taskIndex = static_cast<int16_t>(args[0]);
-		GenerateGif(taskIndex);
+		// Sequentially encode a finished GIF frame, then unlock the bitmap data
+		if (cancel->Token.IsCancellationRequested) {
+			parallelTaskFinished[taskIndex] = 2;
+			return;
+		}
+#ifdef CUSTOMDEBUG
+		System::String^ threadString = "";
+		const auto gifTime{ std::chrono::steady_clock::now() };
+#endif
+		// Save Frame to a temp GIF
+		if (encode >= 2
+			&& !cancel->Token.IsCancellationRequested
+			&& gifEncoder != nullptr
+			&& !((GifEncoder*)gifEncoder)->push(cancel->Token, GifEncoder::PIXEL_FORMAT_BGR, (uint8_t*)(void*)(bitmapData[bitmapsFinished]->Scan0), width, height, delay)) {
+#ifdef CUSTOMDEBUG
+			Log(threadString, "Error writing gif frame.");
+#endif
+			DeleteEncoder();
+		}
+#ifdef CUSTOMDEBUG
+		const auto gifElapsed = (std::chrono::steady_clock::now() - gifTime).count();
+		Log(threadString, "Gifs:" + bitmapsFinished + " time = " + gifElapsed);
+		Monitor::Enter(taskLock);
+		try {
+			gifTimes += gifElapsed;
+			Log(logString, threadString);
+		} finally {
+			Monitor::Exit(taskLock);
+		}
+#endif
+		//Save BMP to RAM
+		if (bitmapState[bitmapsFinished] < 4) {
+			bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]); // Lets me generate next one, and lets the GeneratorForm know that this one is ready
+			bitmapState[bitmapsFinished++] = 4;
+		}
+		exportingGif = false;
+		parallelTaskFinished[taskIndex] = 1;
 	}
 #pragma endregion
 
@@ -1051,31 +1053,12 @@ namespace RgbFractalGenClr {
 		}
 		color = (3 + color + zoom * childColor[0]) % 3;
 	}
-	System::Void FractalGenerator::IncFrameParameters(float& size, float& angle, const int8_t& spin, float& hueAngle, uint8_t& color, const uint8_t blur) {
+	System::Void FractalGenerator::IncFrameParameters(float& size, float& angle, const int8_t& spin, float& hueAngle, const uint16_t blur) {
 		const auto blurPeriod = period * blur;
 		// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
 		angle += spin * (periodAngle * (1 + extraSpin)) / (finalPeriodMultiplier * blurPeriod);
 		hueAngle += (hueCycleMultiplier + 3 * extraHue) * (float)hueCycle / (finalPeriodMultiplier * blurPeriod);
 		IncFrameSize(size, blurPeriod);
-	}
-	System::Void FractalGenerator::SetupFrameColorBlend(const float hueAngle, VecRefWrapper^ R) {
-		// Prepare Color blending per one dot (hueshifting + iteration correction)
-		// So that the color of the dot will slowly approach the combined colors of its childer before it splits
-		auto lerp = std::fmod(hueAngle, 1.0f);
-		switch ((uint8_t)hueAngle % 3) {
-		case 0:
-			R->I->FromVector(Vector::Lerp(unitX, unitY, lerp));
-			R->H->FromVector(Vector::Lerp(*colorBlend, Y(*colorBlend), lerp));
-			break;
-		case 1:
-			R->I->FromVector(Vector::Lerp(unitY, unitZ, lerp));
-			R->H->FromVector(Vector::Lerp(Y(*colorBlend), Z(*colorBlend), lerp));
-			break;
-		case 2:
-			R->I->FromVector(Vector::Lerp(unitZ, unitX, lerp));
-			R->H->FromVector(Vector::Lerp(Z(*colorBlend), *colorBlend, lerp));
-			break;
-		}
 	}
 #pragma endregion
 
@@ -1150,7 +1133,7 @@ namespace RgbFractalGenClr {
 		SelectFractal(2);
 		SetupFractal();
 		SelectThreadingDepth();
-		SelectDetail(1);
+		detail = .25f;
 		debug = 7;
 		width = 80;
 		height = 80;
@@ -1159,7 +1142,6 @@ namespace RgbFractalGenClr {
 		maxDepth = -1;//= 2;
 		maxGenerationTasks = maxTasks = -1;// 10;
 		saturate = 1.0f;
-		SelectDetail(.25f);
 	}
 #pragma endregion
 
@@ -1169,26 +1151,25 @@ namespace RgbFractalGenClr {
 			return true;
 		// new fractal definition selected - let the form know to reset and restart me
 		this->select = select;
+		selectCut = selectAngle = selectColor = -1;
+		SelectColor(0);
+		SelectAngle(0);
+		SelectCutFunction(0);
 		return false;
 	}
 	System::Void FractalGenerator::SetupFractal() {
-		// setup the new fractal definition, with all parameters reset to 0
 		f = fractals[select];
-		logBase = logf(GetFractal()->childSize);
-		SelectThreadingDepth();
-		selectCut = selectAngle = selectColor = -1;
-		if(!SelectColor(0))
-			SetupColor();
-		SelectAngle(0);
-		SelectCutFunction(0);
+		logBase = logf(f->childSize);
 	}
 	bool FractalGenerator::SelectAngle(const uint16_t selectAngle) {
 		if (this->selectAngle == selectAngle)
 			return true;
 		this->selectAngle = selectAngle;
+		return false;
+	}
+	System::Void FractalGenerator::SetupAngle() {
 		childAngle = f->childAngle == nullptr ? new float[1] { (float)M_PI } : f->childAngle[selectAngle].second;
 		periodAngle = f->childCount <= 0 ? 0.0f : std::fmod(childAngle[0], 2.0f * (float)M_PI);
-		return false;
 	}
 	bool FractalGenerator::SelectColor(const uint16_t selectColor) {
 		if (this->selectColor == selectColor)
@@ -1211,16 +1192,18 @@ namespace RgbFractalGenClr {
 				childColor[i] = selectColorPalette == 0 ? childColor[i] : (3 - childColor[i]) % 3;
 		}
 		// Prepare subiteration color blend
-		InitColorBlend();
+		float* colorBlendF = new float[3];
+		colorBlendF[0] = colorBlendF[1] = colorBlendF[2] = 0;
+		for (auto i = f->childCount; 0 <= --i; colorBlendF[childColor[i]] += 1.0f / f->childCount);
+		colorBlend = new Vector(colorBlendF[0], colorBlendF[1], colorBlendF[2]);
 	}
 	bool FractalGenerator::SelectCutFunction(const uint16_t selectCut) {
 		if (this->selectCut == selectCut)
 			return true;
 		this->selectCut = selectCut;
-		cutFunction = f->cutFunction == nullptr || f->cutFunction->first == "" ? nullptr
-			: &f->cutFunction[selectCut].second;
 		return false;
 	}
+
 #pragma endregion
 
 #pragma region Interface_Getters
@@ -1237,50 +1220,6 @@ namespace RgbFractalGenClr {
 		return nativeString;
 	}
 #pragma endregion
-
-
-	inline void FractalGenerator::Join(int i) {
-		if (taskStarted[i]) {
-			if (parallelTasks[i] != nullptr) {
-#ifdef PARALLELDEBUG
-				Debug::WriteLine("join" + i);
-#endif
-				parallelTasks[i]->Wait();
-				parallelTasks[i] = nullptr;
-			} else {
-#ifdef PARALLELDEBUG
-				Debug::WriteLine("ERROR not joinable " + i);
-#endif
-			}
-		} else {
-#ifdef PARALLELDEBUG
-			Debug::WriteLine("ERROR join: task not running " + i);
-#endif
-		}
-		taskStarted[i] = false;
-	}
-
-	inline void FractalGenerator::Start(int i) {
-		if (taskStarted[i]) {
-#ifdef PARALLELDEBUG
-			Debug::WriteLine("ERROR start: task already running " + i);
-#endif
-
-			if (parallelTasks[i] != nullptr) {
-				parallelTasks[i]->Wait();
-				parallelTasks[i] = nullptr;
-			} else {
-#ifdef PARALLELDEBUG
-				Debug::WriteLine("ERROR not joinable " + i);
-#endif
-			}
-		} else {
-#ifdef PARALLELDEBUG
-			Debug::WriteLine("start" + i);
-#endif
-		}
-		taskStarted[i] = true;
-	}
 
 
 }

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -23,7 +24,7 @@ public partial class GeneratorForm : Form {
 			Size = new System.Drawing.Size(80, 80),
 			TabIndex = 25
 		};
-		screenPanel.Click += new(ScreenPanel_Click);
+		screenPanel.Click += new(AnimateButton_Click);
 		screenPanel.Paint += new(ScreenPanel_Paint);
 		Controls.Add(screenPanel);
 	}
@@ -31,14 +32,15 @@ public partial class GeneratorForm : Form {
 
 	#region Variables
 	// Threading
-	bool bInit = true;
+	private bool bInit = true;
+	
 	//private readonly List<Control> MyControls = [];
 	private FractalGenerator generator;     // The core ofthe app, the generator the generates the fractal animations
 	private CancellationTokenSource cancel; // Cancellation Token Source
 	private Task gTask = null;              // CPU gif thread
-	private Task aTask = null;
-	private bool queueAbort = false;
-	private short queueReset = 0;
+	private Task aTask = null;              // Abort Task
+	private bool queueAbort = false;        // Generator abortion queued
+	private short queueReset = 0;			// Counting time until generator Restart
 
 	// Settings
 	private bool previewMode = true;        // Preview mode for booting performance while setting up parameters
@@ -46,8 +48,9 @@ public partial class GeneratorForm : Form {
 	private bool modifySettings = true;     // Allows for modifying settings without it triggering Aborts and Generates
 	private short width = -1, height = -1;
 	private string gifPath;                 // Gif export path name
-	private int cutparamMaximum = 0;
-	private int maxTasks = 0;
+	private int cutparamMaximum = 0;        // Maximum cutparam seed of this CutFunction
+	private int maxTasks = 0;               // Maximum tasks available
+	private short abortDelay = 500;         // Set time to restart generator
 
 	// Display Variables
 	private readonly DoubleBufferedPanel screenPanel;// Display panel
@@ -73,7 +76,7 @@ public partial class GeneratorForm : Form {
 				control.TabIndex = ++controlTabIndex;
 				//MyControls.Add(control);
 			}
-			// Setupd interactable controls (tooltips + tabIndex)
+			// Setup interactable controls (tooltips + tabIndex)
 			SetupControl(fractalSelect, "Select the type of fractal to generate");
 			SetupControl(angleSelect, "Select the children angles definition.");
 			SetupControl(colorSelect, "Select the children colors definition.");
@@ -102,6 +105,7 @@ public partial class GeneratorForm : Form {
 			SetupControl(parallelBox, "Enable parallelism (and then tune with the Max Threads slider).\nSelect the type of parallelism with the followinf checkBox to the right.");
 			SetupControl(parallelTypeBox, "Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong");
 			SetupControl(threadsBox, "The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
+			SetupControl(abortBox, "How many millisecond of pause after the last settings change until the generator restarts?");
 			SetupControl(delayBox, "A delay between frames in 1/100 of seconds for the preview and exported GIF file.\nThe framerate will be roughly 100/delay");
 			SetupControl(prevButton, "Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 			SetupControl(nextButton, "Stop the animation and move to the next frame.\nUseful for selecting the exact frame you want to export to PNG file.");
@@ -122,9 +126,10 @@ public partial class GeneratorForm : Form {
 			fractalSelect.SelectedIndex = 0;
 			// Update Input fields to default values - modifySettings is true from constructor so that it doesn't abort and restant the generator over and over
 			threadsBox.Text = maxTasks.ToString();
+			abortBox_TextChanged(null, null);
 			PeriodBox_TextChanged(null, null);
 			PeriodMultiplierBox_TextChanged(null, null);
-			SelectParallelType();
+			ParallelTypeBox_SelectedIndexChanged(null, null);
 			DelayBox_TextChanged(null, null);
 			DefaultZoom_TextChanged(null, null);
 			SpinSpeedBox_TextChanged(null, null);
@@ -152,6 +157,7 @@ public partial class GeneratorForm : Form {
 			DetailBox_TextChanged(null, null);
 			generator.SetupColor();
 			generator.SetupAngle();
+			generator.SetupCutFunction();
 		}
 		#endregion
 		#region Size
@@ -160,8 +166,8 @@ public partial class GeneratorForm : Form {
 			// bh = Height - ClientHeight = 39
 			int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
 			MinimumSize = new(
-				Math.Max(1100, bw + width + 284),
-				Math.Max(900, bh + Math.Max(460, height + 8))
+				Math.Max(640, bw + width + 284),
+				Math.Max(640, bh + Math.Max(460, height + 8))
 			);
 			//debugLabel.Text = debugLabel.Text + " " + MinimumSize.Height.ToString();
 		}
@@ -202,8 +208,7 @@ public partial class GeneratorForm : Form {
 		void ResizeScreen() {
 			int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
 			var screenHeight = Math.Max(height, Math.Min(Height - bh - 8, (Width - bw - 314) * height / width));
-			var w = screenHeight * width / height;
-			screenPanel.SetBounds(305, 4, w, screenHeight);
+			screenPanel.SetBounds(305, 4, screenHeight * width / height, screenHeight);
 			helpPanel.SetBounds(305, 4, Width - bw - 314, Height - bh - 8);
 			screenPanel.Invalidate();
 		}
@@ -218,7 +223,7 @@ public partial class GeneratorForm : Form {
 		// Window Size Update
 		WindowSizeRefresh();
 		if (queueReset > 0) {
-			if (gTask != null || aTask != null)
+			if (!(gTask == null && aTask == null))
 				return;
 			if (queueAbort)
 				aTask = Task.Run(Abort, (cancel = new()).Token);
@@ -311,7 +316,6 @@ public partial class GeneratorForm : Form {
 	#endregion
 
 	#region Input
-	/*private */
 	private void QueueReset() {
 		if (modifySettings)
 			return;
@@ -322,7 +326,7 @@ public partial class GeneratorForm : Form {
 				aTask = Task.Run(Abort, (cancel = new()).Token);
 			else queueAbort = true;
 		}
-		queueReset = 2000;
+		queueReset = abortDelay;
 	}
 	bool CutSelectEnabled((string, Fractal.CutFunction)[] cf) => cutSelect.Enabled = cf != null && cf.Length > 0;
 	/// <summary>
@@ -355,8 +359,6 @@ public partial class GeneratorForm : Form {
 		if (generator.SelectFractal((short)Math.Max(0, fractalSelect.SelectedIndex)))
 			return;
 		// Fractal is different - load it, change the setting and restart generation
-		//Abort();
-		//generator.SetupFractal();
 		// Fill the fractal's adjuistable definition combos
 		// Fill the fractal's adjuistable cutfunction seed combos, and restart generation
 		if (!modifySettings) {
@@ -416,19 +418,52 @@ public partial class GeneratorForm : Form {
 	private void FillCutParams() => CutParamBoxEnabled(generator.GetCutFunction());
 	// query the number of seeds from the CutFunction
 	bool CutParamBoxEnabled(Fractal.CutFunction cf) => cutparamBox.Enabled = 0 < (cutparamMaximum = cf == null || cf(0, -1) <= 0 ? 0 : (cf(0, 1 - (1 << 16)) + 1) / cf(0, -1));
+
+
+	/*T ClampParam<T>(TextBox BOX, T MIN, T MAX) where T : struct, IComparable<T> {
+		T.TryParse(BOX.Text, out T NEW);
+		cutparamBox.Text = (NEW = Math.Clamp(NEW, (T)0, (T)MAX)).ToString();
+		return NEW;
+	}*/
+
+	void ApplyClampParam<T>(T NEW, ref T GEN, T MIN, T MAX, TextBox TEXT) where T : struct, IComparable<T> {
+		if (NEW.CompareTo(MIN) < 0)
+			NEW = MIN;
+		if (NEW.CompareTo(MAX) > 0)
+			NEW = MAX;
+		if(TEXT != null)
+			TEXT.Text = NEW.ToString();
+		ApplyDiffParam(NEW, ref GEN);
+	}
+	void ApplyModParam<T>(T NEW, ref T GEN, T MIN, T MAX) where T : struct, IComparable<T> {
+		var D = (dynamic)MAX - MIN;
+		while (NEW.CompareTo(MIN) < 0)
+			NEW = (T)(NEW + D);
+		while (NEW.CompareTo(MAX) > 0)
+			NEW = (T)(NEW - D);
+		ApplyDiffParam(NEW, ref GEN);
+	}
+	bool DiffParam<T>(T NEW, T GEN) where T : struct, IComparable<T> {
+		return GEN.CompareTo(NEW) == 0;
+	}
+	void ApplyDiffParam<T>(T NEW, ref T GEN) where T : struct, IComparable<T> {
+		if (DiffParam(NEW, GEN))
+			return;
+		ApplyParam(NEW, ref GEN);
+	}
+	void ApplyParam<T>(T NEW, ref T GEN) {
+		GEN = NEW; QueueReset();
+	}
+
 	/// <summary>
 	/// Change the CutFunction seed parameter through the textBox typing
 	/// </summary>
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void CutparamBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(cutparamBox.Text, out var newcutparam) || newcutparam < 0 || newcutparam > cutparamMaximum)
+		if(!short.TryParse(cutparamBox.Text, out var newcutparam))
 			newcutparam = 0;
-		if (newcutparam == generator.cutparam)
-			return;
-		// Cutfunction seed is different - change the setting and restart generation
-		generator.cutparam = newcutparam;
-		QueueReset();
+		ApplyClampParam(newcutparam, ref generator.cutparam, (short)0, (short)cutparamMaximum, cutparamBox);
 	}
 	/// <summary>
 	/// Resolution Changed Event
@@ -445,15 +480,9 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void PeriodBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(periodBox.Text, out var newPeriod) || newPeriod <= 0)
+		if (!short.TryParse(periodBox.Text, out var newPeriod))
 			newPeriod = 120;
-		if (generator.period == newPeriod)
-			return;
-		// period is different - change the setting and restart generation
-		//Abort();
-		//Abort();
-		generator.period = newPeriod;
-		QueueReset();//ResetGenerate();
+		ApplyClampParam(newPeriod, ref generator.period, (short)1, (short)1000, periodBox);
 	}
 	/// <summary>
 	/// Multiplies the number of loop frames, keeping the spin and huecycle the same speed (you can speed up either with options below)
@@ -461,14 +490,9 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(periodMultiplierBox.Text, out var newPeriod) || newPeriod <= 1)
+		if(!short.TryParse(periodMultiplierBox.Text, out var newPeriod))
 			newPeriod = 1;
-		if (generator.periodMultiplier == newPeriod)
-			return;
-		// period is different - change the setting and restart generation
-		//Abort();
-		generator.periodMultiplier = newPeriod;
-		QueueReset();//ResetGenerate();
+		ApplyClampParam(newPeriod, ref generator.periodMultiplier, (short)1, (short)10, periodMultiplierBox);
 	}
 	/// <summary>
 	/// Zoom direction (-> Forward zoom in, <- Backwards zoom out)
@@ -491,16 +515,7 @@ public partial class GeneratorForm : Form {
 		if (!short.TryParse(defaultZoom.Text, out var newZoom))
 			newZoom = 0;
 		var finalPeriod = (short)(generator.period * generator.GetFinalPeriod());
-		while (newZoom < 0)
-			newZoom += finalPeriod;
-		while (newZoom >= finalPeriod)
-			newZoom -= finalPeriod;
-		if (generator.defaultZoom == newZoom)
-			return;
-		// default zoom is different - change the setting and restart generation
-		//Abort();
-		generator.defaultZoom = newZoom;
-		QueueReset();//ResetGenerate();
+		ApplyModParam(newZoom, ref generator.defaultZoom, (short)0, finalPeriod);
 	}
 	/// <summary>
 	/// Select the spin mode (clockwise, counterclockwise, or antispin where the child spins in opposite direction)
@@ -508,13 +523,8 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		var newSpin = (short)(Math.Max(0, Math.Min(4, spinSelect.SelectedIndex)) - 2);
-		if (generator.defaultSpin == newSpin)
-			return;
-		// spin type is different - change the setting and restart generation
-		//Abort();
-		generator.defaultSpin = newSpin;
-		QueueReset();//ResetGenerate();
+		var newSpin = (short)(spinSelect.SelectedIndex - 2);
+		ApplyClampParam(newSpin, ref generator.defaultSpin, (short)-2, (short)2, null);
 	}
 	/// <summary>
 	/// Select the extra spin of symmentry angle per loop (so it spins faster)
@@ -522,14 +532,11 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void SpinSpeedBox_TextChanged(object sender, EventArgs e) {
-		if (!byte.TryParse(spinSpeedBox.Text, out var newSpeed) || newSpeed < 0)
+		if(!short.TryParse(spinSpeedBox.Text, out var newSpeed))
 			newSpeed = 0;
-		if (generator.extraSpin == newSpeed)
-			return;
-		// spin speed is different - change the setting and restart generation
-		//Abort();
-		generator.extraSpin = newSpeed;
-		QueueReset();//ResetGenerate();
+		//byte newSpeedByte = (byte)Math.Clamp(newSpeed, (short)0, (short)255);
+		spinSpeedBox.Text = newSpeed.ToString();
+		ApplyClampParam(newSpeed, ref generator.extraSpin, (short)0, (short)255, spinSpeedBox);
 	}
 	/// <summary>
 	/// Default spin angle on first frame (in degrees)
@@ -539,16 +546,7 @@ public partial class GeneratorForm : Form {
 	private void DefaultAngle_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(defaultAngle.Text, out var newAngle))
 			newAngle = 0;
-		while (newAngle < 0)
-			newAngle += 360;
-		while (newAngle >= 360)
-			newAngle -= 360;
-		if (generator.defaultAngle == newAngle)
-			return;
-		// angle is different - change the setting and restart generation
-		//Abort();
-		generator.defaultAngle = newAngle;
-		QueueReset();//ResetGenerate();
+		ApplyModParam(newAngle, ref generator.defaultAngle, (short)0, (short)360);
 	}
 	/// <summary>
 	/// Select the hue pallete and cycling
@@ -560,11 +558,7 @@ public partial class GeneratorForm : Form {
 		var newHueCycle = (short)((colorChoice / 2 + 1) % 3 - 1);
 		if (generator.SelectColorPalette((byte)(colorChoice % 2)) && newHueCycle == generator.hueCycle)
 			return;
-		//Abort();
-		// hue is different - change the setting and restart generation
-		generator.hueCycle = newHueCycle;
-		//generator.SetupColor();
-		QueueReset();//ResetGenerate();
+		ApplyParam(newHueCycle, ref generator.hueCycle);
 	}
 	/// <summary>
 	/// Select the extra hue cycling speed of extra full 360° color loops per full animation loop (so it hue cycles spins faster)
@@ -572,17 +566,16 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void HueSpeedBox_TextChanged(object sender, EventArgs e) {
-		if (!byte.TryParse(hueSpeedBox.Text, out var newSpeed) || newSpeed < 0)
+		if (!short.TryParse(hueSpeedBox.Text, out var newSpeed) || newSpeed < 0)
 			newSpeed = 0;
-		if (generator.extraHue == newSpeed)
+		byte newSpeedByte = (byte)Math.Clamp(newSpeed, (short)0, (short)255);
+		hueSpeedBox.Text = newSpeedByte.ToString();
+		if (DiffParam(newSpeedByte, generator.extraHue))
 			return;
 		// hue speed is different - change the setting and if it's actually huecycling restart generation
-		if (generator.hueCycle != 0) {
-			//Abort();
-			generator.extraHue = newSpeed;
-			QueueReset();
-		} else
-			generator.extraHue = newSpeed;
+		if (generator.hueCycle != 0) 
+			ApplyParam(newSpeedByte, ref generator.extraHue);
+		else generator.extraHue = newSpeedByte;
 	}
 	/// <summary>
 	/// Defaul hue angle on first frame (in degrees)
@@ -592,16 +585,7 @@ public partial class GeneratorForm : Form {
 	private void DefaultHue_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(defaultHue.Text, out var newHue))
 			newHue = 0;
-		while (newHue < 0)
-			newHue += 360;
-		while (newHue >= 360)
-			newHue -= 360;
-		if (generator.defaultHue == newHue)
-			return;
-		//Abort();
-		// Hue is different - change the setting and restart generation
-		generator.defaultHue = newHue;
-		QueueReset();//ResetGenerate();
+		ApplyModParam(newHue,ref generator.defaultHue, (short)0, (short)360);
 	}
 	/// <summary>
 	/// The strenghts (lightness) of the dark void outside between the fractal points
@@ -609,12 +593,10 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void AmbBox_TextChanged(object sender, EventArgs e) {
-		short.TryParse(ambBox.Text, out var newAmb);
-		if (generator.amb == (newAmb = (short)Math.Clamp(newAmb * 4, 0, 120)))
-			return;
-		// Ambient is different - change the setting and restart generation
-		generator.amb = newAmb;
-		QueueReset();//AbortGenerate();
+		if (!short.TryParse(ambBox.Text, out var newAmb))
+			newAmb = 0;
+		ambBox.Text = (newAmb = Math.Clamp(newAmb, (byte)0, (byte)30)).ToString();
+		ApplyDiffParam((short)(4 * newAmb), ref generator.amb);
 	}
 	/// <summary>
 	/// Level of void Noise of the dark void outside between the fractal points
@@ -622,13 +604,10 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void NoiseBox_TextChanged(object sender, EventArgs e) {
-		byte.TryParse(noiseBox.Text, out var newNoise);
-		var newNoiseFloat = Math.Clamp(newNoise * .1f, .0f, 3.0f);
-		if (generator.noise == newNoiseFloat)
-			return;
-		// Moise is different - change the setting and restart generation
-		generator.noise = newNoiseFloat;
-		QueueReset();//AbortGenerate();
+		if (!short.TryParse(noiseBox.Text, out var newNoise))
+			newNoise = 0;
+		noiseBox.Text = (newNoise = Math.Clamp(newNoise, (short)0, (short)30)).ToString();
+		ApplyDiffParam(newNoise * .1f, ref generator.noise);
 	}
 	/// <summary>
 	/// Saturation Setting - ramp up saturation to maximum if all the wat to the right
@@ -636,14 +615,10 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void SaturateBox_TextChanged(object sender, EventArgs e) {
-		byte.TryParse(saturateBox.Text, out var newSaturate);
-		var newSaturateFloat = Math.Clamp(newSaturate * .1f, .0f, 1.0f);
-		if (generator.saturate == newSaturateFloat)
-			return;
-		//Abort();
-		// Saturation is different - change the setting and restart generation
-		generator.saturate = newSaturateFloat;
-		QueueReset();//ResetGenerate();
+		if (!short.TryParse(saturateBox.Text, out var newSaturate))
+			newSaturate = 0;
+		saturateBox.Text = (newSaturate = Math.Clamp(newSaturate, (short)0, (short)10)).ToString();
+		ApplyDiffParam(newSaturate * .1f, ref generator.saturate);
 	}
 	/// <summary>
 	/// Detail, how small the split fractal shaped have to get, until they draw a dot of their color to the image buffer (the smaller the finer)
@@ -651,27 +626,10 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void DetailBox_TextChanged(object sender, EventArgs e) {
-		byte.TryParse(detailBox.Text, out var newDetail);
-		var newDetailFloat = Math.Clamp(newDetail * .1f, .0f, 1.0f);
-		if (generator.SelectDetail(newDetailFloat))
-			return;
-		// Detail is different - restart generation
-		QueueReset();//AbortGenerate();
-	}
-	/// <summary>
-	/// Level of blur smear frames (renders multiple fractals of slighlty increased time until the frame deltatime over each other)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void BlurBox_TextChanged(object sender, EventArgs e) {
-		byte.TryParse(blurBox.Text, out var newBlur);
-		newBlur = (byte)Math.Clamp(newBlur + 1, 1, 41);
-		if (generator.selectBlur == newBlur)
-			return;
-		//Abort();
-		// Blur is different - change the setting and restart generation
-		generator.selectBlur = newBlur;
-		QueueReset();//ResetGenerate();
+		if (!short.TryParse(detailBox.Text, out var newDetail))
+			newDetail = 0;
+		detailBox.Text = (newDetail = Math.Clamp(newDetail, (short)0, (short)10)).ToString();
+		ApplyDiffParam(newDetail * .1f * generator.GetFractal().minSize, ref generator.detail);
 	}
 	/// <summary>
 	/// Bloom strength. 0 = crisp, more - expanded and blurry
@@ -679,14 +637,21 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void BloomBox_TextChanged(object sender, EventArgs e) {
-		byte.TryParse(bloomBox.Text, out var newBloom);
-		newBloom = Math.Clamp(newBloom, (byte)0, (byte)40);
-		if (generator.bloom == newBloom * .25f)
-			return;
-		//Abort();
-		// Blur is different - change the setting and restart generation
-		generator.bloom = newBloom * .25f;
-		QueueReset();//ResetGenerate();
+		if (!short.TryParse(bloomBox.Text, out var newBloom))
+			newBloom = 0;
+		bloomBox.Text = (newBloom = Math.Clamp(newBloom, (byte)0, (byte)40)).ToString();
+		ApplyDiffParam(newBloom * .25f, ref generator.bloom);
+	}
+	/// <summary>
+	/// Level of blur smear frames (renders multiple fractals of slighlty increased time until the frame deltatime over each other)
+	/// </summary>
+	/// <param name="sender"></param>
+	/// <param name="e"></param>
+	private void BlurBox_TextChanged(object sender, EventArgs e) {
+		if(!short.TryParse(blurBox.Text, out var newBlur))
+			newBlur = 0;
+		blurBox.Text = (newBlur = Math.Clamp(newBlur, (byte)0, (byte)40)).ToString();
+		ApplyDiffParam(++newBlur, ref generator.selectBlur);
 	}
 	/// <summary>
 	/// Iteration Threading - How many iterations deep have Self Similars a new thread
@@ -694,23 +659,29 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void Parallel_Changed(object sender, EventArgs e) {
-		short.TryParse(threadsBox.Text, out var newThreads);
-		newThreads = (short)Math.Clamp(newThreads, 0, maxTasks);
+		if(!short.TryParse(threadsBox.Text, out var newThreads))
+			newThreads = 0;
+		threadsBox.Text = (newThreads = (short)Math.Clamp(newThreads, 0, maxTasks)).ToString();
 		threadsLabel.Text = "Maximum threads (0-" + maxTasks + "):";
 		generator.maxTasks = (short)(parallelBox.Checked && newThreads > 0 ? newThreads : -1);
 		generator.maxGenerationTasks = (short)(generator.maxTasks - 1);
 		generator.SelectThreadingDepth();
 	}
 	/// <summary>
-	/// Drawing Threading - Paralelizes the scanlines of drawing
+	/// Toggles between parallelism of single images and parallelism of batching animation frames
 	/// </summary>
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
-	private void ParallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) => SelectParallelType();
+	private void ParallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) => generator.parallelType = (byte)parallelTypeBox.SelectedIndex;
 	/// <summary>
-	/// Toggles between parallelism of single images and parallelism of batching animation frames
+	/// Milisecond delay from settings change to generator restart
 	/// </summary>
-	private void SelectParallelType() => generator.parallelType = (byte)parallelTypeBox.SelectedIndex;
+	/// <param name="sender"></param>
+	/// <param name="e"></param>
+	private void abortBox_TextChanged(object sender, EventArgs e) {
+		short.TryParse(abortBox.Text, out abortDelay);
+		abortBox.Text = (abortDelay = Math.Clamp(abortDelay, (short)1, (short)10000)).ToString();
+	}
 	/// <summary>
 	/// Framerate Delay (for previes and for gif encode, so if encoding gif, it will restart the generation)
 	/// </summary>
@@ -719,15 +690,14 @@ public partial class GeneratorForm : Form {
 	private void DelayBox_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(delayBox.Text, out var newDelay) || newDelay <= 0)
 			newDelay = 5;
+		delayBox.Text = newDelay.ToString();
 		if (generator.delay == newDelay)
 			return;
-		//if (generator.encode == 2)
-		//	Abort();
 		// Delay is diffenret, change it, and restart the generation if ou were encoding a gif
 		generator.delay = newDelay;
 		var fpsrate = 100 / generator.delay;
 		timer.Interval = generator.delay * 10;
-		delayLabel.Text = "Delay: " + (generator.delay * 10).ToString() + "ms, Framerate: " + fpsrate.ToString();
+		delayLabel.Text = "Abort / FPS: " + fpsrate.ToString();
 		if (generator.encode == 2)
 			QueueReset();//ResetGenerate();
 	}
@@ -802,12 +772,6 @@ public partial class GeneratorForm : Form {
 	/// <param name="e"></param>
 	private void Gif_Click(object sender, EventArgs e) => saveGif.ShowDialog();
 	/// <summary>
-	/// Start/Stop Animation
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void ScreenPanel_Click(object sender, EventArgs e) => animated = !animated;
-	/// <summary>
 	/// Invalidation event of screen display - draws the current display frame bitmap.
 	/// Get called repeatedly with new frame to animate the preview, if animation is toggled
 	/// </summary>
@@ -875,4 +839,5 @@ public partial class GeneratorForm : Form {
 		gTask = null;
 	}
 	#endregion
+
 }

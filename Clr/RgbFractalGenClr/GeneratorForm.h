@@ -28,28 +28,30 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::Button^ prevButton;
 	private: System::Windows::Forms::Button^ nextButton;
 	private: System::Windows::Forms::Button^ animateButton;
-	private: System::Windows::Forms::Label^ ambLabel;
-	private: System::Windows::Forms::TrackBar^ ambBar;
-	private: System::Windows::Forms::Label^ noiseLabel;
-	private: System::Windows::Forms::TrackBar^ noiseBar;
-	private: System::Windows::Forms::Label^ detailLabel;
-	private: System::Windows::Forms::TrackBar^ detailBar;
-	private: System::Windows::Forms::Label^ saturateLabel;
-	private: System::Windows::Forms::TrackBar^ saturateBar;
+	private: System::Windows::Forms::Label^ voidLabel;
+
+
+
+
+
+	private: System::Windows::Forms::Label^ dotLabel;
+
+
+
 	private: System::Windows::Forms::Label^ threadsLabel;
-	private: System::Windows::Forms::TrackBar^ threadsBar;
+
 	private: System::Windows::Forms::CheckBox^ parallelBox;
 
 	private: System::Windows::Forms::Label^ statusLabel;
 	private: System::Windows::Forms::Label^ infoLabel;
 	private: System::Windows::Forms::Button^ pngButton;
 	private: System::Windows::Forms::Button^ gifButton;
-	private: System::Windows::Forms::TrackBar^ blurBar;
-	private: System::Windows::Forms::Label^ blurLabel;
+
+
 	private: System::Windows::Forms::TextBox^ defaultZoom;
 	private: System::Windows::Forms::TextBox^ defaultAngle;
 	private: System::Windows::Forms::Button^ encodeButton;
-	private: System::Windows::Forms::TrackBar^ cutparamBar;
+
 	private: System::Windows::Forms::TextBox^ cutparamBox;
 	private: System::Windows::Forms::TextBox^ defaultHue;
 	private: System::Windows::Forms::TextBox^ periodMultiplierBox;
@@ -71,6 +73,16 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::TextBox^ spinSpeedBox;
 	private: System::Windows::Forms::TextBox^ hueSpeedBox;
 	private: System::Windows::Forms::ComboBox^ parallelTypeBox;
+	private: System::Windows::Forms::TextBox^ ambBox;
+	private: System::Windows::Forms::TextBox^ noiseBox;
+	private: System::Windows::Forms::TextBox^ saturateBox;
+	private: System::Windows::Forms::TextBox^ detailBox;
+	private: System::Windows::Forms::TextBox^ bloomBox;
+	private: System::Windows::Forms::TextBox^ blurBox;
+	private: System::Windows::Forms::Label^ blurLabel;
+	private: System::Windows::Forms::TextBox^ threadsBox;
+	private: System::Windows::Forms::TextBox^ abortBox;
+
 
 	private: System::ComponentModel::IContainer^ components;
 
@@ -95,13 +107,21 @@ namespace RgbFractalGenClr {
 		// Threading
 		FractalGenerator^ generator;		// The core ofthe app, the generator the generates the fractal animations
 		CancellationTokenSource^ cancel;	// Cancellation Token Source
-		Task^ gTask;						// GIF Export Task
+		Task^ gTask = nullptr;				// GIF Export Task
+		Task^ aTask = nullptr;				// Abort Task
+		bool queueAbort = false;			// Generator abortion queued
+		uint16_t queueReset = 0;			// Couting time until generator Restart
+
 		// Settings
 		bool previewMode = true;			// Preview mode for booting performance while setting up parameters
 		bool animated = true;				// Animating preview or paused? (default animating)
 		bool modifySettings = true;			// Allows for modifying settings without it triggering Aborts and Generates
 		int16_t width = -1, height = -1;
 		System::String^ gifPath = "";		// Gif export path name
+		uint16_t cutparamMaximum = 0;		// Maximum cutparam seed of this CutFunction
+		uint16_t maxTasks = 0;				// Maximum tasks available
+		uint16_t abortDelay = 500;			// Set time to restart generator
+
 		// Display  Variables
 		DoubleBufferedPanel^ screenPanel;	// Display panel
 		Bitmap^ currentBitmap = nullptr;	// Displayed Bitmap
@@ -138,26 +158,6 @@ namespace RgbFractalGenClr {
 		/// </summary>
 		/// <returns></returns>
 		System::Void Abort();
-		/// <summary>
-		/// Resets the generator, so it starts generating from frame 0 again
-		/// </summary>
-		/// <returns></returns>
-		System::Void ResetGenerator();
-		/// <summary>
-		/// Restarts the generator (needs to call Abort before)
-		/// </summary>
-		/// <returns></returns>
-		System::Void ResetGenerate();
-		/// <summary>
-		/// Resizes the resolution, and restarts the generator (needs to call Abort before)
-		/// </summary>
-		/// <returns></returns>
-		System::Void ResizeGenerate();
-		/// <summary>
-		/// Aborts the generator, resizes the resolution, and restarts the generator
-		/// </summary>
-		/// <returns></returns>
-		System::Void AbortGenerate();
 		/// <summary>
 		/// Setups the tooltip and tabindex of the interactable control
 		/// </summary>
@@ -200,6 +200,8 @@ namespace RgbFractalGenClr {
 
 #pragma region Input
 	private:
+		System::Void SetupFractal();
+		System::Void QueueReset();
 		/// <summary>
 		/// Fractal definition selection
 		/// </summary>
@@ -243,29 +245,11 @@ namespace RgbFractalGenClr {
 		/// <param name="e"></param>
 		System::Void cutparamBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
-		/// Change the CutFunction seed parameter through the trackBar scroll
+		/// Resolution Changed Event
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void cutparamBar_Scroll(System::Object^ sender, System::EventArgs^ e);
-		/// <summary>
-		/// Type X resolution - width
-		/// </summary>
-		/// <param name="sender"></param>
-		/// <param name="e"></param>
-		System::Void resX_TextChanged(System::Object^ sender, System::EventArgs^ e);
-		/// <summary>
-		/// Type Y resolution - height
-		/// </summary>
-		/// <param name="sender"></param>
-		/// <param name="e"></param>
-		System::Void resY_TextChanged(System::Object^ sender, System::EventArgs^ e);
-		/// <summary>
-		/// Toggle the "use the resolution", if unchecked, it will run in preview mode of firced 80x80 resolution regardless of typed resolution
-		/// </summary>
-		/// <param name="sender"></param>
-		/// <param name="e"></param>
-		System::Void previewBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
+		System::Void ResolutionChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Number Of Animation Frames to reach the center Self Similar (the total frames can be higher if the center child has a different color or rotation)
 		/// </summary>
@@ -331,58 +315,55 @@ namespace RgbFractalGenClr {
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void ambBar_Scroll(System::Object^ sender, System::EventArgs^ e);
+		System::Void ambBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Level of void Noise of the dark void outside between the fractal points
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void noiseBar_Scroll(System::Object^ sender, System::EventArgs^ e);
+		System::Void noiseBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Saturation Setting - ramp up saturation to maximum if all the wat to the right
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void saturateBar_Scroll(System::Object^ sender, System::EventArgs^ e);
+		System::Void saturateBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Detail, how small the split fractal shaped have to get, until they draw a dot of their color to the image buffer (the smaller the finer)
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void detailBar_Scroll(System::Object^ sender, System::EventArgs^ e);
+		System::Void detailBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
+		/// <summary>
+		/// Bloom strength. 0 = crisp, more - expanded and blurry
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		System::Void bloomBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Level of blur smear frames (renders multiple fractals of slighlty increased time until the frame deltatime over each other)
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void blurBar_Scroll(System::Object^ sender, System::EventArgs^ e);
+		System::Void blurBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Iteration Threading - How many iterations deep have Self Similars a new thread
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void parallelBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
-		/// <summary>
-		/// Sets maximum threads as selected by user (th parallel checkBox and the maxThreads slider)
-		/// </summary>
-		System::Void SelectMaxThreads();
+		System::Void parallel_Changed(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Drawing Threading - Paralelizes the scanlines of drawing
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
 		System::Void parallelTypeBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
-		//System::Void parallelTypeBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
-		/// Toggles between parallelism of single images and parallelism of batching animation frames
-		/// </summary>
-		System::Void SelectParallelType();
-		/// <summary>
-		/// Maximum number of threads
+		/// Milisecond delay from settings change to generator restart
 		/// </summary>
 		/// <param name="sender"></param>
 		/// <param name="e"></param>
-		System::Void threadsBar_Scroll(System::Object^ sender, System::EventArgs^ e);
+		System::Void abortBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
 		/// Framerate Delay (for previes and for gif encode, so if encoding gif, it will restart the generation)
 		/// </summary>
@@ -432,12 +413,6 @@ namespace RgbFractalGenClr {
 		/// <param name="e"></param>
 		System::Void gifButton_Click(System::Object^ sender, System::EventArgs^ e);
 		/// <summary>
-		/// Start/Stop Animation
-		/// </summary>
-		/// <param name="sender"></param>
-		/// <param name="e"></param>
-		System::Void screenPanel_Click(System::Object^ sender, System::EventArgs^ e);
-		/// <summary>
 		/// Invalidation event of screen display - draws the current display frame bitmap.
 		/// Get called repeatedly with new frame to animate the preview, if animation is toggled
 		/// </summary>
@@ -476,6 +451,18 @@ namespace RgbFractalGenClr {
 		//std::string ConvertToStdString(System::String^ managedString);
 #pragma endregion
 
+		template <typename T>
+		inline T Clamp(T val, T min, T max) {
+			return Math::Max(min, Math::Min(max, val));
+		}
+
+		inline bool IsTaskNotRunning(Task^ t) { return t == nullptr || t->IsCanceled || t->IsCompleted || t->IsFaulted; }
+		//inline bool IsTaskNotCancelled(Task^ t) { gTask != nullptr && !(gTask->IsCanceled || gTask->IsCompleted || gTask->IsFaulted) }
+
+		inline bool CutParamBoxEnabled(Fractal::CutFunction* cf) { 
+			cutparamBox->Enabled = 0 < (cutparamMaximum = cf == nullptr || (*cf)(0, -1) <= 0 ? 0 : ((*cf)(0, 1 - (1 << 16)) + 1) / (*cf)(0, -1));
+			return cutparamBox->Enabled;
+		}
 
 };
 }

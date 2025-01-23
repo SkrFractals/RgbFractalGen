@@ -1,0 +1,94 @@
+  RgbFractalGenClr.GeneratorForm.resources - Embedded, ContainedInManifestFile, 
+ImageRuntimeVersion: v4.0.30319
+Assembly RgbFractalGenClr, Version=0.0.*, Culture=Invariant Language (Invariant Country): 
+	hash=SHA1, flags=PublicKey
+Assembly mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089: 
+	hash=None, flags=None
+Assembly System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089: 
+	hash=None, flags=None
+Assembly System, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089: 
+	hash=None, flags=None
+Assembly System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a: 
+	hash=None, flags=None
+Assembly System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089: 
+	hash=None, flags=None
+Assembly System.Xml, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089: 
+	hash=None, flags=None
+Class DoubleBufferedPanel: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+  :System.Windows.Forms.Panel
+    Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+Struct Vector: AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit
+  :System.ValueType
+Class ManagedVector: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+    Void .ctor(Single, Single, Single): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+  Fields:
+    Single X : Public
+    Single Y : Public
+    Single Z : Public
+  Methods:
+    ToNative(Vector*): PrivateScope, Public, HideBySig
+    FromVector(Vector* IsImplicitlyDereferenced): PrivateScope, Public, HideBySig
+Class VecRefWrapper: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+    Void .ctor(Vector***, ManagedVector, ManagedVector): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+  Fields:
+    Vector*** T IsImplicitlyDereferenced : Public
+    ManagedVector I : Public
+    ManagedVector H : Public
+Class RgbFractalGenClr.FractalGenerator: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+    Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+  Fields:
+    Single detail : Public
+    Single noise : Public
+    Single saturate : Public
+    Single bloom : Public
+    Byte parallelType : Public
+    Byte encode : Public
+    SByte zoom : Public
+    SByte hueCycle : Public
+    UInt16 debug : Public
+    UInt16 width : Public
+    UInt16 height : Public
+    UInt16 period : Public
+    UInt16 delay : Public
+    UInt16 defaultZoom : Public
+    UInt16 defaultAngle : Public
+    UInt16 defaultHue : Public
+    UInt16 amb : Public
+    UInt16 selectBlur : Public
+    UInt16 extraSpin : Public
+    UInt16 extraHue : Public
+    Int16 select : Public
+    Int16 maxTasks : Public
+    Int16 maxGenerationTasks : Public
+    Int16 cutparam : Public
+    Int16 defaultSpin : Public
+    Int16 maxDepth : Public
+    Int16 periodMultiplier : Public
+  Methods:
+    StartGenerate(): PrivateScope, Public, HideBySig
+    ResetGenerator(): PrivateScope, Public, HideBySig
+    RequestCancel(): PrivateScope, Public, HideBySig
+    SaveGif(String): PrivateScope, Public, HideBySig
+    DebugStart(): PrivateScope, Public, HideBySig
+    SelectFractal(UInt16 IsConst): PrivateScope, Public, HideBySig
+    SetupFractal(): PrivateScope, Public, HideBySig
+    SelectAngle(UInt16 IsConst): PrivateScope, Public, HideBySig
+    SetupAngle(): PrivateScope, Public, HideBySig
+    SelectColor(UInt16 IsConst): PrivateScope, Public, HideBySig
+    SelectColorPalette(Byte IsConst): PrivateScope, Public, HideBySig
+    SetupColor(): PrivateScope, Public, HideBySig
+    SelectCutFunction(UInt16 IsConst): PrivateScope, Public, HideBySig
+    SetupCutFunction(): PrivateScope, Public, HideBySig
+    SelectThreadingDepth(): PrivateScope, Public, HideBySig
+    GetFractals(): PrivateScope, Public, HideBySig
+    GetFractal(): PrivateScope, Public, HideBySig
+    GetBitmap(Int32 IsConst): PrivateScope, Public, HideBySig
+    GetFinalPeriod(): PrivateScope, Public, HideBySig
+    GetFrames(): PrivateScope, Public, HideBySig
+    GetBitmapsFinished(): PrivateScope, Public, HideBySig
+    IsGifReady(): PrivateScope, Public, HideBySig
+    GetCutFunction(): PrivateScope, Public, HideBySig
+    ConvertToStdString(basic_string<char\,std::char_traits<char>\,std::allocator<char> >*, String): PrivateScope, Public, HideBySig
+Class RgbFractalGenClr.GeneratorForm: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+  :System.Windows.Forms.Form
+    Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
