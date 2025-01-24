@@ -126,7 +126,6 @@ public partial class GeneratorForm : Form {
 			generator.select = -1;
 			fractalSelect.SelectedIndex = 0;
 			// Update Input fields to default values - modifySettings is true from constructor so that it doesn't abort and restant the generator over and over
-			threadsBox.Text = maxTasks.ToString();
 			abortBox_TextChanged(null, null);
 			PeriodBox_TextChanged(null, null);
 			PeriodMultiplierBox_TextChanged(null, null);
@@ -144,8 +143,8 @@ public partial class GeneratorForm : Form {
 			BrightnessBox_TextChanged(null, null);
 			parallelTypeBox.SelectedIndex = 0;
 			hueSelect.SelectedIndex = 0;
-			maxTasks = Environment.ProcessorCount - 2;
 			SetupFractal();
+			threadsBox.Text = (maxTasks = Math.Max(0, Environment.ProcessorCount - 2)).ToString();
 			bInit = modifySettings = helpPanel.Visible = false;
 			// Start the generator
 			TryResize();
