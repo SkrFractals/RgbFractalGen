@@ -39,7 +39,6 @@
 			prevButton = new System.Windows.Forms.Button();
 			nextButton = new System.Windows.Forms.Button();
 			animateButton = new System.Windows.Forms.Button();
-			parallelBox = new System.Windows.Forms.CheckBox();
 			pngButton = new System.Windows.Forms.Button();
 			gifButton = new System.Windows.Forms.Button();
 			timer = new System.Windows.Forms.Timer(components);
@@ -49,7 +48,6 @@
 			delayLabel = new System.Windows.Forms.Label();
 			voidLabel = new System.Windows.Forms.Label();
 			dotLabel = new System.Windows.Forms.Label();
-			threadsLabel = new System.Windows.Forms.Label();
 			statusLabel = new System.Windows.Forms.Label();
 			infoLabel = new System.Windows.Forms.Label();
 			blurLabel = new System.Windows.Forms.Label();
@@ -81,6 +79,9 @@
 			bloomBox = new System.Windows.Forms.TextBox();
 			threadsBox = new System.Windows.Forms.TextBox();
 			abortBox = new System.Windows.Forms.TextBox();
+			threadsLabel = new System.Windows.Forms.Label();
+			brightnessBox = new System.Windows.Forms.TextBox();
+			label1 = new System.Windows.Forms.Label();
 			helpPanel.SuspendLayout();
 			SuspendLayout();
 			// 
@@ -234,20 +235,6 @@
 			animateButton.UseVisualStyleBackColor = true;
 			animateButton.Click += AnimateButton_Click;
 			// 
-			// parallelBox
-			// 
-			parallelBox.AutoSize = true;
-			parallelBox.Checked = true;
-			parallelBox.CheckState = System.Windows.Forms.CheckState.Checked;
-			parallelBox.Location = new System.Drawing.Point(17, 408);
-			parallelBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
-			parallelBox.Name = "parallelBox";
-			parallelBox.Size = new System.Drawing.Size(134, 19);
-			parallelBox.TabIndex = 26;
-			parallelBox.Text = "Parallel Generation...";
-			parallelBox.UseVisualStyleBackColor = true;
-			parallelBox.CheckedChanged += Parallel_Changed;
-			// 
 			// pngButton
 			// 
 			pngButton.Location = new System.Drawing.Point(114, 558);
@@ -327,16 +314,6 @@
 			dotLabel.Size = new System.Drawing.Size(122, 15);
 			dotLabel.TabIndex = 0;
 			dotLabel.Text = "Saturate/Detail (0-10):";
-			// 
-			// threadsLabel
-			// 
-			threadsLabel.AutoSize = true;
-			threadsLabel.Location = new System.Drawing.Point(17, 438);
-			threadsLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-			threadsLabel.Name = "threadsLabel";
-			threadsLabel.Size = new System.Drawing.Size(77, 15);
-			threadsLabel.TabIndex = 0;
-			threadsLabel.Text = "Max Threads:";
 			// 
 			// statusLabel
 			// 
@@ -556,7 +533,7 @@
 			// 
 			parallelTypeBox.FormattingEnabled = true;
 			parallelTypeBox.Items.AddRange(new object[] { "Of Animation", "Of Depth", "Of Recursion" });
-			parallelTypeBox.Location = new System.Drawing.Point(177, 406);
+			parallelTypeBox.Location = new System.Drawing.Point(111, 435);
 			parallelTypeBox.Name = "parallelTypeBox";
 			parallelTypeBox.Size = new System.Drawing.Size(123, 23);
 			parallelTypeBox.TabIndex = 27;
@@ -619,9 +596,9 @@
 			// 
 			// threadsBox
 			// 
-			threadsBox.Location = new System.Drawing.Point(177, 435);
+			threadsBox.Location = new System.Drawing.Point(240, 435);
 			threadsBox.Name = "threadsBox";
-			threadsBox.Size = new System.Drawing.Size(123, 23);
+			threadsBox.Size = new System.Drawing.Size(60, 23);
 			threadsBox.TabIndex = 28;
 			threadsBox.Text = "0";
 			threadsBox.TextChanged += Parallel_Changed;
@@ -636,11 +613,42 @@
 			abortBox.Text = "500";
 			abortBox.TextChanged += abortBox_TextChanged;
 			// 
+			// threadsLabel
+			// 
+			threadsLabel.AutoSize = true;
+			threadsLabel.Location = new System.Drawing.Point(17, 438);
+			threadsLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			threadsLabel.Name = "threadsLabel";
+			threadsLabel.Size = new System.Drawing.Size(77, 15);
+			threadsLabel.TabIndex = 0;
+			threadsLabel.Text = "Max Threads:";
+			// 
+			// brightnessBox
+			// 
+			brightnessBox.Location = new System.Drawing.Point(177, 406);
+			brightnessBox.Name = "brightnessBox";
+			brightnessBox.Size = new System.Drawing.Size(60, 23);
+			brightnessBox.TabIndex = 46;
+			brightnessBox.Text = "100";
+			brightnessBox.TextChanged += BrightnessBox_TextChanged;
+			// 
+			// label1
+			// 
+			label1.AutoSize = true;
+			label1.Location = new System.Drawing.Point(17, 409);
+			label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			label1.Name = "label1";
+			label1.Size = new System.Drawing.Size(115, 15);
+			label1.TabIndex = 47;
+			label1.Text = "Brightness (0-300%):";
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			ClientSize = new System.Drawing.Size(1086, 610);
+			Controls.Add(label1);
+			Controls.Add(brightnessBox);
 			Controls.Add(abortBox);
 			Controls.Add(threadsBox);
 			Controls.Add(bloomBox);
@@ -688,14 +696,13 @@
 			Controls.Add(voidLabel);
 			Controls.Add(dotLabel);
 			Controls.Add(threadsLabel);
-			Controls.Add(parallelBox);
 			Controls.Add(statusLabel);
 			Controls.Add(infoLabel);
 			Controls.Add(pngButton);
 			Controls.Add(gifButton);
 			Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.8";
+			Text = "RGB Fractal Zoom Generator C# v1.82";
 			FormClosing += GeneratorForm_FormClosing;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();
@@ -719,14 +726,12 @@
 		private System.Windows.Forms.Button prevButton;
 		private System.Windows.Forms.Button nextButton;
 		private System.Windows.Forms.Button animateButton;
-		private System.Windows.Forms.CheckBox parallelBox;
 		private System.Windows.Forms.Label statusLabel;
 		private System.Windows.Forms.Label infoLabel;
 		private System.Windows.Forms.Button pngButton;
 		private System.Windows.Forms.Button gifButton;
 		private System.Windows.Forms.Label dotLabel;
 		private System.Windows.Forms.Label voidLabel;
-		private System.Windows.Forms.Label threadsLabel;
 		private System.Windows.Forms.Label blurLabel;
 		private System.Windows.Forms.TextBox defaultZoom;
 		private System.Windows.Forms.TextBox defaultAngle;
@@ -760,6 +765,9 @@
 		private System.Windows.Forms.TextBox bloomBox;
 		private System.Windows.Forms.TextBox threadsBox;
 		private System.Windows.Forms.TextBox abortBox;
+		private System.Windows.Forms.Label threadsLabel;
+		private System.Windows.Forms.TextBox brightnessBox;
+		private System.Windows.Forms.Label label1;
 	}
 }
 

@@ -102,7 +102,8 @@ public partial class GeneratorForm : Form {
 			SetupControl(detailBox, "Level of Detail (The lower the finer).");
 			SetupControl(bloomBox, "Bloom: 0 will be maximally crisp, but possibly dark with think fractals. Higher values wil blur/bloom out the fractal dots.");
 			SetupControl(blurBox, "Motion blur: Lowest no blur and fast generation, highest 10 smeared frames 10 times slower generation.");
-			SetupControl(parallelBox, "Enable parallelism (and then tune with the Max Threads slider).\nSelect the type of parallelism with the followinf checkBox to the right.");
+			SetupControl(brightnessBox, "Brightness level: 0% black, 100% normalized maximum, 300% overexposed 3x maximum");
+			//SetupControl(parallelBox, "Enable parallelism (and then tune with the Max Threads slider).\nSelect the type of parallelism with the followinf checkBox to the right.");
 			SetupControl(parallelTypeBox, "Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong");
 			SetupControl(threadsBox, "The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
 			SetupControl(abortBox, "How many millisecond of pause after the last settings change until the generator restarts?");
@@ -140,6 +141,7 @@ public partial class GeneratorForm : Form {
 			BloomBox_TextChanged(null, null);
 			BlurBox_TextChanged(null, null);
 			SaturateBox_TextChanged(null, null);
+			BrightnessBox_TextChanged(null, null);
 			parallelTypeBox.SelectedIndex = 0;
 			hueSelect.SelectedIndex = 0;
 			maxTasks = Environment.ProcessorCount - 2;
@@ -465,7 +467,7 @@ public partial class GeneratorForm : Form {
 	private void CutparamBox_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(cutparamBox.Text, out var newcutparam))
 			newcutparam = 0;
-		ApplyClampParam(newcutparam, ref generator.cutparam, (short)0, (short)cutparamMaximum, cutparamBox);
+		ApplyClampParam(newcutparam, ref generator.selectCutparam, (short)0, (short)cutparamMaximum, cutparamBox);
 	}
 	/// <summary>
 	/// Resolution Changed Event
@@ -484,7 +486,7 @@ public partial class GeneratorForm : Form {
 	private void PeriodBox_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(periodBox.Text, out var newPeriod))
 			newPeriod = 120;
-		ApplyClampParam(newPeriod, ref generator.period, (short)1, (short)1000, periodBox);
+		ApplyClampParam(newPeriod, ref generator.selectPeriod, (short)1, (short)1000, periodBox);
 	}
 	/// <summary>
 	/// Multiplies the number of loop frames, keeping the spin and huecycle the same speed (you can speed up either with options below)
@@ -494,7 +496,7 @@ public partial class GeneratorForm : Form {
 	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(periodMultiplierBox.Text, out var newPeriod))
 			newPeriod = 1;
-		ApplyClampParam(newPeriod, ref generator.periodMultiplier, (short)1, (short)10, periodMultiplierBox);
+		ApplyClampParam(newPeriod, ref generator.selectPeriodMultiplier, (short)1, (short)10, periodMultiplierBox);
 	}
 	/// <summary>
 	/// Zoom direction (-> Forward zoom in, <- Backwards zoom out)
@@ -504,8 +506,8 @@ public partial class GeneratorForm : Form {
 	private void ZoomButton_Click(object sender, EventArgs e) {
 		// zoom is different - change the setting and restart generation
 		//Abort();
-		generator.zoom = (short)-generator.zoom;
-		zoomButton.Text = "Zoom: " + ((generator.zoom > 0) ? "->" : "<-");
+		generator.selectZoom = (short)-generator.selectZoom;
+		zoomButton.Text = "Zoom: " + ((generator.selectZoom > 0) ? "->" : "<-");
 		QueueReset();//ResetGenerate();
 	}
 	/// <summary>
@@ -516,8 +518,8 @@ public partial class GeneratorForm : Form {
 	private void DefaultZoom_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(defaultZoom.Text, out var newZoom))
 			newZoom = 0;
-		var finalPeriod = (short)(generator.period * generator.GetFinalPeriod());
-		ApplyModParam(newZoom, ref generator.defaultZoom, (short)0, finalPeriod);
+		var finalPeriod = (short)(generator.selectPeriod * generator.GetFinalPeriod());
+		ApplyModParam(newZoom, ref generator.selectDefaultZoom, (short)0, finalPeriod);
 	}
 	/// <summary>
 	/// Select the spin mode (clockwise, counterclockwise, or antispin where the child spins in opposite direction)
@@ -526,7 +528,7 @@ public partial class GeneratorForm : Form {
 	/// <param name="e"></param>
 	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		var newSpin = (short)(spinSelect.SelectedIndex - 2);
-		ApplyClampParam(newSpin, ref generator.defaultSpin, (short)-2, (short)2, null);
+		ApplyClampParam(newSpin, ref generator.selectDefaultSpin, (short)-2, (short)2, null);
 	}
 	/// <summary>
 	/// Select the extra spin of symmentry angle per loop (so it spins faster)
@@ -538,7 +540,7 @@ public partial class GeneratorForm : Form {
 			newSpeed = 0;
 		//byte newSpeedByte = (byte)Math.Clamp(newSpeed, (short)0, (short)255);
 		spinSpeedBox.Text = newSpeed.ToString();
-		ApplyClampParam(newSpeed, ref generator.extraSpin, (short)0, (short)255, spinSpeedBox);
+		ApplyClampParam(newSpeed, ref generator.selectExtraSpin, (short)0, (short)255, spinSpeedBox);
 	}
 	/// <summary>
 	/// Default spin angle on first frame (in degrees)
@@ -548,7 +550,7 @@ public partial class GeneratorForm : Form {
 	private void DefaultAngle_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(defaultAngle.Text, out var newAngle))
 			newAngle = 0;
-		ApplyModParam(newAngle, ref generator.defaultAngle, (short)0, (short)360);
+		ApplyModParam(newAngle, ref generator.selectDefaultAngle, (short)0, (short)360);
 	}
 	/// <summary>
 	/// Select the hue pallete and cycling
@@ -558,9 +560,9 @@ public partial class GeneratorForm : Form {
 	private void HueSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		var colorChoice = (byte)(hueSelect.SelectedIndex % 6);
 		var newHueCycle = (short)((colorChoice / 2 + 1) % 3 - 1);
-		if (generator.SelectColorPalette((byte)(colorChoice % 2)) && newHueCycle == generator.hueCycle)
+		if (generator.SelectColorPalette((byte)(colorChoice % 2)) && newHueCycle == generator.selectHueCycle)
 			return;
-		ApplyParam(newHueCycle, ref generator.hueCycle);
+		ApplyParam(newHueCycle, ref generator.selectHueCycle);
 	}
 	/// <summary>
 	/// Select the extra hue cycling speed of extra full 360° color loops per full animation loop (so it hue cycles spins faster)
@@ -572,12 +574,12 @@ public partial class GeneratorForm : Form {
 			newSpeed = 0;
 		byte newSpeedByte = (byte)Math.Clamp(newSpeed, (short)0, (short)255);
 		hueSpeedBox.Text = newSpeedByte.ToString();
-		if (DiffParam(newSpeedByte, generator.extraHue))
+		if (DiffParam(newSpeedByte, generator.selectExtraHue))
 			return;
 		// hue speed is different - change the setting and if it's actually huecycling restart generation
-		if (generator.hueCycle != 0)
-			ApplyParam(newSpeedByte, ref generator.extraHue);
-		else generator.extraHue = newSpeedByte;
+		if (generator.selectHueCycle != 0)
+			ApplyParam(newSpeedByte, ref generator.selectExtraHue);
+		else generator.selectExtraHue = newSpeedByte;
 	}
 	/// <summary>
 	/// Defaul hue angle on first frame (in degrees)
@@ -587,7 +589,7 @@ public partial class GeneratorForm : Form {
 	private void DefaultHue_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(defaultHue.Text, out var newHue))
 			newHue = 0;
-		ApplyModParam(newHue, ref generator.defaultHue, (short)0, (short)360);
+		ApplyModParam(newHue, ref generator.selectDefaultHue, (short)0, (short)360);
 	}
 	/// <summary>
 	/// The strenghts (lightness) of the dark void outside between the fractal points
@@ -598,7 +600,7 @@ public partial class GeneratorForm : Form {
 		if (!short.TryParse(ambBox.Text, out var newAmb))
 			newAmb = 0;
 		ambBox.Text = (newAmb = Math.Clamp(newAmb, (byte)0, (byte)30)).ToString();
-		ApplyDiffParam((short)(4 * newAmb), ref generator.amb);
+		ApplyDiffParam((short)(4 * newAmb), ref generator.selectAmbient);
 	}
 	/// <summary>
 	/// Level of void Noise of the dark void outside between the fractal points
@@ -609,7 +611,7 @@ public partial class GeneratorForm : Form {
 		if (!short.TryParse(noiseBox.Text, out var newNoise))
 			newNoise = 0;
 		noiseBox.Text = (newNoise = Math.Clamp(newNoise, (short)0, (short)30)).ToString();
-		ApplyDiffParam(newNoise * .1f, ref generator.noise);
+		ApplyDiffParam(newNoise * .1f, ref generator.selectNoise);
 	}
 	/// <summary>
 	/// Saturation Setting - ramp up saturation to maximum if all the wat to the right
@@ -620,7 +622,7 @@ public partial class GeneratorForm : Form {
 		if (!short.TryParse(saturateBox.Text, out var newSaturate))
 			newSaturate = 0;
 		saturateBox.Text = (newSaturate = Math.Clamp(newSaturate, (short)0, (short)10)).ToString();
-		ApplyDiffParam(newSaturate * .1f, ref generator.saturate);
+		ApplyDiffParam(newSaturate * .1f, ref generator.selectSaturate);
 	}
 	/// <summary>
 	/// Detail, how small the split fractal shaped have to get, until they draw a dot of their color to the image buffer (the smaller the finer)
@@ -644,7 +646,7 @@ public partial class GeneratorForm : Form {
 		if (!short.TryParse(bloomBox.Text, out var newBloom))
 			newBloom = 0;
 		bloomBox.Text = (newBloom = Math.Clamp(newBloom, (byte)0, (byte)40)).ToString();
-		ApplyDiffParam(newBloom * .25f, ref generator.bloom);
+		ApplyDiffParam(newBloom * .25f, ref generator.selectBloom);
 	}
 	/// <summary>
 	/// Level of blur smear frames (renders multiple fractals of slighlty increased time until the frame deltatime over each other)
@@ -658,6 +660,17 @@ public partial class GeneratorForm : Form {
 		ApplyDiffParam(++newBlur, ref generator.selectBlur);
 	}
 	/// <summary>
+	/// Type the brightness to which to normalize (0 - black, 100 - max, 300 - 3x max)
+	/// </summary>
+	/// <param name="sender"></param>
+	/// <param name="e"></param>
+	private void BrightnessBox_TextChanged(object sender, EventArgs e) {
+		if (!short.TryParse(brightnessBox.Text, out var newBrightness))
+			newBrightness = 0;
+		blurBox.Text = (newBrightness = Math.Clamp(newBrightness, (short)0, (short)300)).ToString();
+		ApplyDiffParam(newBrightness, ref generator.selectBrightness);
+	}
+	/// <summary>
 	/// Iteration Threading - How many iterations deep have Self Similars a new thread
 	/// </summary>
 	/// <param name="sender"></param>
@@ -667,8 +680,8 @@ public partial class GeneratorForm : Form {
 			newThreads = 0;
 		threadsBox.Text = (newThreads = (short)Math.Clamp(newThreads, 0, maxTasks)).ToString();
 		threadsLabel.Text = "Maximum threads (0-" + maxTasks + "):";
-		generator.maxTasks = (short)(parallelBox.Checked && newThreads > 0 ? newThreads : -1);
-		generator.maxGenerationTasks = (short)(generator.maxTasks - 1);
+		generator.selectMaxTasks = (short)(newThreads > 0 ? newThreads : -1);
+		generator.maxGenerationTasks = (short)(generator.selectMaxTasks - 1);
 		generator.SelectThreadingDepth();
 	}
 	/// <summary>

@@ -121,6 +121,9 @@ Motion Blur:
 - Will render multiple smear frames per frame, will take proportionally longer to render
 - Not recommended for "Only Image", or if you want the animation super crisp even at the edges.
 
+Brightness:
+- Type to which brightness you want the fractal to be normalized
+- 0 - black, 100 - 100% max brightness, 300 - 3x max brightness overexposure
 
 Parallel generation:
 - Will enable threading, significantly boosting performance on multicore CPUs
