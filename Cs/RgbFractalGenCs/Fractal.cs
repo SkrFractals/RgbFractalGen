@@ -615,6 +615,7 @@ return newFlags;
 internal class VecRefWrapper {
 	internal Vector3[][] buffT;
 	internal Vector3 H, I;
+	internal (float, float, (float, float)[])[] preIterate;
 	internal VecRefWrapper(Vector3[][] buffT, Vector3 I, Vector3 H) {
 		this.buffT = buffT;
 		this.H = H; this.I = I;

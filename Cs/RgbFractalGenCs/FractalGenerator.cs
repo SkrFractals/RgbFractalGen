@@ -77,7 +77,7 @@ internal class FractalGenerator {
 	private short applyMaxTasks;                    // Safely copy maxTasks in here so it doesn't change in the middle of generation
 	private short applyMaxGenerationTasks;          // Safely copy maxGenerationTasks in here so it doesn't change in the middle of generation
 	private short maxIterations = -1;               // maximum depth of iteration (dependent on fractal/detail/resolution)
-	(float, float, (float, float)[])[] preIterate; // (childSize, childDetail, childSpread, (childX,childY)[])
+	(float, float, (float, float)[])[][] preIterate;// (childSize, childDetail, childSpread, (childX,childY)[])
 
 	private short widthBorder;                      // Precomputed maximum x coord fot pixel input
 	private short heightBorder;                     // Precomputed maximum y coord for pixel input
@@ -354,7 +354,7 @@ internal class FractalGenerator {
 			void GenerateDots_SingleTask(VecRefWrapper R,
 				(float, float) inXY, (float, float) inAngle, byte inColor, int inFlags, byte inDepth
 			) {
-				var preIterated = preIterate[inDepth];
+				var preIterated = R.preIterate[inDepth];
 
 				//var inAngleF = inAngle.Item1;
 
@@ -363,7 +363,7 @@ internal class FractalGenerator {
 					return;
 				}
 				// Split Iteration Deeper
-				var newPreIterated = preIterate[++inDepth];
+				var newPreIterated = R.preIterate[++inDepth];
 				var i = f.childCount;
 				while (0 <= --i) {
 					if (cancel.Token.IsCancellationRequested)
@@ -387,13 +387,13 @@ internal class FractalGenerator {
 					count = (max + insertTo - index) % max;
 				while (count > 0 && count < maxcount) {
 					(var inXY, var inAngle, var inColor, var inFlags, var inDepth) = tuples[index++];
-					var preIterated = preIterate[inDepth];
+					var preIterated = R.preIterate[inDepth];
 					if (preIterated.Item1 < detail) {
 						ApplyDot(R, inXY.Item1, inXY.Item2, preIterated.Item2, inColor);
 						continue;
 					}
 					// Split Iteration Deeper
-					var newPreIterated = preIterate[++inDepth];
+					var newPreIterated = R.preIterate[++inDepth];
 					var i = f.childCount;
 					while (0 <= --i) {
 						if (cancel.Token.IsCancellationRequested)
@@ -446,13 +446,13 @@ internal class FractalGenerator {
 				(float, float) inXY, (float, float) inAngle,
 				byte inColor, int inFlags, byte inDepth
 			) {
-				var preIterated = preIterate[inDepth];
+				var preIterated = R.preIterate[inDepth];
 				if (preIterated.Item1 < detail) {
 					ApplyDot(R, inXY.Item1, inXY.Item2, preIterated.Item2, inColor);
 					return;
 				}
 				// Split Iteration Deeper
-				var newPreIterated = preIterate[++inDepth];
+				var newPreIterated = R.preIterate[++inDepth];
 				var i = f.childCount;
 				while (0 <= --i) {
 					if (cancel.Token.IsCancellationRequested)
@@ -465,8 +465,11 @@ internal class FractalGenerator {
 					var XY = preIterated.Item3[i];
 					var newXY = NewXY(inXY, XY, inAngle.Item1);
 					if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1)) {
-						if (imageTasks != null && imageTasks.Count < applyMaxGenerationTasks && inDepth < maxDepth)
-							imageTasks.Add(Task.Run(() => GenerateDots_OfRecursion(R, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth)));
+						if (imageTasks != null && imageTasks.Count < applyMaxGenerationTasks && inDepth < maxDepth) {
+							int index = i;
+							imageTasks.Add(Task.Run(() => GenerateDots_OfRecursion(R, newXY, index == 0 ? (inAngle.Item1 + childAngle[index] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[index], inAngle.Item2), (byte)((inColor + childColor[index]) % 3), newFlags, inDepth)));
+						}
+							
 						else
 							GenerateDots_OfRecursion(R, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
 					}
@@ -528,18 +531,19 @@ internal class FractalGenerator {
 			for (var b = 0; b < selectBlur; ++b) {
 				ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 				// Preiterate values that change the same way as iteration goes deeper, so they only get calculated once
+				R.preIterate = preIterate[bufferIndex];
 				float inSize = size;
 				for (int i = 0; i < maxIterations; ++i) {
-
-					preIterate[i].Item2 = (float)Math.Log(detail / (preIterate[i].Item1 = inSize)) / logBase;
+					R.preIterate[i].Item2 = (float)Math.Log(detail / (R.preIterate[i].Item1 = inSize)) / logBase;
 					//var inDetail = inSize;
-					var inDetail = -inSize * Math.Max(-1, preIterate[i].Item2 = (float)Math.Log(detail / (preIterate[i].Item1 = inSize)) / logBase);
-					if (preIterate[i].Item3 == null || preIterate[i].Item3.Length < f.childCount)
-						preIterate[i].Item3 = new (float, float)[f.childCount];
+					var inDetail = -inSize * Math.Max(-1, R.preIterate[i].Item2 = (float)Math.Log(detail / (R.preIterate[i].Item1 = inSize)) / logBase);
+					if (R.preIterate[i].Item3 == null || R.preIterate[i].Item3.Length < f.childCount)
+						R.preIterate[i].Item3 = new (float, float)[f.childCount];
 					for (int c = 0; c < f.childCount; ++c)
-						preIterate[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
+						R.preIterate[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					inSize /= f.childSize;
 				}
+				
 				// Prepare Color blending per one dot (hueshifting + iteration correction)
 				// So that the color of the dot will slowly approach the combined colors of its childer before it splits
 				var lerp = hueAngle % 1.0f;
@@ -1176,13 +1180,14 @@ internal class FractalGenerator {
 		logBase = (float)Math.Log(f.childSize);
 		SetMaxIterations();
 	}
-	internal void SetMaxIterations() {
+	internal void SetMaxIterations(bool forcedReset = false) {
 		short newMaxIterations = (short)(2 + Math.Ceiling(Math.Log(Math.Max(width, height) * f.maxSize / detail) / logBase));
-		if (newMaxIterations <= maxIterations) {
+		if (newMaxIterations <= maxIterations && !forcedReset) {
 			maxIterations = newMaxIterations;
 			return;
 		}
-		preIterate = new (float, float, (float, float)[])[maxIterations = newMaxIterations];
+		for(int t = 0; t < selectMaxTasks; ++t)
+			preIterate[t] = new (float, float, (float, float)[])[maxIterations = newMaxIterations];
 	}
 	internal bool SelectAngle(short selectAngle) {
 		if (this.selectAngle == selectAngle)
@@ -1239,6 +1244,8 @@ internal class FractalGenerator {
 	}*/
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal void SelectThreadingDepth() {
+		preIterate = new (float, float, (float, float)[])[Math.Max((short)1,selectMaxTasks)][];
+		SetMaxIterations(true);
 		maxDepth = 0;
 		if (f.childCount <= 0)
 			return;

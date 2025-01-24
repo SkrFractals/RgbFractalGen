@@ -666,7 +666,7 @@ public partial class GeneratorForm : Form {
 	private void BrightnessBox_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(brightnessBox.Text, out var newBrightness))
 			newBrightness = 0;
-		blurBox.Text = (newBrightness = Math.Clamp(newBrightness, (short)0, (short)300)).ToString();
+		brightnessBox.Text = (newBrightness = Math.Clamp(newBrightness, (short)0, (short)300)).ToString();
 		ApplyDiffParam(newBrightness, ref generator.selectBrightness);
 	}
 	/// <summary>
