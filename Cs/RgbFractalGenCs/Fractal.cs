@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace RgbFractalGenCs; 
+namespace RgbFractalGenCs;
 /// <summary>
 /// Fractal Definitions
 /// </summary>

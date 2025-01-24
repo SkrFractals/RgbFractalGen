@@ -33,14 +33,14 @@ public partial class GeneratorForm : Form {
 	#region Variables
 	// Threading
 	private bool bInit = true;
-	
+
 	//private readonly List<Control> MyControls = [];
 	private FractalGenerator generator;     // The core ofthe app, the generator the generates the fractal animations
 	private CancellationTokenSource cancel; // Cancellation Token Source
 	private Task gTask = null;              // CPU gif thread
 	private Task aTask = null;              // Abort Task
 	private bool queueAbort = false;        // Generator abortion queued
-	private short queueReset = 0;			// Counting time until generator Restart
+	private short queueReset = 0;           // Counting time until generator Restart
 
 	// Settings
 	private bool previewMode = true;        // Preview mode for booting performance while setting up parameters
@@ -187,6 +187,7 @@ public partial class GeneratorForm : Form {
 		void ResizeAll() {
 			generator.width = width;
 			generator.height = height;
+			generator.SetMaxIterations();
 			// Update the size of the window and display
 			SetMinimumSize();
 			SetClientSizeCore(width + 314, Math.Max(height + 8, 300));
@@ -431,7 +432,7 @@ public partial class GeneratorForm : Form {
 			NEW = MIN;
 		if (NEW.CompareTo(MAX) > 0)
 			NEW = MAX;
-		if(TEXT != null)
+		if (TEXT != null)
 			TEXT.Text = NEW.ToString();
 		ApplyDiffParam(NEW, ref GEN);
 	}
@@ -446,10 +447,11 @@ public partial class GeneratorForm : Form {
 	bool DiffParam<T>(T NEW, T GEN) where T : struct, IComparable<T> {
 		return GEN.CompareTo(NEW) == 0;
 	}
-	void ApplyDiffParam<T>(T NEW, ref T GEN) where T : struct, IComparable<T> {
+	bool ApplyDiffParam<T>(T NEW, ref T GEN) where T : struct, IComparable<T> {
 		if (DiffParam(NEW, GEN))
-			return;
+			return true;
 		ApplyParam(NEW, ref GEN);
+		return false;
 	}
 	void ApplyParam<T>(T NEW, ref T GEN) {
 		GEN = NEW; QueueReset();
@@ -461,7 +463,7 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void CutparamBox_TextChanged(object sender, EventArgs e) {
-		if(!short.TryParse(cutparamBox.Text, out var newcutparam))
+		if (!short.TryParse(cutparamBox.Text, out var newcutparam))
 			newcutparam = 0;
 		ApplyClampParam(newcutparam, ref generator.cutparam, (short)0, (short)cutparamMaximum, cutparamBox);
 	}
@@ -490,7 +492,7 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e) {
-		if(!short.TryParse(periodMultiplierBox.Text, out var newPeriod))
+		if (!short.TryParse(periodMultiplierBox.Text, out var newPeriod))
 			newPeriod = 1;
 		ApplyClampParam(newPeriod, ref generator.periodMultiplier, (short)1, (short)10, periodMultiplierBox);
 	}
@@ -532,7 +534,7 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void SpinSpeedBox_TextChanged(object sender, EventArgs e) {
-		if(!short.TryParse(spinSpeedBox.Text, out var newSpeed))
+		if (!short.TryParse(spinSpeedBox.Text, out var newSpeed))
 			newSpeed = 0;
 		//byte newSpeedByte = (byte)Math.Clamp(newSpeed, (short)0, (short)255);
 		spinSpeedBox.Text = newSpeed.ToString();
@@ -573,7 +575,7 @@ public partial class GeneratorForm : Form {
 		if (DiffParam(newSpeedByte, generator.extraHue))
 			return;
 		// hue speed is different - change the setting and if it's actually huecycling restart generation
-		if (generator.hueCycle != 0) 
+		if (generator.hueCycle != 0)
 			ApplyParam(newSpeedByte, ref generator.extraHue);
 		else generator.extraHue = newSpeedByte;
 	}
@@ -585,7 +587,7 @@ public partial class GeneratorForm : Form {
 	private void DefaultHue_TextChanged(object sender, EventArgs e) {
 		if (!short.TryParse(defaultHue.Text, out var newHue))
 			newHue = 0;
-		ApplyModParam(newHue,ref generator.defaultHue, (short)0, (short)360);
+		ApplyModParam(newHue, ref generator.defaultHue, (short)0, (short)360);
 	}
 	/// <summary>
 	/// The strenghts (lightness) of the dark void outside between the fractal points
@@ -629,7 +631,9 @@ public partial class GeneratorForm : Form {
 		if (!short.TryParse(detailBox.Text, out var newDetail))
 			newDetail = 0;
 		detailBox.Text = (newDetail = Math.Clamp(newDetail, (short)0, (short)10)).ToString();
-		ApplyDiffParam(newDetail * .1f * generator.GetFractal().minSize, ref generator.detail);
+		if (ApplyDiffParam(newDetail * .1f * generator.GetFractal().minSize, ref generator.detail))
+			return;
+		generator.SetMaxIterations();
 	}
 	/// <summary>
 	/// Bloom strength. 0 = crisp, more - expanded and blurry
@@ -648,7 +652,7 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void BlurBox_TextChanged(object sender, EventArgs e) {
-		if(!short.TryParse(blurBox.Text, out var newBlur))
+		if (!short.TryParse(blurBox.Text, out var newBlur))
 			newBlur = 0;
 		blurBox.Text = (newBlur = Math.Clamp(newBlur, (byte)0, (byte)40)).ToString();
 		ApplyDiffParam(++newBlur, ref generator.selectBlur);
@@ -659,7 +663,7 @@ public partial class GeneratorForm : Form {
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	private void Parallel_Changed(object sender, EventArgs e) {
-		if(!short.TryParse(threadsBox.Text, out var newThreads))
+		if (!short.TryParse(threadsBox.Text, out var newThreads))
 			newThreads = 0;
 		threadsBox.Text = (newThreads = (short)Math.Clamp(newThreads, 0, maxTasks)).ToString();
 		threadsLabel.Text = "Maximum threads (0-" + maxTasks + "):";
