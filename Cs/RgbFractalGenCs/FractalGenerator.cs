@@ -293,7 +293,7 @@ internal class FractalGenerator {
 				("Center Y", [1, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Y", [0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Double Y", [0, 2, 1, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-			], []
+			], null
 			)
 			];
 		var maxChildren = 1;
@@ -679,7 +679,7 @@ internal class FractalGenerator {
 			unsafe {
 				[MethodImpl(MethodImplOptions.AggressiveInlining)] Vector3 Normalize(Vector3 pixel, float lightNormalizer) {
 					//pixel = lightNormalizer * pixel;
-					float max = MathF.Max(pixel.X, MathF.Max(pixel.Y, pixel.Z)) / 255.0f;
+					float max = MathF.Max(pixel.X, MathF.Max(pixel.Y, pixel.Z)) / 254.0f;
 					return lightNormalizer * max > 1.0f ? (1.0f / max) * pixel : lightNormalizer * pixel;
 				}
 
