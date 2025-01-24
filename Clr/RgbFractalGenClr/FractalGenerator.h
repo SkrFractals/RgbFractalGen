@@ -47,7 +47,7 @@ namespace RgbFractalGenClr {
         array<Bitmap^>^ bitmap;		                // Prerender as an array of bitmaps
         uint8_t* bitmapState;                       // Flag if the bitmap was finished generating (ready to encode GIF and UnlockBits)
         array<System::Drawing::Imaging::BitmapData^>^ bitmapData;	// Locked Bits for bitmaps
-        std::tuple<float, float, float, float, float, uint8_t, int>* tuples; // Queue struct for GenerateDots_OfDepth
+        std::tuple<double, double, uint8_t, int, uint8_t>* tuples; // Queue struct for GenerateDots_OfDepth
 
         // Threading
         Object^ taskLock = gcnew Object();          // Monitor lock
@@ -69,6 +69,7 @@ namespace RgbFractalGenClr {
         uint16_t bitmapsFinished;					// How many bitmaps are completely finished generating? (ready to display, encoded if possible)
         uint16_t nextBitmap;						// How many bitmaps have started generating? (next task should begin with this one)
         uint16_t finalPeriodMultiplier;			    // How much will the period get finally stretched? (calculated for seamless + user multiplier)
+        uint16_t maxChildren;
 
         int16_t selectColor;						// Selected childColor definition
         int16_t selectAngle;						// Selected childAngle definition
@@ -79,6 +80,8 @@ namespace RgbFractalGenClr {
         int16_t allocatedFrames;					// How many bitmap frames are currently allocated?
         int16_t applyMaxTasks;                      // Safely copy maxTasks in here so it doesn't change in the middle of generation
         int16_t applyMaxGenerationTasks;            // Safely copy maxGenerationTasks in here so it doesn't change in the middle of generation
+        int16_t maxIterations;
+        std::tuple<float, float, std::pair<float, float>*>* preIterate; // (childSize, childDetail, childSpread, (childX,childY)[])
 
         int16_t widthBorder;						// Precomputed maximum x coord fot pixel input
         int16_t heightBorder;						// Precomputed maximum y coord for pixel input
@@ -118,44 +121,20 @@ namespace RgbFractalGenClr {
     private:
         System::Void GenerateAnimation();
         System::Void GenerateImage(const uint16_t& bitmapIndex, const int16_t& taskIndex, float size, float angle, int8_t spin, float hueAngle, uint8_t color);
-        System::Void GenerateDots_SingleTask(VecRefWrapper^ R,
-                                             const float inX, const float inY, const float inAngle, const float inAntiAngle, const float inSize,
-                                             const uint8_t inColor, const int inFlags);
-        System::Void GenerateDots_OfDepth(VecRefWrapper^ R);
-        System::Void GenerateDots_OfRecursion(VecRefWrapper^ R,
-                                         const float inX, const float inY, const float inAngle, const float inAntiAngle, const float inSize,
-                                         const uint8_t inColor, const int inFlags, const uint16_t inDepth);
-        //System::Void GenerateVoid(std::queue<std::pair<int16_t, int16_t>>& queueT, const Vector**& buffT, int16_t**& voidT, float& lightNormalizer, float& voidDepthMax);
-        //System::Void GenerateBitmap(uint16_t bitmapIndex, const Vector**& buffT, const int16_t**& voidT, const float lightNormalizer, const float voidDepthMax);
-        //System::Void GenerateGif(const int16_t taskIndex);
+        System::Void GenerateDots_SingleTask(const ManagedVecWrapper^ R, double inXY, double AA, const uint8_t inColor, const int inFlags, uint8_t inDepth);
+        System::Void GenerateDots_OfDepth(ManagedVecWrapper^ R);
+        System::Void GenerateDots_OfRecursion(ManagedVecWrapper^ R, double inXY, double AA, const uint8_t inColor, const int inFlags, uint8_t inDepth);
         bool FinishTask(const int16_t taskIndex);
         System::Void TryGif(const int16_t taskIndex);
-        //System::Void WaitForRecursiveTasks();
 #pragma endregion
 
 #pragma region Generate_Inline
     private:
-        inline void ApplyDot(const VecRefWrapper^ R, const float& inX, const float& inY, const float& inSize, const uint8_t& inColor) {
-            //Vector<float> dotColor = (1 - lerp) * colorBlendH + lerp * colorBlendI;
-            Vector dotColor = Vector::Lerp(R->H->ToNative(), R->I->ToNative(), logf(detail / inSize) / logBase);
-            switch (inColor) {
-            case 1: dotColor = Y(dotColor); break;
-            case 2: dotColor = Z(dotColor); break;
-            }
-            // Iterated deep into a single point - Interpolate inbetween 4 pixels and Stop
-            const auto startY = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(floor(inY - bloom))),
-                endX = Math::Min(widthBorder, static_cast<int16_t>(ceil(inX + bloom))),
-                endY = Math::Min(heightBorder, static_cast<int16_t>(ceil(inY + bloom)));
-            for (int16_t y, x = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(floor(inX - bloom))); x <= endX; x++) {
-                const auto xd = bloom1 - abs(x - inX);
-                for (y = startY; y <= endY; y++)
-                    R->T[y][x] += xd * (bloom1 - abs(y - inY)) * dotColor; //buffT[y][x] += Vector<float>((1.0f - abs(x - inX)) * (1.0f - abs(y - inY))) * dotColor;
-            }
-        }
+        bool ApplyDot(const bool apply, const ManagedVecWrapper^ R, const float& inX, const float& inY, const float& inDetail, const uint8_t& inColor);
         inline int CalculateFlags(const int& index, const int& inFlags) { return cutFunction == nullptr ? inFlags : (*cutFunction)(index, inFlags); }
         inline bool TestSize(const float& newX, const float& newY, const float& inSize) {
             const auto testSize = inSize * f->cutSize;
-            return ((Math::Min(newX, newY) + testSize <= upleftStart) || (newX - testSize >= rightEnd) || (newY - testSize >= downEnd) );
+            return ((Math::Min(newX, newY) + testSize > upleftStart) && (newX - testSize < rightEnd) && (newY - testSize < downEnd) );
         }
         Vector& ApplyAmbientNoise(Vector& rgb, const float Amb, const float Noise, std::uniform_real_distribution<float>& dist, std::mt19937& randGen);
         Vector ApplySaturate(const Vector& rgb);
@@ -243,6 +222,7 @@ namespace RgbFractalGenClr {
     public:
         bool SelectFractal(const uint16_t select);
         System::Void SetupFractal();
+        System::Void SetMaxIterations();
         bool SelectAngle(const uint16_t selectAngle);
         System::Void SetupAngle();
         bool SelectColor(const uint16_t selectColor);
@@ -283,6 +263,26 @@ namespace RgbFractalGenClr {
         inline Fractal::CutFunction* GetCutFunction() { return cutFunction; }
         std::string ConvertToStdString(System::String^ managedString);
 #pragma endregion
+
+        // Pack two floats into a double
+        double pack(float f1, float f2) {
+            uint64_t f1_bits = *reinterpret_cast<uint32_t*>(&f1); // Get bits of f1
+            uint64_t f2_bits = *reinterpret_cast<uint32_t*>(&f2); // Get bits of f2
+
+            uint64_t combined_bits = (f1_bits << 32) | f2_bits;   // Combine into a 64-bit value
+            return *reinterpret_cast<double*>(&combined_bits);    // Reinterpret as a double
+        }
+
+        // Unpack a double into two floats
+        void unpack(double packed, float& f1, float& f2) {
+            uint64_t combined_bits = *reinterpret_cast<uint64_t*>(&packed); // Get bits of double
+
+            uint32_t f1_bits = combined_bits >> 32;         // Extract upper 32 bits
+            uint32_t f2_bits = combined_bits & 0xFFFFFFFF;  // Extract lower 32 bits
+
+            f1 = *reinterpret_cast<float*>(&f1_bits);       // Reinterpret as float
+            f2 = *reinterpret_cast<float*>(&f2_bits);       // Reinterpret as float
+        }
 
     };
 }

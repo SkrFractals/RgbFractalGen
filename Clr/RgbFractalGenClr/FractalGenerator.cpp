@@ -14,18 +14,18 @@
 #define FE { "", new float[0] { } }
 #define BE { "", new uint8_t[0] { } }
 #define CE { "", nullptr }
-#define FrameParams width * .5f, height * .5f, angle, Math::Abs(spin) > 1 ? 2 * angle : 0, size, color, -cutparam
-#define IterationBody\
-	if (cancel->Token.IsCancellationRequested) return;\
-	const auto newFlags = CalculateFlags(i, inFlags);\
-	if(newFlags < 0) continue;\
-	const auto newX = inX + inSize * (f->childX[i] * cos(inAngle) - f->childY[i] * sin(inAngle)),\
-	newY = inY - inSize * (f->childY[i] * cos(inAngle) + f->childX[i] * sin(inAngle));\
-	if(TestSize(newX, newY, inSize)) continue;\
-	if (i == 0)
-#define CenterChild newX, newY, inAngle + childAngle[i] - inAntiAngle, -inAntiAngle, newSize, static_cast<uint8_t>((inColor + childColor[i]) % 3), newFlags
-#define OtherChild newX, newY, inAngle + childAngle[i], inAntiAngle, newSize, static_cast<uint8_t>((inColor + childColor[i]) % 3), newFlags
-
+#define CHILDPARAMS pack(width * .5f, height * .5f), pack(angle, Math::Abs(spin) > 1 ? 2 * angle : 0), color, -cutparam, static_cast<uint8_t>(0)
+#define IFAPPLIEDDOT float inX, inY; unpack(inXY, inX, inY); const auto& preIterated = preIterate[inDepth];const auto& inSize = std::get<0>(preIterated);\
+	if (ApplyDot(inSize < detail, R, inX, inY, std::get<1>(preIterated), inColor))
+#define STARTITERATION const auto& newPreIterated = preIterate[++inDepth];auto i = f->childCount; while (0 <= --i)
+#define ITERATECHILDREN if (cancel->Token.IsCancellationRequested) return;\
+	const auto newFlags = CalculateFlags(i, inFlags);if (newFlags < 0) continue;\
+	const auto& XY = std::get<2>(preIterated)[i];float inAngle, inAntiAngle; unpack(AA, inAngle, inAntiAngle); const auto cs = cos(inAngle), sn = sin(inAngle);\
+	const float newX = inX + XY.first * cs - XY.second * sn, newY = inY - XY.second * cs - XY.first * sn;\
+	if (TestSize(newX, newY, inSize))
+#define NEWCHILD pack(newX, newY), i == 0\
+	? pack(inAngle + childAngle[i] - inAntiAngle, -inAntiAngle)\
+	: pack(inAngle + childAngle[i], inAntiAngle), (inColor + childColor[i]) % 3, newFlags, inDepth
 
 namespace RgbFractalGenClr {
 
@@ -40,7 +40,7 @@ namespace RgbFractalGenClr {
 	FractalGenerator::FractalGenerator() {
 		cutparam = debug = defaultHue = defaultZoom = defaultAngle = extraSpin = extraHue = parallelType = 0;
 		zoom = 1;
-		select = selectColor = selectAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = defaultSpin = selectColorPalette = -1;
+		select = selectColor = selectAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = defaultSpin = maxIterations = selectColorPalette = -1;
 		encode = 2;
 		gifEncoder = nullptr;
 		bitmap = nullptr;
@@ -248,7 +248,7 @@ namespace RgbFractalGenClr {
 				}, nullptr
 			), nullptr
 		};
-		int maxChildren = 1;
+		maxChildren = 1;
 		for (Fractal** i = fractals; *i != nullptr; ++i)
 			if ((*i)->childCount > maxChildren)
 				maxChildren = (*i)->childCount;
@@ -322,7 +322,6 @@ namespace RgbFractalGenClr {
 		int8_t spin = (int8_t)defaultSpin;
 		ModFrameParameters(size, angle, spin, hueAngle, color);
 		for (int i = defaultZoom; 0 <= --i; IncFrameSize(size, period));
-		
 		// Generate the images
 		while (!cancel->Token.IsCancellationRequested && bitmapsFinished < bitmap->Length) {
 			// Initialize buffers (delete and reset if size changed)
@@ -352,7 +351,7 @@ namespace RgbFractalGenClr {
 					//delete[] parallelTasks;
 				}
 				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, allocatedHeight = height);
-				tuples = new std::tuple<float, float, float, float, float, uint8_t, int>[Math::Max(1, applyMaxGenerationTasks * 8)];
+				tuples = new std::tuple<double, double, uint8_t, int, uint8_t>[Math::Max(1, applyMaxGenerationTasks * 8)];
 				voidDepth = new int16_t * *[batchTasks];
 				voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [batchTasks];
 				parallelTasks = gcnew array<Task^>(batchTasks + 1);
@@ -361,8 +360,10 @@ namespace RgbFractalGenClr {
 				buffer = new Vector * *[allocatedTasks = batchTasks];
 				for (int t = 0; t < batchTasks; NewBuffer(t++))
 					voidQueue[t] = new std::queue<std::pair<int16_t, int16_t>>();
-				for (int t = 0; t <= batchTasks; parallelTaskFinished[t++] = 2)
+				for (int t = 0; t <= batchTasks; parallelTaskFinished[t++] = 2) {
 					parallelTasks[t] = nullptr;
+					taskStarted[t] = false;
+				}
 			}
 			if (height != allocatedHeight) {
 				for (int t = 0; t < batchTasks; NewBuffer(t++))
@@ -380,7 +381,6 @@ namespace RgbFractalGenClr {
 					}
 					for (auto y = allocatedHeight; y < height; voidT[y++] = new int16_t[width])
 						buffT[y] = new Vector[width];
-
 				}
 				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, height);
 			}
@@ -430,7 +430,6 @@ namespace RgbFractalGenClr {
 			}
 		}
 		// Wait for threads to finish
-			//WaitForThreads();
 		for (int i = allocatedTasks; i >= 0; Join(i--));
 		// Unlock unfinished bitmaps:
 		for (int i = 0; i < bitmap->Length; ++i)
@@ -480,38 +479,59 @@ namespace RgbFractalGenClr {
 			return;
 		}
 		// Generate the fractal frame recursively
-		VecRefWrapper^ R = gcnew VecRefWrapper(buffT, gcnew ManagedVector(0,0,0), gcnew ManagedVector(0, 0, 0));
+		//VecRefWrapper^ R = gcnew VecRefWrapper(buffT, gcnew ManagedVector(0,0,0), gcnew ManagedVector(0, 0, 0));
+		ManagedVecWrapper^ R = gcnew ManagedVecWrapper(buffT, Vector(0,0,0), Vector(0,0,0));
 		for (int b = 0; b < selectBlur; ++b) {
 			ModFrameParameters(size, angle, spin, hueAngle, color);
+			// Preiterate values that change the same way as iteration goes deeper, so they only get calculated once
+			float inSize = size;
+			for (int i = 0; i < maxIterations; ++i) {
+				auto& preIterated = preIterate[i];
+				const auto inDetail = -inSize * Math::Max(-1.0f, std::get<1>(preIterated) = (float)Math::Log(detail / (std::get<0>(preIterated) = inSize)) / logBase);
+				auto& XY = std::get<2>(preIterated);
+				if (XY == nullptr)
+					XY = new std::pair<float, float>[maxChildren];
+				for (int c = 0; c < f->childCount; ++c)
+					XY[c] = std::pair<float,float>(f->childX[c] * inDetail, f->childY[c] * inDetail);
+				inSize /= f->childSize;
+			}
 			// Prepare Color blending per one dot (hueshifting + iteration correction)
 			// So that the color of the dot will slowly approach the combined colors of its childer before it splits
 			auto lerp = std::fmod(hueAngle, 1.0f);
+			auto & H = R->H;
+			auto & I = R->I;
 			switch ((uint8_t)hueAngle % 3) {
 			case 0:
-				R->I->FromVector(Vector::Lerp(unitX, unitY, lerp));
-				R->H->FromVector(Vector::Lerp(*colorBlend, Y(*colorBlend), lerp));
+				I = Vector::Lerp(unitX, unitY, lerp);
+				H = Vector::Lerp(*colorBlend, Y(*colorBlend), lerp);
+				//R->I->FromVector(Vector::Lerp(unitX, unitY, lerp));
+				//R->H->FromVector(Vector::Lerp(*colorBlend, Y(*colorBlend), lerp));
 				break;
 			case 1:
-				R->I->FromVector(Vector::Lerp(unitY, unitZ, lerp));
-				R->H->FromVector(Vector::Lerp(Y(*colorBlend), Z(*colorBlend), lerp));
+				I = Vector::Lerp(unitY, unitZ, lerp);
+				H = Vector::Lerp(Y(*colorBlend), Z(*colorBlend), lerp);
+				//R->I->FromVector(Vector::Lerp(unitY, unitZ, lerp));
+				//R->H->FromVector(Vector::Lerp(Y(*colorBlend), Z(*colorBlend), lerp));
 				break;
 			case 2:
-				R->I->FromVector(Vector::Lerp(unitZ, unitX, lerp));
-				R->H->FromVector(Vector::Lerp(Z(*colorBlend), *colorBlend, lerp));
+				I = Vector::Lerp(unitZ, unitX, lerp);
+				H = Vector::Lerp(Z(*colorBlend), *colorBlend, lerp);
+				//R->I->FromVector(Vector::Lerp(unitZ, unitX, lerp));
+				//R->H->FromVector(Vector::Lerp(Z(*colorBlend), *colorBlend, lerp));
 				break;
 			}
 			if(applyMaxGenerationTasks <= 1)
-				GenerateDots_SingleTask(R, FrameParams);
+				GenerateDots_SingleTask(R, CHILDPARAMS);
 			else switch (applyParallelType) {
 			case 0:
-				GenerateDots_SingleTask(R, FrameParams);
+				GenerateDots_SingleTask(R, CHILDPARAMS);
 				break;
 			case 1:
-				tuples[0] = { FrameParams };
+				tuples[0] = { CHILDPARAMS };
 				GenerateDots_OfDepth(R);
 				break;
 			case 2:
-				GenerateDots_OfRecursion(R, FrameParams, 0);
+				GenerateDots_OfRecursion(R, CHILDPARAMS);
 				if (imageTasks == nullptr)
 					return;
 				// Wait for image parallelism threads to complete
@@ -604,7 +624,6 @@ namespace RgbFractalGenClr {
 			for (uint16_t y = 0; y < height; y++) {
 				if (cancel->Token.IsCancellationRequested) {
 					parallelTaskFinished[taskIndex] = 2;
-					std::swap(queueT, std::queue<std::pair<int16_t, int16_t>>()); // Fast swap-and-drop
 					return;
 				}
 				const auto buffY = buffT[y];
@@ -717,43 +736,42 @@ namespace RgbFractalGenClr {
 		parallelTaskFinished[taskIndex] = 1;
 	}
 	System::Void FractalGenerator::GenerateDots_SingleTask(
-		VecRefWrapper^ R,
-		const float inX, const float inY, const float inAngle, const float inAntiAngle, const float inSize,
-		const uint8_t inColor, const int inFlags
+		const ManagedVecWrapper^ R,
+		double inXY, double AA,
+		const uint8_t inColor, const int inFlags, uint8_t inDepth
 	) {
-		if (inSize < detail) {
-			ApplyDot(R, inX, inY, inSize, inColor);
-			return;
-		}
-		// Split Iteration Deeper
-		const auto newSize = inSize / f->childSize;
-		auto i = f->childCount;
-		while (0 <= --i) {
-			IterationBody GenerateDots_SingleTask(R, CenterChild); else GenerateDots_SingleTask(R, OtherChild);
+		/*IFAPPLIEDDOT return;
+		STARTITERATION{
+			if (cancel->Token.IsCancellationRequested) return;
+		const auto newFlags = CalculateFlags(i, inFlags);
+		if (newFlags < 0) continue; 
+		const auto& XY = std::get<2>(preIterated)[i];
+		float inAngle, inAntiAngle; unpack(AA, inAngle, inAntiAngle); 
+		const auto cs = cos(inAngle), sn = sin(inAngle);
+		const float newX = inX + XY.first * cs - XY.second * sn, newY = inY - XY.second * cs - XY.first * sn;
+		if (TestSize(newX, newY, inSize)) GenerateDots_SingleTask(R, NEWCHILD);
+		}*/
+		IFAPPLIEDDOT return;
+		STARTITERATION {
+			ITERATECHILDREN GenerateDots_SingleTask(R, NEWCHILD);
 		}
 	}
-	System::Void FractalGenerator::GenerateDots_OfDepth(VecRefWrapper^ R) {
+	System::Void FractalGenerator::GenerateDots_OfDepth(ManagedVecWrapper^ R) {
 		uint16_t index = 0, insertTo = 1, max = applyMaxGenerationTasks * 8, maxcount = max - f->childCount - 1;
 		int16_t count = (max + insertTo - index) % max;
 		while (count > 0 && count < maxcount) {
-			auto& params = tuples[index++];
-			const float& inX = std::get<0>(params);
-			const float& inY = std::get<1>(params);
-			const float& inAngle = std::get<2>(params);
-			const float& inAntiAngle = std::get<3>(params);
-			const float& inSize = std::get<4>(params);
-			const uint8_t& inColor = std::get<5>(params);
-			const int& inFlags = std::get<6>(params);
-			if (inSize < detail) {
-				ApplyDot(R, inX, inY, inSize, inColor);
-				continue;
-			}
-			// Split Iteration Deeper
-			const auto newSize = inSize / f->childSize;
-			auto i = f->childCount;
-			while (0 <= --i) {
-				IterationBody tuples[insertTo++] = { CenterChild }; else tuples[insertTo++] = { OtherChild };
-				insertTo %= max;
+			const auto& params = tuples[index++];
+			const double& inXY = std::get<0>(params);
+			const double& AA = std::get<1>(params);
+			const uint8_t& inColor = std::get<2>(params);
+			const int& inFlags = std::get<3>(params);
+			uint8_t inDepth = std::get<4>(params);
+			IFAPPLIEDDOT continue;
+			STARTITERATION {
+				ITERATECHILDREN {
+					tuples[insertTo++] = { NEWCHILD };
+					insertTo %= max;
+				}
 			}
 			count = (max + insertTo - index) % max;
 		}
@@ -785,34 +803,19 @@ namespace RgbFractalGenClr {
 		}
 	}
 	System::Void FractalGenerator::GenerateDots_OfRecursion(
-		VecRefWrapper^ R,
-		const float inX, const float inY, const float inAngle, const float inAntiAngle, const float inSize,
-		const uint8_t inColor, const int inFlags, const uint16_t inDepth
+		ManagedVecWrapper^ R,
+		double inXY, double AA,
+		const uint8_t inColor, const int inFlags, uint8_t inDepth
 	) {
-		if (inSize < detail) {
-			ApplyDot(R, inX, inY, inSize, inColor);
-			return;
-		}
-		// Split Iteration Deeper
-		uint8_t newDepth = inDepth + static_cast<uint8_t>(1);
-		const auto newSize = inSize / f->childSize;
-		auto i = f->childCount;
-		while (0 <= --i) {
-			// Iteration Tasks
-			IterationBody {
+		IFAPPLIEDDOT return;
+		STARTITERATION {
+			ITERATECHILDREN {
 				if (imageTasks != nullptr && imageTasks->Count < applyMaxGenerationTasks && inDepth < maxDepth)
 					imageTasks->Add(Task::Factory->StartNew(
 						gcnew Action<Object^>(this, &FractalGenerator::Task_OfRecursion),
-						gcnew array<System::Object^>{ R, CenterChild, newDepth }
+						gcnew array<System::Object^>{ R, NEWCHILD }
 					));
-				else GenerateDots_OfRecursion(R, CenterChild, newDepth);
-			} else {
-				if (imageTasks != nullptr && imageTasks->Count < applyMaxGenerationTasks && inDepth < maxDepth)
-					imageTasks->Add(Task::Factory->StartNew(
-						gcnew Action<Object^>(this, &FractalGenerator::Task_OfRecursion),
-						gcnew array<System::Object^>{ R, OtherChild, newDepth }
-					));
-				else GenerateDots_OfRecursion(R, OtherChild, newDepth);
+				else GenerateDots_OfRecursion(R, NEWCHILD);
 			}
 		}
 	}
@@ -822,7 +825,6 @@ namespace RgbFractalGenClr {
 	bool FractalGenerator::FinishTask(int16_t taskIndex) {
 		if (parallelTaskFinished[taskIndex] == 1) {
 			Join(taskIndex);
-			
 			parallelTaskFinished[taskIndex] = 2;
 		}
 		return parallelTaskFinished[taskIndex] >= 2;
@@ -851,6 +853,28 @@ namespace RgbFractalGenClr {
 #pragma endregion
 
 #pragma region Generate_Inline
+	bool FractalGenerator::ApplyDot(const bool apply, const ManagedVecWrapper^ R, const float& inX, const float& inY, const float& inDetail, const uint8_t& inColor) {
+		if (apply) {
+			//Vector<float> dotColor = (1 - lerp) * colorBlendH + lerp * colorBlendI;
+			Vector dotColor = Vector::Lerp(R->H, R->I, inDetail);
+			switch (inColor) {
+			case 1: dotColor = Y(dotColor); break;
+			case 2: dotColor = Z(dotColor); break;
+			}
+			// Iterated deep into a single point - Interpolate inbetween 4 pixels and Stop
+			const auto& buffT = R->T;
+			const auto startY = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(Math::Floor(inY - bloom))),
+				endX = Math::Min(widthBorder, static_cast<int16_t>(Math::Ceiling(inX + bloom))),
+				endY = Math::Min(heightBorder, static_cast<int16_t>(Math::Ceiling(inY + bloom)));
+			for (int16_t y, x = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(Math::Floor(inX - bloom))); x <= endX; x++) {
+				const auto xd = bloom1 - Math::Abs(x - inX);
+				for (y = startY; y <= endY; y++)
+					buffT[y][x] += xd * (bloom1 - Math::Abs(y - inY)) * dotColor; //buffT[y][x] += Vector<float>((1.0f - Math::Abs(x - inX)) * (1.0f - Math::Abs(y - inY))) * dotColor;
+			}
+			return true;
+		}
+		return false;
+	}
 	// old code that should work with SIMD vectors but couldn't get it to work
 	/*inline System::Void FractalGenerator::ApplyAmbientNoise(Vector<float>& rgb,  const float Amb, const float Noise, std::uniform_real_distribution<float>& dist, std::mt19937& randGen) {
 		rgb += Noise * Vector<float>(gcnew array<float>(3) { dist(randGen), dist(randGen), dist(randGen)}) + Vector<float>(amb);
@@ -943,31 +967,30 @@ namespace RgbFractalGenClr {
 		GenerateImage(bitmapIndex, taskIndex, size, angle, spin, hueAngle, color);
 	}
 	System::Void FractalGenerator::Task_OfDepth(System::Object^ obj) {
+		//static_cast<VecRefWrapper^>(args[0]);
 		const auto args = (array<System::Object^>^)obj;
-		const auto R = static_cast<VecRefWrapper^>(args[0]);
+		const ManagedVecWrapper^ R = (ManagedVecWrapper^)args[0];
 		const auto taskIndex = static_cast<int16_t>(args[1]);
 		const auto tupleIndex = static_cast<uint16_t>(args[2]);
-		auto& params = tuples[tupleIndex];
-		GenerateDots_SingleTask(R, std::get<0>(params), std::get<1>(params), std::get<2>(params), std::get<3>(params), std::get<4>(params), std::get<5>(params), std::get<6>(params));
+		const auto& params = tuples[tupleIndex];
+		GenerateDots_SingleTask(R, std::get<0>(params), std::get<1>(params), std::get<2>(params), std::get<3>(params), std::get<4>(params));
 		parallelTaskFinished[taskIndex] = 1;
 	}
 	System::Void FractalGenerator::Task_OfRecursion(System::Object^ obj) {
 		// Unpack arguments
 		const auto args = (array<System::Object^>^)obj;
-		VecRefWrapper^ R = (VecRefWrapper^)args[0];
-		const auto inX = static_cast<float>(args[1]);
-		const auto inY = static_cast<float>(args[2]);
-		const auto inAngle = static_cast<float>(args[3]);
-		const auto inAntiAngle = static_cast<float>(args[4]);
-		const auto inSize = static_cast<float>(args[5]);
-		const auto inColor = static_cast<uint8_t>(args[6]);
-		const auto inFlags = static_cast<int>(args[7]);
-		const auto inDepth = static_cast<uint8_t>(args[8]);
+		//VecRefWrapper^ R = (VecRefWrapper^)args[0];
+		ManagedVecWrapper^ R = (ManagedVecWrapper^)args[0];
+		const auto inXY = static_cast<double>(args[1]);
+		const auto inAngle = static_cast<double>(args[2]);
+		const auto inColor = static_cast<uint8_t>(args[3]);
+		const auto inFlags = static_cast<int>(args[4]);
+		const auto inDepth = static_cast<uint8_t>(args[5]);
 #ifdef CUSTOMDEBUG
 		const auto threadTime{ std::chrono::steady_clock::now() };
 		System::String^ start = "Thread:x" + (int)floor(inX) + "y" + (int)floor(inY) + "s" + (int)floor(inSize) + " start = " + (threadTime - *startTime).count();
 #endif
-		GenerateDots_OfRecursion(R, inX, inY, inAngle, inAntiAngle, inSize, inColor, inDepth, inFlags);
+		GenerateDots_OfRecursion(R, inXY, inAngle, inColor, inFlags, inDepth);
 #ifdef CUSTOMDEBUG
 		const auto threadEndTime{ std::chrono::steady_clock::now() };
 		Monitor::Enter(taskLock);
@@ -1011,16 +1034,24 @@ namespace RgbFractalGenClr {
 		}
 #endif
 		//Save BMP to RAM
-		if (bitmapState[bitmapsFinished] < 4) {
-			bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]); // Lets me generate next one, and lets the GeneratorForm know that this one is ready
-			bitmapState[bitmapsFinished++] = 4;
-		}
+		//if (bitmapState[bitmapsFinished] < 4) {
+		bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]); // Lets me generate next one, and lets the GeneratorForm know that this one is ready
+		bitmapState[bitmapsFinished++] = 4;
+		//}
 		exportingGif = false;
 		parallelTaskFinished[taskIndex] = 1;
 	}
 #pragma endregion
 
 #pragma region AnimationParameters
+	System::Void FractalGenerator::SwitchParentChild(float& angle, int8_t& spin, uint8_t& color) {
+		if (Math::Abs(spin) > 1) {
+			// reverse angle and spin when antispinning, or else the direction would change when parent and child switches
+			angle = -angle;
+			spin = -spin;
+		}
+		color = (3 + color + zoom * childColor[0]) % 3;
+	}
 	System::Void FractalGenerator::ModFrameParameters(float& size, float& angle, int8_t& spin, float& hueAngle, uint8_t& color) {
 		const auto w = Math::Max(width, height) * f->maxSize, fp = f->childSize;
 		// Zoom Rotation
@@ -1044,14 +1075,6 @@ namespace RgbFractalGenClr {
 			angle -= childAngle[0];
 			SwitchParentChild(angle, spin, color);
 		}
-	}
-	System::Void FractalGenerator::SwitchParentChild(float& angle, int8_t& spin, uint8_t& color) {
-		if (abs(spin) > 1) {
-			// reverse angle and spin when antispinning, or else the direction would change when parent and child switches
-			angle = -angle;
-			spin = -spin;
-		}
-		color = (3 + color + zoom * childColor[0]) % 3;
 	}
 	System::Void FractalGenerator::IncFrameParameters(float& size, float& angle, const int8_t& spin, float& hueAngle, const uint16_t blur) {
 		const auto blurPeriod = period * blur;
@@ -1159,7 +1182,17 @@ namespace RgbFractalGenClr {
 	}
 	System::Void FractalGenerator::SetupFractal() {
 		f = fractals[select];
-		logBase = logf(f->childSize);
+		logBase = (float)Math::Log(f->childSize);
+		SetMaxIterations();
+	}
+	System::Void FractalGenerator::SetMaxIterations() {
+		int16_t newMaxIterations = 2 + (int16_t)(Math::Ceiling(Math::Log(Math::Max(width, height) * f->maxSize / detail) / logBase));
+		if (newMaxIterations <= maxIterations) {
+			maxIterations = newMaxIterations;
+			return;
+		}
+		preIterate = new std::tuple<float, float, std::pair<float, float>*>[maxIterations = newMaxIterations];
+		for (int i = 0; i < maxIterations; preIterate[i++] = { 0.0f, 0.0f, nullptr });
 	}
 	bool FractalGenerator::SelectAngle(const uint16_t selectAngle) {
 		if (this->selectAngle == selectAngle)

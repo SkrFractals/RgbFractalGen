@@ -1,12 +1,12 @@
 // Starts the generator with special testing settings
 //#define CUSTOMDEBUGTEST
 
+#include "GeneratorForm.h"
+
 #define DN nullptr, nullptr
 
-#include "GeneratorForm.h"
 using namespace System;
 using namespace System::Windows::Forms;
-
 
 [STAThread]
 //int main(Platform::Array<Platform::String^>^ argv)
@@ -881,8 +881,7 @@ namespace RgbFractalGenClr {
 		gifButton->Enabled = generator->IsGifReady() && gTaskNotRunning;
 		if (b > 0) {
 			// Fetch bitmap, make sure the index is is range
-			currentBitmapIndex = currentBitmapIndex % b;
-			Bitmap^ bitmap = generator->GetBitmap(currentBitmapIndex);
+			Bitmap^ bitmap = generator->GetBitmap(currentBitmapIndex = currentBitmapIndex % b);
 			if (bitmap != nullptr) {
 				// Update the display with it if necessary
 				if (currentBitmap != bitmap) {
@@ -948,6 +947,7 @@ namespace RgbFractalGenClr {
 	System::Void GeneratorForm::ResizeAll() {
 		generator->width = width;
 		generator->height = height;
+		generator->SetMaxIterations();
 		// Update the size of the window and display
 		SetMinimumSize();
 		SetClientSizeCore(width + 314, Math::Max(height + 8, 320));
@@ -1091,7 +1091,7 @@ namespace RgbFractalGenClr {
 #define APPLY_CLAMP_PARAM(TYPE, BOX, NEW, MIN, MAX, GEN) CLAMP_PARAM(TYPE, BOX, NEW, MIN, MAX) APPLY_DIFF_PARAM(NEW, GEN)
 #define APPLY_DCLAMP_PARAM(TYPE, BOX, NEW, MIN, MAX, TYPE2, NEW2, MUL, GEN) CLAMP_PARAM(TYPE, BOX, NEW, MIN, MAX)\
 	const TYPE2 NEW2 = static_cast<TYPE2>(NEW * MUL); APPLY_DIFF_PARAM(NEW2, GEN)
-#define APPLY_MOD_PARAM(TYPE, BOX, NEW, MIN, MAX, GEN)TYPE NEW; if(TYPE::TryParse(BOX->Text, NEW)) NEW = MIN; \
+#define APPLY_MOD_PARAM(TYPE, BOX, NEW, MIN, MAX, GEN)TYPE NEW; if(!TYPE::TryParse(BOX->Text, NEW)) NEW = MIN; \
 	while (NEW < MIN)NEW += (MAX-MIN); while (NEW >= MAX)NEW -= (MAX-MIN); APPLY_DIFF_PARAM(NEW, GEN)
 
 	System::Void GeneratorForm::cutparamBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
@@ -1158,6 +1158,7 @@ namespace RgbFractalGenClr {
 		CLAMP_PARAM(uint16_t, detailBox, newDetail, 0, 10)
 		const auto newDetailFloat = newDetail * .1f * generator->GetFractal()->minSize;
 		APPLY_DIFF_PARAM(newDetailFloat, detail)
+		generator->SetMaxIterations();
 	}
 	System::Void GeneratorForm::bloomBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		APPLY_DCLAMP_PARAM(uint16_t, bloomBox, newBloom, 0, 40, float, newSaturateFloat, .25f, bloom)

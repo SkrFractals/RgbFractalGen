@@ -66,7 +66,21 @@ static Vector zero(0, 0, 0);
 static Vector Y(const Vector& X) { return Vector(X.Z, X.X, X.Y); }
 static Vector Z(const Vector& X) { return Vector(X.Y, X.Z, X.X); }
 
-public ref class ManagedVector {
+public ref struct ManagedVecWrapper {
+	Vector**& T;
+	Vector& I;
+	Vector& H;
+	ManagedVecWrapper(Vector**& T, Vector& I, Vector& H) : T(T), I(I), H(H) { }
+};
+
+public ref struct ManagedPairWrapper {
+	std::pair<float, float>& XY;
+	std::pair<float, float>& Angle;
+	ManagedPairWrapper(std::pair<float, float>& XY, std::pair<float, float>& Angle) : XY(XY), Angle(Angle) { }
+};
+
+
+ref struct ManagedVector {
 public:
 	float X, Y, Z;
 	ManagedVector(float x, float y, float z) : X(x), Y(y), Z(z) {}
@@ -86,7 +100,7 @@ public:
 	}
 };
 
-public ref struct VecRefWrapper {
+/*public ref struct VecRefWrapper {
 	Vector**& T;
 	ManagedVector^ I;
 	ManagedVector^ H;
@@ -95,5 +109,5 @@ public ref struct VecRefWrapper {
 		I = blendI;
 		H = blendH;
 	}
-};
+};*/
 
