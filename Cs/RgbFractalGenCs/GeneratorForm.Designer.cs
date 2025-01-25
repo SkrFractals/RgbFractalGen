@@ -199,7 +199,7 @@
 			nextButton.Name = "nextButton";
 			nextButton.Size = new System.Drawing.Size(30, 27);
 			nextButton.TabIndex = 30;
-			nextButton.Text = "Frame ->";
+			nextButton.Text = "->";
 			nextButton.UseVisualStyleBackColor = true;
 			nextButton.Click += NextButton_Click;
 			// 
