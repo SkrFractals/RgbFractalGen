@@ -313,7 +313,7 @@
 			// 
 			infoLabel.AutoSize = true;
 			infoLabel.ForeColor = System.Drawing.Color.White;
-			infoLabel.Location = new System.Drawing.Point(114, 528);
+			infoLabel.Location = new System.Drawing.Point(91, 528);
 			infoLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			infoLabel.Name = "infoLabel";
 			infoLabel.Size = new System.Drawing.Size(28, 15);

@@ -11,9 +11,11 @@ Clr:
 - has some trouble encoding/saving GIFs
 
 Cpp:
-- threading doesn't work at all, if I don't make it work in a while I might just upload it for some volunteer to debug it...
+- only recently has somewhat started working, might need more testing
 
 ---------------------------------------------------------------------------------------------------------
+
+- Exe can be found in the Build folder
 
 Language Implementations:
 
@@ -21,6 +23,7 @@ RgbFractalGenCs
 - The original c sharp version
 - Relatively fast, and bugfree
 - Easiest code
+- Recommended for most stability
 
 RgbFractalGenClr
 - Direct rewrite from managed C sharp to managed CLI C++
