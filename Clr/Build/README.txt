@@ -46,14 +46,14 @@ CutFunction Param Seed (textbox + slider):
 
 
 Resolution Width:
-- Horizontal render resolution
+- Horizontal custom render resolution
 
 Resolution Height:
-- Vertical render resolution
+- Vertical custom render resolution
 
-Resolution Accept Checkbox:
-- If unchecked the resolution will be 80x80 regardless of the text in the boxes to the left
-- Useful for toying with the settings and getting fast results, before you settle on full scale render
+Resolution Select
+- Select resolution to render
+- The second option is your custom resolution typed in the boxes to the left
 
 
 Zoom Direction:
@@ -144,8 +144,10 @@ Frame Selection (<- and ->):
 - Stops preview animation and toggles forward or backward between preview frames
 
 Preview Animation:
-- Toggless if the preview animates or pauses (the same toggle can also be done by clicking on the preview image itself)
+- Toggles if the preview animates or pauses (the same toggle can also be done by clicking on the preview image itself)
 
+RESTART
+- Will restart the generator (only useful if something goes wrong or you have random settings enabled)
 
 Generation Options:
 - Only Image: Will only render one still image

@@ -14,16 +14,17 @@
 #define FE { "", new float[0] { } }
 #define BE { "", new uint8_t[0] { } }
 #define CE { "", nullptr }
-#define CHILDPARAMS pack(width * .5f, height * .5f), pack(angle, Math::Abs(spin) > 1 ? 2 * angle : 0), color, -cutparam, static_cast<uint8_t>(0)
-#define IFAPPLIEDDOT float inX, inY; unpack(inXY, inX, inY); const auto& preIterated = preIterate[inDepth];const auto& inSize = std::get<0>(preIterated);\
-	if (ApplyDot(inSize < detail, R, inX, inY, std::get<1>(preIterated), inColor))
-#define STARTITERATION const auto& newPreIterated = preIterate[++inDepth];auto i = f->childCount; while (0 <= --i)
+#define CHILDPARAMS taskIndex, pack(selectWidth * .5f, selectHeight * .5f), pack(angle, spin > 1 ? 2 * angle : 0), color, -applyCutparam, static_cast<uint8_t>(0)
+#define IFAPPLIEDDOT const FractalTask& task = tasks[taskIndex];\
+	float inX, inY; unpack(inXY, inX, inY); const auto& preIterated = task.preIterate[inDepth]; const auto& inSize = std::get<0>(preIterated);\
+	if (ApplyDot(inSize < selectDetail, task, inX, inY, std::get<1>(preIterated), inColor))
+#define STARTITERATION const auto& newPreIterated = task.preIterate[++inDepth];auto i = f->childCount; while (0 <= --i)
 #define ITERATECHILDREN if (cancel->Token.IsCancellationRequested) return;\
 	const auto newFlags = CalculateFlags(i, inFlags);if (newFlags < 0) continue;\
 	const auto& XY = std::get<2>(preIterated)[i];float inAngle, inAntiAngle; unpack(AA, inAngle, inAntiAngle); const auto cs = cos(inAngle), sn = sin(inAngle);\
 	const float newX = inX + XY.first * cs - XY.second * sn, newY = inY - XY.second * cs - XY.first * sn;\
 	if (TestSize(newX, newY, inSize))
-#define NEWCHILD pack(newX, newY), i == 0\
+#define NEWCHILD taskIndex, pack(newX, newY), i == 0\
 	? pack(inAngle + childAngle[i] - inAntiAngle, -inAntiAngle)\
 	: pack(inAngle + childAngle[i], inAntiAngle), (inColor + childColor[i]) % 3, newFlags, inDepth
 
@@ -38,12 +39,17 @@ namespace RgbFractalGenClr {
 
 #pragma region Init
 	FractalGenerator::FractalGenerator() {
-		cutparam = debug = defaultHue = defaultZoom = defaultAngle = extraSpin = extraHue = parallelType = 0;
-		zoom = 1;
-		select = selectColor = selectAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = defaultSpin = maxIterations = selectColorPalette = -1;
-		encode = 2;
+		selectCutparam = debug = selectDefaultHue = selectDefaultZoom = selectDefaultAngle = selectExtraSpin = selectExtraHue = selectParallelType = 0;
+		selectZoom = 1;
+		selectFractal = selectChildColor = selectChildAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = selectSpin = maxIterations = -1;
+		selectEncode = 2;
 		gifEncoder = nullptr;
 		bitmap = nullptr;
+		cutFunction = nullptr;
+		tuples = nullptr;
+		parallelTasks = nullptr;
+		childAngle = nullptr;
+		childColor = nullptr;
 		gifSuccess = false;
 		taskSnapshot = gcnew System::Collections::Generic::List<Task^>();
 		emptyFloat = new float[1] { static_cast<float>(M_PI) };
@@ -177,7 +183,7 @@ namespace RgbFractalGenClr {
 					CE
 				}
 			), 
-			new Fractal("SierpinskiCarpet", 9, 3, .9f, .175f, .9f, cx, cy,
+			new Fractal("SierpinskiCarpet", 9, 3, 1.0f, .175f, .9f, cx, cy,
 					FA(17) {
 						{ "Classic", F(9) { SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0 } },
 						{ "H-I De Rivera O (opposites)", F(9) { SYMMETRIC + pi, 0, 0, 0, pi / 2, 0, 0, 0, pi / 2 } },
@@ -260,9 +266,9 @@ namespace RgbFractalGenClr {
 			gifEncoder = nullptr;
 		}
 	}
-	System::Void FractalGenerator::DeleteBuffer(const uint16_t taskIndex) {
-		const auto& buffT = buffer[taskIndex];
-		const auto& voidT = voidDepth[taskIndex];
+	void FractalGenerator::DeleteBuffer(const FractalTask& task) {
+		const auto& buffT = task.buffer;
+		const auto& voidT = task.voidDepth;
 		for (auto y = 0; y < allocatedHeight; ++y) {
 			delete buffT[y];
 			delete voidT[y];
@@ -270,12 +276,12 @@ namespace RgbFractalGenClr {
 		delete[] buffT;
 		delete[] voidT;
 	}
-	System::Void FractalGenerator::NewBuffer(const uint16_t taskIndex) {
-		const auto& voidT = voidDepth[taskIndex] = new int16_t * [height];
-		const auto& buffT = buffer[taskIndex] = new Vector * [height];
-		for (auto y = 0; y < height; voidT[y++] = new int16_t[width]) {
-			const auto& buffY = buffT[y] = new Vector[width];
-			for (auto x = 0; x < width; buffY[x++] = zero);
+	void FractalGenerator::NewBuffer(FractalTask& task) {
+		const auto& voidT = task.voidDepth = new int16_t * [selectHeight];
+		const auto& buffT = task.buffer = new Vector * [selectHeight];
+		for (auto y = 0; y < selectHeight; voidT[y++] = new int16_t[selectWidth]) {
+			const auto& buffY = buffT[y] = new Vector[selectWidth];
+			for (auto x = 0; x < selectWidth; buffY[x++] = zero);
 		}
 	}
 #pragma endregion
@@ -293,12 +299,12 @@ namespace RgbFractalGenClr {
 		// Open a temp file to presave GIF to - Use xiaozhuai's GifEncoder
 		exportingGif = gifSuccess = false;
 		DeleteEncoder();
-		if (encode >= 2) {
+		if (selectEncode >= 2) {
 			gifEncoder = new GifEncoder();
 			uint8_t gifIndex = 0;
 			while (gifIndex < 255) {
 				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
-				if (!((GifEncoder*)gifEncoder)->open(ConvertToStdString(gifTempPath), width, height, 1, false, 0, width * height * 3)) {
+				if (!((GifEncoder*)gifEncoder)->open(ConvertToStdString(gifTempPath), selectWidth, selectHeight, 1, false, 0, selectWidth * selectHeight * 3)) {
 #ifdef CUSTOMDEBUG
 					Log(logString, "Error opening gif file: " + gifTempPath);
 #endif
@@ -310,86 +316,95 @@ namespace RgbFractalGenClr {
 				DeleteEncoder();
 		}
 		// Initialize the starting default animation values
-		auto size = 2400.0f, angle = defaultAngle * (float)M_PI / 180.0f, hueAngle = defaultHue / 120.0f;
+		auto size = 2400.0f, angle = selectDefaultAngle * (float)M_PI / 180.0f, hueAngle = selectDefaultHue / 120.0f;
 		uint8_t color = 0;
-		widthBorder = width - 2;
-		heightBorder = height - 2;
-		bloom1 = bloom + 1;
-		upleftStart = -bloom;
+		widthBorder = selectWidth - 2;
+		heightBorder = selectHeight - 2;
+		bloom1 = selectBloom + 1;
+		upleftStart = -selectBloom;
 		rightEnd = widthBorder + bloom1;
 		downEnd = heightBorder + bloom1;
-		ambnoise = amb * noise;
-		int8_t spin = (int8_t)defaultSpin;
+		ambnoise = selectAmbient * selectNoise;
+		int8_t spin = static_cast<int8_t>(selectSpin < -1 ? random.Next(-1, 3) : selectSpin);
 		ModFrameParameters(size, angle, spin, hueAngle, color);
-		for (int i = defaultZoom; 0 <= --i; IncFrameSize(size, period));
+		for (int i = selectDefaultZoom < 0 ? random.Next(0, selectPeriod * finalPeriodMultiplier) : (selectDefaultZoom % (selectPeriod * finalPeriodMultiplier)); 0 <= --i; IncFrameSize(size, selectPeriod));
 		// Generate the images
 		while (!cancel->Token.IsCancellationRequested && bitmapsFinished < bitmap->Length) {
 			// Initialize buffers (delete and reset if size changed)
-			applyMaxGenerationTasks = maxGenerationTasks;
-			const int16_t batchTasks = Math::Max(static_cast<int16_t>(1), applyMaxTasks = maxTasks);
+			applyMaxGenerationTasks = selectMaxGenerationTasks;
+			const int16_t batchTasks = Math::Max(static_cast<int16_t>(1), applyMaxTasks = selectMaxTasks);
 			if (batchTasks != allocatedTasks) {
 				if (allocatedTasks >= 0) {
 					for (int t = 0; t < allocatedTasks; ++t) {
-						if (taskStarted[t]) {
+						auto& task = tasks[t];
+						if (task.taskStarted) {
 #ifdef PARALLELDEBUG
 							Debug::WriteLine("GenerateAnimation task still running: " + t);
 #endif
-							Join(t);
+							Join(task);
 						}
+						DeleteBuffer(task);
+						delete[] task.buffer;
+						delete[] task.voidDepth;
 					}
-					// Delete old task arrays
-					for (int t = 0; t < allocatedTasks; ++t) {
-						DeleteBuffer(t);
-						delete voidQueue[t];
-					}
-					delete[] buffer;
-					delete[] voidDepth;
-					delete[] voidQueue;
-					delete[] parallelTaskFinished;
+					delete[] tasks;
 					delete[] tuples;
-					delete[] taskStarted;
-					//delete[] parallelTasks;
 				}
-				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, allocatedHeight = height);
-				tuples = new std::tuple<double, double, uint8_t, int, uint8_t>[Math::Max(1, applyMaxGenerationTasks * 8)];
-				voidDepth = new int16_t * *[batchTasks];
-				voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [batchTasks];
+				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
+				tasks = new FractalTask[(allocatedTasks = batchTasks) + 2];
+				tuples = new std::tuple<uint16_t, double, double, uint8_t, int, uint8_t>[std::max(1, applyMaxGenerationTasks * 8)];
+				for (int t = 0; t < allocatedTasks; ++t) {
+					auto& task = tasks[t];
+					task.voidDepth = new int16_t * [batchTasks];
+					task.buffer = new Vector * [batchTasks];
+					task.index = t;
+					NewBuffer(task);
+				}
 				parallelTasks = gcnew array<Task^>(batchTasks + 1);
-				taskStarted = new bool[batchTasks + 1];
-				parallelTaskFinished = new uint8_t[batchTasks + 2];
-				buffer = new Vector * *[allocatedTasks = batchTasks];
-				for (int t = 0; t < batchTasks; NewBuffer(t++))
-					voidQueue[t] = new std::queue<std::pair<int16_t, int16_t>>();
-				for (int t = 0; t <= batchTasks; parallelTaskFinished[t++] = 2) {
-					parallelTasks[t] = nullptr;
-					taskStarted[t] = false;
+				for (uint16_t t = 0; t <= batchTasks; parallelTasks[t++] = nullptr);
+
+				SetMaxIterations(true);
+
+				//tuples = new std::tuple<double, double, uint8_t, int, uint8_t>[Math::Max(1, applyMaxGenerationTasks * 8)];
+				//voidDepth = new int16_t * *[batchTasks];
+				//voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [batchTasks];
+				
+				//taskStarted = new bool[batchTasks + 1];
+				//parallelTaskFinished = new uint8_t[batchTasks + 2];
+				//buffer = new Vector * *[allocatedTasks = batchTasks];
+				//for (int t = 0; t < batchTasks; NewBuffer(t++))
+				//	voidQueue[t] = new std::queue<std::pair<int16_t, int16_t>>();
+				
+			}
+			if (selectHeight != allocatedHeight) {
+				for (uint16_t t = 0; t < batchTasks; ++t) {
+					auto& task = tasks[t];
+					DeleteBuffer(task);
+					NewBuffer(task);
 				}
+				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
 			}
-			if (height != allocatedHeight) {
-				for (int t = 0; t < batchTasks; NewBuffer(t++))
-					DeleteBuffer(t);
-				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, allocatedHeight = height);
-			}
-			if (width != allocatedWidth) {
+			if (selectWidth != allocatedWidth) {
 				for (int t = 0; t < batchTasks; ++t) {
-					const auto& buffT = buffer[t];
-					const auto& voidT = voidDepth[t];
-					for (auto y = 0; y < allocatedHeight; voidT[y++] = new int16_t[width]) {
+					const auto& task = tasks[t];
+					const auto& buffT = task.buffer;
+					const auto& voidT = task.voidDepth;
+					for (uint16_t y = 0; y < allocatedHeight; voidT[y++] = new int16_t[selectWidth]) {
 						delete buffT[y];
 						delete voidT[y];
-						buffT[y] = new Vector[width];
+						buffT[y] = new Vector[selectWidth];
 					}
-					for (auto y = allocatedHeight; y < height; voidT[y++] = new int16_t[width])
-						buffT[y] = new Vector[width];
+					for (uint16_t y = allocatedHeight; y < selectHeight; voidT[y++] = new int16_t[selectWidth])
+						buffT[y] = new Vector[selectWidth];
 				}
-				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = width, height);
+				rect = System::Drawing::Rectangle(0, 0, allocatedWidth = selectWidth, selectHeight);
 			}
-			const auto generateLength = (encode > 0 ? static_cast<int16_t>(bitmap->Length) : static_cast<int16_t>(1));
+			const auto generateLength = (selectEncode > 0 ? static_cast<int16_t>(bitmap->Length) : static_cast<int16_t>(1));
 			// Wait if no more frames to generate
 			if (bitmapsFinished >= generateLength)
 				continue;
 			// Image parallelism
-			imageTasks = (applyParallelType = parallelType) == 2 ? gcnew ConcurrentBag<Task^>() : nullptr;
+			imageTasks = (applyParallelType = selectParallelType) == 2 ? gcnew ConcurrentBag<Task^>() : nullptr;
 			// Animation Parallelism Task Count
 			auto animationTaskCount = applyParallelType > 0 ? static_cast<int16_t>(0) : Math::Min(batchTasks, generateLength);
 			if (animationTaskCount <= 1) {
@@ -398,28 +413,29 @@ namespace RgbFractalGenClr {
 					ModFrameParameters(size, angle, spin, hueAngle, color);
 					GenerateImage(nextBitmap++, batchTasks, size, angle, spin, hueAngle, color);
 					IncFrameParameters(size, angle, spin, hueAngle, 1);
-					parallelTaskFinished[batchTasks] = 2;
+					tasks[batchTasks].state = 2;
 				}
-				const auto gifTaskIndex = Math::Max(static_cast<int16_t>(0), applyMaxGenerationTasks);
-				if (FinishTask(gifTaskIndex))
-					TryGif(gifTaskIndex);
+				FractalTask& gif = tasks[applyMaxGenerationTasks];
+				if (FinishTask(gif))
+					TryGif(gif);
 			} else {
 				// Animation parallelism: Continue/Finish Animation and Gif tasks
 				bool tasksRemaining = true;
 				while (tasksRemaining) {
 					tasksRemaining = false;
 					// Check every task
-					for (int16_t task = 0; task < batchTasks; ++task) {
+					for (int16_t t = 0; t < batchTasks; ++t) {
+						FractalTask& task = tasks[t];
 						if (FinishTask(task)) {
 							TryGif(task);
-							if (parallelTaskFinished[task] >= 2 && nextBitmap < generateLength && !cancel->Token.IsCancellationRequested && maxTasks == applyMaxTasks) {
+							if (task.state >= 2 && nextBitmap < generateLength && !cancel->Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks) {
 								// Start another task when previous was finished
-								parallelTaskFinished[task] = 0;
+								task.state = 0;
 								ModFrameParameters(size, angle, spin, hueAngle, color);
 								Start(task);
-								parallelTasks[task] = Task::Factory->StartNew(
+								parallelTasks[t] = Task::Factory->StartNew(
 									gcnew Action<Object^>(this, &FractalGenerator::Task_Animation),
-									gcnew array<System::Object^>{ nextBitmap++, task, size, angle, spin, hueAngle, color }
+									gcnew array<System::Object^>{ nextBitmap++, t, size, angle, spin, hueAngle, color }
 								);
 								IncFrameParameters(size, angle, spin, hueAngle, 1);
 								tasksRemaining = true; // A task finished, but started another one - keep checking before new master loop
@@ -430,17 +446,17 @@ namespace RgbFractalGenClr {
 			}
 		}
 		// Wait for threads to finish
-		for (int i = allocatedTasks; i >= 0; Join(i--));
+		for (int t = allocatedTasks; t >= 0; Join(tasks[t--]));
 		// Unlock unfinished bitmaps:
-		for (int i = 0; i < bitmap->Length; ++i)
-			if (bitmapState[i] > 0 && bitmapState[i] < 4 && bitmap[i] != nullptr) {
+		for (int b = 0; b < bitmap->Length; ++b)
+			if (bitmapState[b] > 0 && bitmapState[b] < 4 && bitmap[b] != nullptr) {
 				try {
-					bitmap[i]->UnlockBits(bitmapData[i]);
+					bitmap[b]->UnlockBits(bitmapData[b]);
 				} catch (Exception^) {}
 			}
 		// Save the temp GIF file
 		gifSuccess = false;
-		if (encode >= 2 && gifEncoder != nullptr && ((GifEncoder*)gifEncoder)->close(cancel->Token))
+		if (selectEncode >= 2 && gifEncoder != nullptr && ((GifEncoder*)gifEncoder)->close(cancel->Token))
 			gifSuccess = true;
 #ifdef CUSTOMDEBUG
 		else Log(logString, "Error closing gif file.");
@@ -457,37 +473,40 @@ namespace RgbFractalGenClr {
 #endif
 		DeleteEncoder();
 	}
-	System::Void FractalGenerator::GenerateImage(const uint16_t& bitmapIndex, const int16_t& taskIndex, float size, float angle, int8_t spin, float hueAngle, uint8_t color) {
+	System::Void FractalGenerator::GenerateImage(const uint16_t& bitmapIndex, const int16_t& stateIndex, float size, float angle, int8_t spin, float hueAngle, uint8_t color) {
 #ifdef CUSTOMDEBUG
 		System::String^ threadString = "";
 		const auto initTime{ std::chrono::steady_clock::now() };
 #endif
-		int16_t bufferIndex = taskIndex % applyMaxTasks;
-		auto& buffT = buffer[bufferIndex];
-		for (auto y = 0; y < height; ++y) {
+		int16_t taskIndex = stateIndex % applyMaxTasks;
+		auto& task = tasks[taskIndex],
+			& state = tasks[stateIndex];
+		auto& buffT = task.buffer;
+		for (auto y = 0; y < selectHeight; ++y) {
 			const auto& buffY = buffT[y];
-			for (auto x = 0; x < width; buffY[x++] = zero);
+			for (auto x = 0; x < selectWidth; buffY[x++] = zero);
 		}
-		auto& voidT = voidDepth[bufferIndex];
+		auto& voidT = task.voidDepth;
 #ifdef CUSTOMDEBUG
 		const auto initElapsed = (std::chrono::steady_clock::now() - initTime).count();
 		Log(threadString, "Init:" + bitmapIndex + " time = " + initElapsed);
 		const auto iterTime{ std::chrono::steady_clock::now() };
 #endif
 		if (cancel->Token.IsCancellationRequested) {
-			parallelTaskFinished[taskIndex] = 2;
+			state.state = 2;
 			return;
 		}
 		// Generate the fractal frame recursively
 		//VecRefWrapper^ R = gcnew VecRefWrapper(buffT, gcnew ManagedVector(0,0,0), gcnew ManagedVector(0, 0, 0));
-		ManagedVecWrapper^ R = gcnew ManagedVecWrapper(buffT, Vector(0,0,0), Vector(0,0,0));
+		//ManagedVecWrapper^ R = gcnew ManagedVecWrapper(buffT, Vector(0,0,0), Vector(0,0,0));
 		for (int b = 0; b < selectBlur; ++b) {
 			ModFrameParameters(size, angle, spin, hueAngle, color);
 			// Preiterate values that change the same way as iteration goes deeper, so they only get calculated once
 			float inSize = size;
+			auto& preIterateTask = task.preIterate;
 			for (int i = 0; i < maxIterations; ++i) {
-				auto& preIterated = preIterate[i];
-				const auto inDetail = -inSize * Math::Max(-1.0f, std::get<1>(preIterated) = (float)Math::Log(detail / (std::get<0>(preIterated) = inSize)) / logBase);
+				auto& preIterated = preIterateTask[i];
+				const auto inDetail = -inSize * Math::Max(-1.0f, std::get<1>(preIterated) = (float)Math::Log(selectDetail / (std::get<0>(preIterated) = inSize)) / logBase);
 				auto& XY = std::get<2>(preIterated);
 				if (XY == nullptr)
 					XY = new std::pair<float, float>[maxChildren];
@@ -498,8 +517,8 @@ namespace RgbFractalGenClr {
 			// Prepare Color blending per one dot (hueshifting + iteration correction)
 			// So that the color of the dot will slowly approach the combined colors of its childer before it splits
 			auto lerp = std::fmod(hueAngle, 1.0f);
-			auto & H = R->H;
-			auto & I = R->I;
+			auto & H = task.H;
+			auto & I = task.I;
 			switch ((uint8_t)hueAngle % 3) {
 			case 0:
 				I = Vector::Lerp(unitX, unitY, lerp);
@@ -521,17 +540,17 @@ namespace RgbFractalGenClr {
 				break;
 			}
 			if(applyMaxGenerationTasks <= 1)
-				GenerateDots_SingleTask(R, CHILDPARAMS);
+				GenerateDots_SingleTask(CHILDPARAMS);
 			else switch (applyParallelType) {
 			case 0:
-				GenerateDots_SingleTask(R, CHILDPARAMS);
+				GenerateDots_SingleTask(CHILDPARAMS);
 				break;
 			case 1:
 				tuples[0] = { CHILDPARAMS };
-				GenerateDots_OfDepth(R);
+				GenerateDots_OfDepth();
 				break;
 			case 2:
-				GenerateDots_OfRecursion(R, CHILDPARAMS);
+				GenerateDots_OfRecursion(CHILDPARAMS);
 				if (imageTasks == nullptr)
 					return;
 				// Wait for image parallelism threads to complete
@@ -554,7 +573,7 @@ namespace RgbFractalGenClr {
 			}
 			IncFrameParameters(size, angle, spin, hueAngle, selectBlur);
 			if (cancel->Token.IsCancellationRequested) {
-				parallelTaskFinished[taskIndex] = 2;
+				state.state = 2;
 				return;
 			}
 		}
@@ -565,20 +584,19 @@ namespace RgbFractalGenClr {
 #endif
 		// Generate the grey void areas
 		auto lightNormalizer = 0.1f, voidDepthMax = 1.0f;
-		auto& queueT = *voidQueue[bufferIndex];
+		auto& queueT = task.voidQueue;
 		int16_t voidYX;
-		const auto w1 = width - 1, h1 = height - 1;
+		const auto w1 = selectWidth - 1, h1 = selectHeight - 1;
 		lightNormalizer = 0.1f;
 		// Old SIMD vector code I couldn't get to work
 		//Vector<float> *buffY;
 		int16_t* voidY, * void0, * voidH, * voidP, * voidM;
-		if (amb > 0) {
+		if (selectAmbient > 0) {
 			// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
-			auto& queue = *voidQueue;
 			float lightMax;
 			for (uint16_t y = 1; y < h1; ++y) {
 				if (cancel->Token.IsCancellationRequested) {
-					parallelTaskFinished[taskIndex] = 2;
+					state.state = 2;
 					std::swap(queueT, std::queue<std::pair<int16_t, int16_t>>()); // Fast swap-and-drop
 					return;
 				}
@@ -600,7 +618,7 @@ namespace RgbFractalGenClr {
 			}
 			void0 = voidT[0];
 			voidH = voidT[h1];
-			for (uint16_t x = 0; x < width; ++x) {
+			for (uint16_t x = 0; x < selectWidth; ++x) {
 				void0[x] = voidH[x] = 0;
 				queueT.push({ 0, x });
 				queueT.push({ h1, x });
@@ -614,29 +632,29 @@ namespace RgbFractalGenClr {
 				y = qt.first, ym = y - 1, yp = y + 1, x = qt.second, xm = x - 1, xp = x + 1;
 				voidY = voidT[y];
 				voidMax = Math::Max(voidMax, voidYX = voidY[x] + 1);
-				if (xp < width && (voidY[xp] == -1)) { voidY[xp] = voidYX; queueT.push({ y, xp }); }
-				if (yp < height && ((voidP = voidT[yp])[x] == -1)) { voidP[x] = voidYX;  queueT.push({ yp, x }); }
+				if (xp < selectWidth && (voidY[xp] == -1)) { voidY[xp] = voidYX; queueT.push({ y, xp }); }
+				if (yp < selectHeight && ((voidP = voidT[yp])[x] == -1)) { voidP[x] = voidYX;  queueT.push({ yp, x }); }
 				if (xm >= 0 && (voidY[xm] == -1)) { voidY[xm] = voidYX; queueT.push({ y, xm }); }
 				if (ym >= 0 && ((voidM = voidT[ym])[x] == -1)) { voidM[x] = voidYX;  queueT.push({ ym, x }); }
 			}
 			voidDepthMax = voidMax;
 		} else
-			for (uint16_t y = 0; y < height; y++) {
+			for (uint16_t y = 0; y < selectHeight; y++) {
 				if (cancel->Token.IsCancellationRequested) {
-					parallelTaskFinished[taskIndex] = 2;
+					state.state = 2;
 					return;
 				}
 				const auto buffY = buffT[y];
-				for (uint16_t x = 0; x < width; x++) {
+				for (uint16_t x = 0; x < selectWidth; x++) {
 					auto& buffYX = buffY[x];
 					// Old SIMD vector code I couldn't get to work
 					//lightNormalizer = Math::Max(lightNormalizer, Math::Max(buffYX[0], Math::Max(buffYX[1], buffYX[2])));
 					lightNormalizer = Math::Max(lightNormalizer, buffYX.Max());
 				}
 			}
-		lightNormalizer = 160.0f / lightNormalizer;
+		lightNormalizer = selectBrightness * 2.55f / lightNormalizer;
 		if (cancel->Token.IsCancellationRequested) {
-			parallelTaskFinished[taskIndex] = 2;
+			state.state = 2;
 			return;
 		}
 #ifdef CUSTOMDEBUG
@@ -646,7 +664,7 @@ namespace RgbFractalGenClr {
 #endif
 		// Draw the generated pixel to bitmap data
 		// Make a locked bitmap, remember the locked state
-		uint8_t* p = (uint8_t*)(void*)((bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = gcnew Bitmap(width, height))
+		uint8_t* p = (uint8_t*)(void*)((bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = gcnew Bitmap(selectWidth, selectHeight))
 										->LockBits(rect, ImageLockMode::WriteOnly, System::Drawing::Imaging::PixelFormat::Format24bppRgb))->Scan0);
 		bitmapState[bitmapIndex] = 1;
 		// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
@@ -656,11 +674,11 @@ namespace RgbFractalGenClr {
 		const auto& cvoidT = const_cast<const int16_t**&>(voidT);
 		if (applyParallelType > 0 && applyMaxGenerationTasks > 1) {
 			// Multi Threaded:
-			const auto stride = 3 * width;
+			const auto stride = 3 * selectWidth;
 			if (ambnoise > 0) {
-				if (saturate > 0.0) {
+				if (selectSaturate > 0.0) {
 #pragma omp parallel for num_threads(applyMaxGenerationTasks)
-					for (int16_t y = 0; y < height; ++y) {
+					for (int16_t y = 0; y < selectHeight; ++y) {
 						if (cancel->Token.IsCancellationRequested)
 							continue;
 						auto rp = p + y * stride;
@@ -668,7 +686,7 @@ namespace RgbFractalGenClr {
 					}
 				} else {
 #pragma omp parallel for num_threads(applyMaxGenerationTasks)
-					for (int16_t y = 0; y < height; ++y) {
+					for (int16_t y = 0; y < selectHeight; ++y) {
 						if (cancel->Token.IsCancellationRequested)
 							continue;
 						uint8_t* rp = p + y * stride;
@@ -676,9 +694,9 @@ namespace RgbFractalGenClr {
 					}
 				}
 			} else {
-				if (saturate > 0.0) {
+				if (selectSaturate > 0.0) {
 #pragma omp parallel for num_threads(applyMaxGenerationTasks)
-					for (int16_t y = 0; y < height; ++y) {
+					for (int16_t y = 0; y < selectHeight; ++y) {
 						if (cancel->Token.IsCancellationRequested)
 							continue;
 						auto rp = p + y * stride;
@@ -686,7 +704,7 @@ namespace RgbFractalGenClr {
 					}
 				} else {
 #pragma omp parallel for num_threads(applyMaxGenerationTasks)
-					for (int16_t y = 0; y < height; ++y) {
+					for (int16_t y = 0; y < selectHeight; ++y) {
 						if (cancel->Token.IsCancellationRequested)
 							continue;
 						auto rp = p + y * stride;
@@ -697,21 +715,21 @@ namespace RgbFractalGenClr {
 		} else {
 			// Single Threaded:
 			if (ambnoise > 0) {
-				if (saturate > 0.0) for (uint16_t y = 0; y < height; ++y) {
+				if (selectSaturate > 0.0) for (uint16_t y = 0; y < selectHeight; ++y) {
 					if (cancel->Token.IsCancellationRequested)
 						continue;
 					NoiseSaturate(cbuffT[y], cvoidT[y], p, lightNormalizer, voidDepthMax);
-				} else for (uint16_t y = 0; y < height; ++y) {
+				} else for (uint16_t y = 0; y < selectHeight; ++y) {
 					if (cancel->Token.IsCancellationRequested)
 						continue;
 					NoiseNoSaturate(cbuffT[y], cvoidT[y], p, lightNormalizer, voidDepthMax);
 				}
 			} else {
-				if (saturate > 0.0) for (uint16_t y = 0; y < height; ++y) {
+				if (selectSaturate > 0.0) for (uint16_t y = 0; y < selectHeight; ++y) {
 					if (cancel->Token.IsCancellationRequested)
 						continue;
 					NoNoiseSaturate(cbuffT[y], cvoidT[y], p, lightNormalizer, voidDepthMax);
-				} else for (uint16_t y = 0; y < height; ++y) {
+				} else for (uint16_t y = 0; y < selectHeight; ++y) {
 					if (cancel->Token.IsCancellationRequested)
 						continue;
 					NoNoiseNoSaturate(cbuffT[y], cvoidT[y], p, lightNormalizer, voidDepthMax);
@@ -733,39 +751,25 @@ namespace RgbFractalGenClr {
 #endif
 		// Lets the generator know it's finished so it can encode gif it it's allowed to, if not it just lets the form know it can diplay it
 		bitmapState[bitmapIndex] = 2;
-		parallelTaskFinished[taskIndex] = 1;
+		state.state = 1;
 	}
-	System::Void FractalGenerator::GenerateDots_SingleTask(
-		const ManagedVecWrapper^ R,
-		double inXY, double AA,
-		const uint8_t inColor, const int inFlags, uint8_t inDepth
-	) {
-		/*IFAPPLIEDDOT return;
-		STARTITERATION{
-			if (cancel->Token.IsCancellationRequested) return;
-		const auto newFlags = CalculateFlags(i, inFlags);
-		if (newFlags < 0) continue; 
-		const auto& XY = std::get<2>(preIterated)[i];
-		float inAngle, inAntiAngle; unpack(AA, inAngle, inAntiAngle); 
-		const auto cs = cos(inAngle), sn = sin(inAngle);
-		const float newX = inX + XY.first * cs - XY.second * sn, newY = inY - XY.second * cs - XY.first * sn;
-		if (TestSize(newX, newY, inSize)) GenerateDots_SingleTask(R, NEWCHILD);
-		}*/
+	System::Void FractalGenerator::GenerateDots_SingleTask(const uint16_t taskIndex, double inXY, double AA, const uint8_t inColor, const int inFlags, uint8_t inDepth) {
 		IFAPPLIEDDOT return;
 		STARTITERATION {
-			ITERATECHILDREN GenerateDots_SingleTask(R, NEWCHILD);
+			ITERATECHILDREN GenerateDots_SingleTask(NEWCHILD);
 		}
 	}
-	System::Void FractalGenerator::GenerateDots_OfDepth(ManagedVecWrapper^ R) {
+	System::Void FractalGenerator::GenerateDots_OfDepth() {
 		uint16_t index = 0, insertTo = 1, max = applyMaxGenerationTasks * 8, maxcount = max - f->childCount - 1;
 		int16_t count = (max + insertTo - index) % max;
 		while (count > 0 && count < maxcount) {
 			const auto& params = tuples[index++];
-			const double& inXY = std::get<0>(params);
-			const double& AA = std::get<1>(params);
-			const uint8_t& inColor = std::get<2>(params);
-			const int& inFlags = std::get<3>(params);
-			uint8_t inDepth = std::get<4>(params);
+			const uint16_t& taskIndex = std::get<0>(params);
+			const double& inXY = std::get<1>(params);
+			const double& AA = std::get<2>(params);
+			const uint8_t& inColor = std::get<3>(params);
+			const int& inFlags = std::get<4>(params);
+			uint8_t inDepth = std::get<5>(params);
 			IFAPPLIEDDOT continue;
 			STARTITERATION {
 				ITERATECHILDREN {
@@ -779,19 +783,21 @@ namespace RgbFractalGenClr {
 			// more parallels to compute
 			bool tasksRemaining = true;
 			while (tasksRemaining) {
-				if (FinishTask(applyMaxGenerationTasks))
-					TryGif(applyMaxGenerationTasks);
+				auto& gif = tasks[applyMaxGenerationTasks];
+				if (FinishTask(gif))
+					TryGif(gif);
 				tasksRemaining = false;
 				// Check every task
-				for (int16_t task = 0; task < applyMaxGenerationTasks; ++task) {
+				for (int16_t t = 0; t < applyMaxGenerationTasks; ++t) {
+					auto& task = tasks[t];
 					if (FinishTask(task)) {
-						if (parallelTaskFinished[task] >= 2 && count > 0 && !cancel->Token.IsCancellationRequested) {
+						if (task.state >= 2 && count > 0 && !cancel->Token.IsCancellationRequested) {
 							// Start another task when previous was finished
-							parallelTaskFinished[task] = 0;
+							task.state = 0;
 							Start(task);
-							parallelTasks[task] = Task::Factory->StartNew(
+							parallelTasks[t] = Task::Factory->StartNew(
 								gcnew Action<Object^>(this, &FractalGenerator::Task_OfDepth),
-								gcnew array<System::Object^>{ R, task, index++ }
+								gcnew array<System::Object^>{ t, index++ }
 							);
 							index %= max;
 							count = (max + insertTo - index) % max;
@@ -803,7 +809,7 @@ namespace RgbFractalGenClr {
 		}
 	}
 	System::Void FractalGenerator::GenerateDots_OfRecursion(
-		ManagedVecWrapper^ R,
+		const uint16_t taskIndex,
 		double inXY, double AA,
 		const uint8_t inColor, const int inFlags, uint8_t inDepth
 	) {
@@ -813,37 +819,34 @@ namespace RgbFractalGenClr {
 				if (imageTasks != nullptr && imageTasks->Count < applyMaxGenerationTasks && inDepth < maxDepth)
 					imageTasks->Add(Task::Factory->StartNew(
 						gcnew Action<Object^>(this, &FractalGenerator::Task_OfRecursion),
-						gcnew array<System::Object^>{ R, NEWCHILD }
+						gcnew array<System::Object^>{ NEWCHILD }
 					));
-				else GenerateDots_OfRecursion(R, NEWCHILD);
+				else GenerateDots_OfRecursion(NEWCHILD);
 			}
 		}
 	}
-	//System::Void FractalGenerator::GenerateVoid(std::queue<std::pair<int16_t, int16_t>>& queueT, const Vector**& buffT, int16_t**& voidT, float& lightNormalizer, float& voidDepthMax) {}
-	//System::Void FractalGenerator::GenerateBitmap(uint16_t bitmapIndex, const Vector**& buffT, const int16_t**& voidT, const float lightNormalizer, const float voidDepthMax) {}
-	//System::Void FractalGenerator::GenerateGif(const int16_t taskIndex) {}
-	bool FractalGenerator::FinishTask(int16_t taskIndex) {
-		if (parallelTaskFinished[taskIndex] == 1) {
-			Join(taskIndex);
-			parallelTaskFinished[taskIndex] = 2;
+	bool FractalGenerator::FinishTask(FractalTask& task) {
+		if (task.state == 1) {
+			Join(task);
+			task.state = 2;
 		}
-		return parallelTaskFinished[taskIndex] >= 2;
+		return task.state >= 2;
 	}
-	System::Void FractalGenerator::TryGif(int16_t taskIndex) {
+	System::Void FractalGenerator::TryGif(FractalTask& task) {
 		if (bitmapState[bitmapsFinished] != 2)
 			return;
 		if (gifEncoder != nullptr
 			&& !exportingGif 
 			&& !cancel->Token.IsCancellationRequested 
-			&& maxTasks == applyMaxTasks
+			&& selectMaxTasks == applyMaxTasks
 		) {
 			exportingGif = true;
-			parallelTaskFinished[taskIndex] = 0;
+			task.state = 0;
 			bitmapState[bitmapsFinished] = 3;
-			Start(taskIndex);
-			parallelTasks[taskIndex] = Task::Factory->StartNew(
+			Start(task);
+			parallelTasks[task.index] = Task::Factory->StartNew(
 				gcnew Action<Object^>(this, &FractalGenerator::Task_Gif),
-				gcnew array<System::Object^>{ taskIndex }
+				gcnew array<System::Object^>{ task.index }
 			);
 		} else {
 			bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]);
@@ -853,27 +856,31 @@ namespace RgbFractalGenClr {
 #pragma endregion
 
 #pragma region Generate_Inline
-	bool FractalGenerator::ApplyDot(const bool apply, const ManagedVecWrapper^ R, const float& inX, const float& inY, const float& inDetail, const uint8_t& inColor) {
+	bool FractalGenerator::ApplyDot(const bool apply, const FractalTask& task, const float& inX, const float& inY, const float& inDetail, const uint8_t& inColor) {
 		if (apply) {
-			//Vector<float> dotColor = (1 - lerp) * colorBlendH + lerp * colorBlendI;
-			Vector dotColor = Vector::Lerp(R->H, R->I, inDetail);
+			Vector dotColor = Vector::Lerp(task.H, task.I, inDetail);
 			switch (inColor) {
 			case 1: dotColor = Y(dotColor); break;
 			case 2: dotColor = Z(dotColor); break;
 			}
 			// Iterated deep into a single point - Interpolate inbetween 4 pixels and Stop
-			const auto& buffT = R->T;
-			const auto startY = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(Math::Floor(inY - bloom))),
-				endX = Math::Min(widthBorder, static_cast<int16_t>(Math::Ceiling(inX + bloom))),
-				endY = Math::Min(heightBorder, static_cast<int16_t>(Math::Ceiling(inY + bloom)));
-			for (int16_t y, x = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(Math::Floor(inX - bloom))); x <= endX; x++) {
-				const auto xd = bloom1 - Math::Abs(x - inX);
-				for (y = startY; y <= endY; y++)
-					buffT[y][x] += xd * (bloom1 - Math::Abs(y - inY)) * dotColor; //buffT[y][x] += Vector<float>((1.0f - Math::Abs(x - inX)) * (1.0f - Math::Abs(y - inY))) * dotColor;
+			const auto& buffT = task.buffer;
+			const auto startX = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(Math::Floor(inX - selectBloom))),
+				endX = Math::Min(widthBorder, static_cast<int16_t>(Math::Ceiling(inX + selectBloom))),
+				endY = Math::Min(heightBorder, static_cast<int16_t>(Math::Ceiling(inY + selectBloom)));
+			for (int16_t x, y = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(Math::Floor(inY - selectBloom))); y <= endY; ++y) {
+				const auto yd = bloom1 - Math::Abs(y - inY);
+				const auto& buffY = buffT[y];
+				for (x = startX; x <= endX; ++x)
+					buffY[x] += (yd * (bloom1 - Math::Abs(x - inX))) * dotColor; //buffT[y][x] += Vector<float>((1.0f - Math::Abs(x - inX)) * (1.0f - Math::Abs(y - inY))) * dotColor;
 			}
 			return true;
 		}
 		return false;
+	}
+	Vector FractalGenerator::Normalize(const Vector& pixel, const float lightNormalizer) {
+		const float max = pixel.Max();
+		return lightNormalizer * max > 254.0f ? (254.0f / max) * pixel : lightNormalizer * pixel;
 	}
 	// old code that should work with SIMD vectors but couldn't get it to work
 	/*inline System::Void FractalGenerator::ApplyAmbientNoise(Vector<float>& rgb,  const float Amb, const float Noise, std::uniform_real_distribution<float>& dist, std::mt19937& randGen) {
@@ -898,7 +905,7 @@ namespace RgbFractalGenClr {
 	Vector FractalGenerator::ApplySaturate(const Vector& rgb) {
 		// The saturation equation boosting up the saturation of the pixel (powered by the saturation slider setting)
 		float m; const auto min = Math::Min(Math::Min(rgb.X, rgb.Y), rgb.Z), max = Math::Max(Math::Max(rgb.X, rgb.Y), rgb.Z);
-		return max <= min ? rgb : Vector::MultiplyMinus(rgb, (m = max * saturate / (max - min)) + 1 - saturate, min * m);
+		return max <= min ? rgb : Vector::MultiplyMinus(rgb, (m = max * selectSaturate / (max - min)) + 1 - selectSaturate, min * m);
 	}
 	System::Void FractalGenerator::ApplyRGBToBytePointer(const Vector& rgb, uint8_t*& p) {
 		// Without gamma:
@@ -914,42 +921,41 @@ namespace RgbFractalGenClr {
 		p += 3;
 	}
 	inline System::Void FractalGenerator::NoiseSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
-		if (amb <= 0)
-			for (uint16_t x = 0; x < width; ApplyRGBToBytePointer(ApplySaturate(lightNormalizer * buffY[x++]), p));
+		if (selectAmbient <= 0)
+			for (uint16_t x = 0; x < selectWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), p));
 		else {
 			std::random_device rd;
 			std::mt19937 randGen(rd());
 			std::uniform_real_distribution<float> dist(0.0f, ambnoise);
-			for (uint16_t x = 0; x < width; ++x) {
+			for (uint16_t x = 0; x < selectWidth; ++x) {
 				const auto voidAmb = voidY[x] / voidDepthMax;
-				//auto rgb = ApplySaturate(lightNormalizer * buffY[x]);
-				ApplyRGBToBytePointer(ApplyAmbientNoise(ApplySaturate(lightNormalizer * buffY[x]), voidAmb * amb, (1.0f - voidAmb) * voidAmb, dist, randGen), p);
+				ApplyRGBToBytePointer(ApplyAmbientNoise(ApplySaturate(Normalize(buffY[x], lightNormalizer)), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb, dist, randGen), p);
 			}
 		}
 	}
 	inline System::Void FractalGenerator::NoNoiseSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
-		if (amb <= 0) for (uint16_t x = 0; x < width; ApplyRGBToBytePointer(ApplySaturate(lightNormalizer * buffY[x++]), p));
-		else for (uint16_t x = 0; x < width; ApplyRGBToBytePointer(Vector(amb * voidY[x++] / voidDepthMax) + ApplySaturate(lightNormalizer * buffY[x]), p));
+		if (selectAmbient <= 0) for (uint16_t x = 0; x < selectWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), p));
+		else for (uint16_t x = 0; x < selectWidth; ApplyRGBToBytePointer(Vector(selectAmbient * voidY[x++] / voidDepthMax) + ApplySaturate(Normalize(buffY[x], lightNormalizer)), p));
 
 	}
 	inline System::Void FractalGenerator::NoiseNoSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
-		if (amb <= 0)
-			for (uint16_t x = 0; x < width; ApplyRGBToBytePointer(lightNormalizer * buffY[x++], p));
+		if (selectAmbient <= 0)
+			for (uint16_t x = 0; x < selectWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), p));
 		else {
 			std::random_device rd;
 			std::mt19937 randGen(rd());
 			std::uniform_real_distribution<float> dist(0.0f, ambnoise);
-			for (uint16_t x = 0; x < width; x++) {
+			for (uint16_t x = 0; x < selectWidth; x++) {
 				const auto voidAmb = voidY[x] / voidDepthMax;
-				ApplyRGBToBytePointer(ApplyAmbientNoise(lightNormalizer * buffY[x], voidAmb * amb, (1.0f - voidAmb) * voidAmb, dist, randGen), p);
+				ApplyRGBToBytePointer(ApplyAmbientNoise(Normalize(buffY[x], lightNormalizer), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb, dist, randGen), p);
 			}
 		}
 	}
 	inline System::Void FractalGenerator::NoNoiseNoSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
-		if (amb <= 0) for (uint16_t x = 0; x < width; x++)
-			ApplyRGBToBytePointer(lightNormalizer * buffY[x], p);
-		else for (uint16_t x = 0; x < width; x++)
-			ApplyRGBToBytePointer(Vector(amb * voidY[x] / voidDepthMax) + lightNormalizer * buffY[x], p);
+		if (selectAmbient <= 0) 
+			for (uint16_t x = 0; x < selectWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), p));
+		else for (uint16_t x = 0; x < selectWidth; x++)
+			ApplyRGBToBytePointer(Vector(selectAmbient * voidY[x] / voidDepthMax) + Normalize(buffY[x], lightNormalizer), p);
 	}
 #pragma endregion
 
@@ -967,20 +973,17 @@ namespace RgbFractalGenClr {
 		GenerateImage(bitmapIndex, taskIndex, size, angle, spin, hueAngle, color);
 	}
 	System::Void FractalGenerator::Task_OfDepth(System::Object^ obj) {
-		//static_cast<VecRefWrapper^>(args[0]);
 		const auto args = (array<System::Object^>^)obj;
-		const ManagedVecWrapper^ R = (ManagedVecWrapper^)args[0];
-		const auto taskIndex = static_cast<int16_t>(args[1]);
-		const auto tupleIndex = static_cast<uint16_t>(args[2]);
+		const auto taskIndex = static_cast<int16_t>(args[0]);
+		const auto tupleIndex = static_cast<uint16_t>(args[1]);
 		const auto& params = tuples[tupleIndex];
-		GenerateDots_SingleTask(R, std::get<0>(params), std::get<1>(params), std::get<2>(params), std::get<3>(params), std::get<4>(params));
-		parallelTaskFinished[taskIndex] = 1;
+		GenerateDots_SingleTask(std::get<0>(params), std::get<1>(params), std::get<2>(params), std::get<3>(params), std::get<4>(params), std::get<5>(params));
+		tasks[taskIndex].state = 1;
 	}
 	System::Void FractalGenerator::Task_OfRecursion(System::Object^ obj) {
 		// Unpack arguments
 		const auto args = (array<System::Object^>^)obj;
-		//VecRefWrapper^ R = (VecRefWrapper^)args[0];
-		ManagedVecWrapper^ R = (ManagedVecWrapper^)args[0];
+		const auto taskIndex = static_cast<uint16_t>(args[0]);
 		const auto inXY = static_cast<double>(args[1]);
 		const auto inAngle = static_cast<double>(args[2]);
 		const auto inColor = static_cast<uint8_t>(args[3]);
@@ -990,7 +993,7 @@ namespace RgbFractalGenClr {
 		const auto threadTime{ std::chrono::steady_clock::now() };
 		System::String^ start = "Thread:x" + (int)floor(inX) + "y" + (int)floor(inY) + "s" + (int)floor(inSize) + " start = " + (threadTime - *startTime).count();
 #endif
-		GenerateDots_OfRecursion(R, inXY, inAngle, inColor, inFlags, inDepth);
+		GenerateDots_OfRecursion(taskIndex, inXY, inAngle, inColor, inFlags, inDepth);
 #ifdef CUSTOMDEBUG
 		const auto threadEndTime{ std::chrono::steady_clock::now() };
 		Monitor::Enter(taskLock);
@@ -1002,10 +1005,10 @@ namespace RgbFractalGenClr {
 	System::Void FractalGenerator::Task_Gif(System::Object^ obj) {
 		// Unpack arguments
 		const auto args = (array<System::Object^>^)obj;
-		const int16_t taskIndex = static_cast<int16_t>(args[0]);
+		FractalTask& task = tasks[static_cast<uint16_t>(args[0])];
 		// Sequentially encode a finished GIF frame, then unlock the bitmap data
 		if (cancel->Token.IsCancellationRequested) {
-			parallelTaskFinished[taskIndex] = 2;
+			task.state = 2;
 			return;
 		}
 #ifdef CUSTOMDEBUG
@@ -1013,10 +1016,10 @@ namespace RgbFractalGenClr {
 		const auto gifTime{ std::chrono::steady_clock::now() };
 #endif
 		// Save Frame to a temp GIF
-		if (encode >= 2
+		if (selectEncode >= 2
 			&& !cancel->Token.IsCancellationRequested
 			&& gifEncoder != nullptr
-			&& !((GifEncoder*)gifEncoder)->push(cancel->Token, GifEncoder::PIXEL_FORMAT_BGR, (uint8_t*)(void*)(bitmapData[bitmapsFinished]->Scan0), width, height, delay)) {
+			&& !((GifEncoder*)gifEncoder)->push(cancel->Token, GifEncoder::PIXEL_FORMAT_BGR, (uint8_t*)(void*)(bitmapData[bitmapsFinished]->Scan0), selectWidth, selectHeight, selectDelay)) {
 #ifdef CUSTOMDEBUG
 			Log(threadString, "Error writing gif frame.");
 #endif
@@ -1039,7 +1042,7 @@ namespace RgbFractalGenClr {
 		bitmapState[bitmapsFinished++] = 4;
 		//}
 		exportingGif = false;
-		parallelTaskFinished[taskIndex] = 1;
+		task.state = 1;
 	}
 #pragma endregion
 
@@ -1050,10 +1053,10 @@ namespace RgbFractalGenClr {
 			angle = -angle;
 			spin = -spin;
 		}
-		color = (3 + color + zoom * childColor[0]) % 3;
+		color = (3 + color + applyZoom * childColor[0]) % 3;
 	}
 	System::Void FractalGenerator::ModFrameParameters(float& size, float& angle, int8_t& spin, float& hueAngle, uint8_t& color) {
-		const auto w = Math::Max(width, height) * f->maxSize, fp = f->childSize;
+		const auto w = Math::Max(selectWidth, selectHeight) * f->maxSize, fp = f->childSize;
 		// Zoom Rotation
 		while (angle > 2 * M_PI)
 			angle -= 2 * (float)M_PI;
@@ -1077,10 +1080,10 @@ namespace RgbFractalGenClr {
 		}
 	}
 	System::Void FractalGenerator::IncFrameParameters(float& size, float& angle, const int8_t& spin, float& hueAngle, const uint16_t blur) {
-		const auto blurPeriod = period * blur;
+		const auto blurPeriod = selectPeriod * blur;
 		// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
-		angle += spin * (periodAngle * (1 + extraSpin)) / (finalPeriodMultiplier * blurPeriod);
-		hueAngle += (hueCycleMultiplier + 3 * extraHue) * (float)hueCycle / (finalPeriodMultiplier * blurPeriod);
+		angle += spin * (periodAngle * (1 + selectExtraSpin)) / (finalPeriodMultiplier * blurPeriod);
+		hueAngle += (hueCycleMultiplier + 3 * selectExtraHue) * (float)applyHueCycle / (finalPeriodMultiplier * blurPeriod);
 		IncFrameSize(size, blurPeriod);
 	}
 #pragma endregion
@@ -1091,14 +1094,16 @@ namespace RgbFractalGenClr {
 		mainTask = Task::Run(gcnew Action(this, &FractalGenerator::GenerateAnimation), (cancel = gcnew CancellationTokenSource())->Token);
 	}
 	System::Void FractalGenerator::ResetGenerator() {
+		applyZoom = (short)(selectZoom != 0 ? selectZoom : random.NextDouble() < .5f ? -1 : 1);
+		applyCutparam = selectCutparam < 0 ? (short)random.Next(0, cutparamMaximum) : selectCutparam;
+		SetupColor();
 		finalPeriodMultiplier = GetFinalPeriod();
 		// A complex expression to calculate the minimum needed hue shift speed to match the loop:
-		//hueCycleMultiplier = hueCycle == 0 ? 0 : ((childColor[0] % 3) == 0 ? 3 : ((((childColor[0] % 3) == 1) == (1 == hueCycle) == (zoom == 1) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3) + 1);
-		hueCycleMultiplier = hueCycle == 0 ? 0 : childColor[0] % 3 == 0 ? 2 : 1 +
-			(childColor[0] % 3 == 1 == (1 == hueCycle) == (1 == zoom) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3;
+		hueCycleMultiplier = applyHueCycle == 0 ? 0 : childColor[0] % 3 == 0 ? 2 : 1 +
+			(childColor[0] % 3 == 1 == (1 == applyHueCycle) == (1 == applyZoom) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3;
 		// setup bitmap data
 		bitmapsFinished = nextBitmap = 0;
-		uint16_t frames = debug > 0 ? debug : period * finalPeriodMultiplier;
+		uint16_t frames = debug > 0 ? debug : selectPeriod * finalPeriodMultiplier;
 		if (frames != allocatedFrames) {
 			if (allocatedFrames >= 0)
 				delete[] bitmapState;
@@ -1156,73 +1161,64 @@ namespace RgbFractalGenClr {
 		SelectFractal(2);
 		SetupFractal();
 		SelectThreadingDepth();
-		detail = .25f;
+		selectDetail = .25f;
 		debug = 7;
-		width = 80;
-		height = 80;
-		parallelType = 1;
-		maxTasks = 0;
+		selectWidth = 80;
+		selectHeight = 80;
+		selectParallelType = 1;
+		selectMaxTasks = 0;
 		maxDepth = -1;//= 2;
-		maxGenerationTasks = maxTasks = -1;// 10;
-		saturate = 1.0f;
+		selectMaxGenerationTasks = selectMaxTasks = -1;// 10;
+		selectSaturate = 1.0f;
 	}
 #pragma endregion
 
 #pragma region Interface_Settings
 	bool FractalGenerator::SelectFractal(const uint16_t select) {
-		if (this->select == select)
+		if (this->selectFractal == select)
 			return true;
 		// new fractal definition selected - let the form know to reset and restart me
-		this->select = select;
-		selectCut = selectAngle = selectColor = -1;
-		SelectColor(0);
-		SelectAngle(0);
-		SelectCutFunction(0);
+		this->selectFractal = select;
+		selectCut = selectChildAngle = selectChildColor = 0;
 		return false;
 	}
 	System::Void FractalGenerator::SetupFractal() {
-		f = fractals[select];
+		f = fractals[selectFractal];
 		logBase = (float)Math::Log(f->childSize);
-		SetMaxIterations();
+		SetMaxIterations(false);
 	}
-	System::Void FractalGenerator::SetMaxIterations() {
-		int16_t newMaxIterations = 2 + (int16_t)(Math::Ceiling(Math::Log(Math::Max(width, height) * f->maxSize / detail) / logBase));
-		if (newMaxIterations <= maxIterations) {
+	System::Void FractalGenerator::SetMaxIterations(bool forcedReset) {
+		int16_t newMaxIterations = 2 + (int16_t)(Math::Ceiling(Math::Log(Math::Max(selectWidth, selectHeight) * f->maxSize / selectDetail) / logBase));
+		if (newMaxIterations <= maxIterations && !forcedReset) {
 			maxIterations = newMaxIterations;
 			return;
 		}
-		preIterate = new std::tuple<float, float, std::pair<float, float>*>[maxIterations = newMaxIterations];
-		for (int i = 0; i < maxIterations; preIterate[i++] = { 0.0f, 0.0f, nullptr });
-	}
-	bool FractalGenerator::SelectAngle(const uint16_t selectAngle) {
-		if (this->selectAngle == selectAngle)
-			return true;
-		this->selectAngle = selectAngle;
-		return false;
+		maxIterations = newMaxIterations;
+		for (int t = 0; t < allocatedTasks; ++t) {
+			auto& preIterateTask = tasks[t].preIterate;
+			preIterateTask = new std::tuple<float, float, std::pair<float, float>*>[maxIterations];
+			for (int i = 0; i < maxIterations; preIterateTask[i++] = { 0.0f, 0.0f, nullptr });
+		}
 	}
 	System::Void FractalGenerator::SetupAngle() {
-		childAngle = f->childAngle == nullptr ? new float[1] { (float)M_PI } : f->childAngle[selectAngle].second;
+		childAngle = f->childAngle == nullptr ? new float[1] { (float)M_PI } : f->childAngle[selectChildAngle].second;
 		periodAngle = f->childCount <= 0 ? 0.0f : std::fmod(childAngle[0], 2.0f * (float)M_PI);
 	}
-	bool FractalGenerator::SelectColor(const uint16_t selectColor) {
-		if (this->selectColor == selectColor)
-			return true;
-		this->selectColor = selectColor;
-		return false;
-	}
-	bool FractalGenerator::SelectColorPalette(const uint8_t selectColorPalette) {
-		if (this->selectColorPalette == selectColorPalette)
-			return true;
-		this->selectColorPalette = selectColorPalette;
-		return false;
-	}
 	System::Void FractalGenerator::SetupColor() {
+		// Unpack the color palette and hue cycling
+		if (selectHue < 0) {
+			applyHueCycle = (short)random.Next(-1, 2);
+			applyColorPalette = (short)random.Next(0, 2);
+		} else {
+			applyHueCycle = (short)((selectHue / 2 + 1) % 3 - 1);
+			applyColorPalette = (short)(selectHue % 2);
+		}
 		// Setup colors
 		if (f->childCount > 0) {
-			for (int i = f->childCount; 0 <= --i; childColor[i] = f->childColor[selectColor].second[i]);
+			for (int i = f->childCount; 0 <= --i; childColor[i] = f->childColor[selectChildColor].second[i]);
 			// Setup palette
 			for (int i = 0; i < f->childCount; ++i)
-				childColor[i] = selectColorPalette == 0 ? childColor[i] : (3 - childColor[i]) % 3;
+				childColor[i] = applyColorPalette == 0 ? childColor[i] : (3 - childColor[i]) % 3;
 		}
 		// Prepare subiteration color blend
 		float* colorBlendF = new float[3];
@@ -1230,20 +1226,14 @@ namespace RgbFractalGenClr {
 		for (auto i = f->childCount; 0 <= --i; colorBlendF[childColor[i]] += 1.0f / f->childCount);
 		colorBlend = new Vector(colorBlendF[0], colorBlendF[1], colorBlendF[2]);
 	}
-	bool FractalGenerator::SelectCutFunction(const uint16_t selectCut) {
-		if (this->selectCut == selectCut)
-			return true;
-		this->selectCut = selectCut;
-		return false;
-	}
 
 #pragma endregion
 
 #pragma region Interface_Getters
 	uint16_t FractalGenerator::GetFinalPeriod() {
 		// get the multiplier of the basic period required to get to a seamless loop
-		uint16_t m = hueCycle == 0 && childColor[0] > 0 ? periodMultiplier * 3 : periodMultiplier;
-		return Math::Abs(defaultSpin) > 1 || (defaultSpin == 0 && childAngle[0] < 2 * M_PI) ? 2 * m : m;
+		uint16_t m = applyHueCycle == 0 && childColor[0] > 0 ? selectPeriodMultiplier * 3 : selectPeriodMultiplier;
+		return Math::Abs(selectSpin) > 1 || (selectSpin == 0 && childAngle[0] < 2 * M_PI) ? 2 * m : m;
 	}
 	std::string FractalGenerator::ConvertToStdString(System::String^ managedString) {
 		using namespace System::Runtime::InteropServices;

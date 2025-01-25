@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using static System.Net.Mime.MediaTypeNames;
+using System.Windows.Media;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -43,14 +44,14 @@ public partial class GeneratorForm : Form {
 	private short queueReset = 0;           // Counting time until generator Restart
 
 	// Settings
-	private bool previewMode = true;        // Preview mode for booting performance while setting up parameters
+	//private bool previewMode = true;        // Preview mode for booting performance while setting up parameters
 	private bool animated = true;           // Animating preview or paused? (default animating)
 	private bool modifySettings = true;     // Allows for modifying settings without it triggering Aborts and Generates
 	private short width = -1, height = -1;
 	private string gifPath;                 // Gif export path name
-	private int cutparamMaximum = 0;        // Maximum cutparam seed of this CutFunction
 	private int maxTasks = 0;               // Maximum tasks available
 	private short abortDelay = 500;         // Set time to restart generator
+	private short restartTimer = 0;
 
 	// Display Variables
 	private readonly DoubleBufferedPanel screenPanel;// Display panel
@@ -81,15 +82,14 @@ public partial class GeneratorForm : Form {
 			SetupControl(angleSelect, "Select the children angles definition.");
 			SetupControl(colorSelect, "Select the children colors definition.");
 			SetupControl(cutSelect, "Select the cutfunction definition.");
-			SetupControl(cutparamBox, "Type the cutfunction seed.");
-			//SetupControl(cutparamBar, "Select the cutfunction seed.");
+			SetupControl(cutparamBox, "Type the cutfunction seed. (-1 for random)");
 			SetupControl(resX, "Type the X resolution of the render (width)");
 			SetupControl(resY, "Type the Y resolution of the render (height)");
-			SetupControl(previewBox, "If checked, the resolution will be only 80x80 for fast preview render.\nUncheck it when you are done with preparing the settings and want to render it in full resolution");
+			SetupControl(resSelect, "Select a rendering resolution (the second choise is the custom resolution you can type in the boxes to the left");
 			SetupControl(periodBox, "How many frames for the self-similar center child to zoom in to the same size as the parent if you are zooming in.\nOr for the parent to zoom out to the same size as the child if you are zooming out.\nThis will equal the number of generated frames of the animation if the center child is the same color.\nOr it will be a third of the number of generated frames of the animation if the center child is a different color.");
 			SetupControl(periodMultiplierBox, "Multiplies the frame count, slowing down the rotaion and hue shifts.");
-			SetupControl(zoomButton, "Toggle in which direction you want the fractal zoom . ZoomIn, or <- ZoomOut");
-			SetupControl(defaultZoom, "Type the initial zoom of the first image (in number of skipped frames).");
+			SetupControl(zoomSelect, "Choose in which direction you want the fractal zoom.");
+			SetupControl(defaultZoom, "Type the initial zoom of the first image in number of skipped frames. -1 for random");
 			SetupControl(spinSelect, "Choose in which direction you want the zoom animation to spin, or to not spin.");
 			SetupControl(spinSpeedBox, "Type the extra speed on the spinning from the values possible for looping.");
 			SetupControl(defaultAngle, "Type the initial angle of the first image (in degrees).");
@@ -103,7 +103,6 @@ public partial class GeneratorForm : Form {
 			SetupControl(bloomBox, "Bloom: 0 will be maximally crisp, but possibly dark with think fractals. Higher values wil blur/bloom out the fractal dots.");
 			SetupControl(blurBox, "Motion blur: Lowest no blur and fast generation, highest 10 smeared frames 10 times slower generation.");
 			SetupControl(brightnessBox, "Brightness level: 0% black, 100% normalized maximum, 300% overexposed 3x maximum");
-			//SetupControl(parallelBox, "Enable parallelism (and then tune with the Max Threads slider).\nSelect the type of parallelism with the followinf checkBox to the right.");
 			SetupControl(parallelTypeBox, "Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong");
 			SetupControl(threadsBox, "The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
 			SetupControl(abortBox, "How many millisecond of pause after the last settings change until the generator restarts?");
@@ -119,14 +118,17 @@ public partial class GeneratorForm : Form {
 			// Read the REDME.txt for the help button
 			if (File.Exists("README.txt"))
 				helpLabel.Text = File.ReadAllText("README.txt");
+
 			// Create the Generator
 			generator = new();
 			foreach (var i in generator.GetFractals())
 				fractalSelect.Items.AddRange([i.name]);
-			generator.select = -1;
+			generator.selectFractal = -1;
 			fractalSelect.SelectedIndex = 0;
+			resSelect.SelectedIndex = 0;
+
 			// Update Input fields to default values - modifySettings is true from constructor so that it doesn't abort and restant the generator over and over
-			abortBox_TextChanged(null, null);
+			AbortBox_TextChanged(null, null);
 			PeriodBox_TextChanged(null, null);
 			PeriodMultiplierBox_TextChanged(null, null);
 			ParallelTypeBox_SelectedIndexChanged(null, null);
@@ -142,10 +144,11 @@ public partial class GeneratorForm : Form {
 			SaturateBox_TextChanged(null, null);
 			BrightnessBox_TextChanged(null, null);
 			parallelTypeBox.SelectedIndex = 0;
-			hueSelect.SelectedIndex = 0;
+			spinSelect.SelectedIndex = zoomSelect.SelectedIndex = hueSelect.SelectedIndex = 1;
 			SetupFractal();
 			threadsBox.Text = (maxTasks = Math.Max(0, Environment.ProcessorCount - 2)).ToString();
 			bInit = modifySettings = helpPanel.Visible = false;
+
 			// Start the generator
 			TryResize();
 			ResizeAll();
@@ -156,7 +159,6 @@ public partial class GeneratorForm : Form {
 			generator.SetupFractal();
 			Parallel_Changed(null, null);
 			DetailBox_TextChanged(null, null);
-			generator.SetupColor();
 			generator.SetupAngle();
 			generator.SetupCutFunction();
 		}
@@ -186,8 +188,8 @@ public partial class GeneratorForm : Form {
 			SizeAdapt();
 		}
 		void ResizeAll() {
-			generator.width = width;
-			generator.height = height;
+			generator.selectWidth = width;
+			generator.selectHeight = height;
 			generator.SetMaxIterations();
 			// Update the size of the window and display
 			SetMinimumSize();
@@ -233,9 +235,12 @@ public partial class GeneratorForm : Form {
 				return;
 			SetupFractal();
 			ResizeAll();
-			queueReset = 0;
+			restartButton.Enabled = true;
+			ResetRestart();
 			generator.StartGenerate();
 		}
+		if (restartTimer > 0 && (restartTimer -= (short)timer.Interval) <= 0)
+			ResetRestart();
 		// Fetch the state of generated bitmaps
 		int b = generator.GetBitmapsFinished(), bt = generator.GetFrames();
 		if (bt <= 0)
@@ -298,28 +303,57 @@ public partial class GeneratorForm : Form {
 		gifButton.Enabled = false;
 		aTask = null;
 	}
+	private void ResetRestart() {
+		queueReset = restartTimer = 0;
+		restartButton.Text = "! RESTART !";
+	}
 	/// <summary>
 	/// Fetch the resolution
 	/// </summary>
 	/// <returns>Changed</returns>
 	private bool TryResize() {
-		previewMode = !previewBox.Checked;
+		//previewMode = !previewBox.Checked;
 		width = 8;
 		height = 8;
 		if (!short.TryParse(resX.Text, out width) || width <= 8)
 			width = 8;
 		if (!short.TryParse(resY.Text, out height) || height <= 8)
 			height = 8;
-		previewBox.Text = "Resolution: " + width.ToString() + "x" + height.ToString();
-		if (previewMode)
-			width = height = 80;
-		return generator.width != width || generator.height != height;
+		var c = "Custom:" + width.ToString() + "x" + height.ToString();
+		if (resSelect.Items[1].ToString() != c) {
+			resSelect.Items[1] = c;
+		}
+		//previewBox.Text = "Resolution: " + width.ToString() + "x" + height.ToString();
+		//if (previewMode)
+		//	width = height = 80;
+		string[] rxy = resSelect.SelectedIndex is 1 or < 0 ? resSelect.Items[1].ToString().Split(':')[1].Split('x') : resSelect.Items[resSelect.SelectedIndex].ToString().Split('x');
+		if(!short.TryParse(rxy[0], out width))
+			width = 80;
+		if (!short.TryParse(rxy[1], out height))
+			height = 80;
+		return generator.selectWidth != width || generator.selectHeight != height;
 	}
 	#endregion
 
 	#region Input
-	private void QueueReset() {
-		if (modifySettings)
+	private static short Parse(TextBox BOX) => short.TryParse(BOX.Text, out var v) ? v : (short)0;
+	private static T Clamp<T>(T NEW, T MIN, T MAX) where T : struct, IComparable<T> => NEW.CompareTo(MIN) < 0 ? MIN : NEW.CompareTo(MAX) > 0 ? MAX : NEW;
+	private static short Retext(TextBox BOX, short NEW) { BOX.Text = NEW == 0 ? "" : NEW.ToString(); return NEW; }
+	private static T Mod<T>(T NEW, T MIN, T MAX) where T : struct, IComparable<T> {
+		var D = (dynamic)MAX - MIN; while (NEW.CompareTo(MIN) < 0) NEW = (T)(NEW + D); while (NEW.CompareTo(MAX) > 0) NEW = (T)(NEW - D); return NEW;
+	}
+	private static bool Diff<T>(T NEW, T GEN) where T : struct, IComparable<T> => GEN.CompareTo(NEW) == 0;
+	private bool Apply<T>(T NEW, ref T GEN) { GEN = NEW; QueueReset(); return false; }
+	private static short ParseClampRetext(TextBox BOX, short MIN, short MAX) => Retext(BOX, Clamp(Parse(BOX), MIN, MAX));
+	private bool DiffApply<T>(T NEW, ref T GEN) where T : struct, IComparable<T> => Diff(NEW, GEN) || Apply(NEW, ref GEN);
+	private bool ClampDiffApply<T>(T NEW, ref T GEN, T MIN, T MAX) where T : struct, IComparable<T> => DiffApply(Clamp(NEW, MIN, MAX), ref GEN);
+	private bool ParseDiffApply(TextBox BOX, ref short GEN) => DiffApply(Parse(BOX), ref GEN);
+	private bool ParseModDiffApply(TextBox BOX, ref short GEN, short MIN, short MAX) => DiffApply(Mod(Parse(BOX), MIN, MAX), ref GEN);
+	private bool ParseClampRetextDiffApply(TextBox BOX, ref short GEN, short MIN, short MAX) => DiffApply(ParseClampRetext(BOX, MIN, MAX), ref GEN);
+	private bool ParseClampRetextMulDiffApply(TextBox BOX, ref short GEN, short MIN, short MAX, short MUL) => DiffApply((short)(ParseClampRetext(BOX, MIN, MAX) * MUL), ref GEN);
+	private bool ParseClampRetextMulDiffApply(TextBox BOX, ref float GEN, short MIN, short MAX, float MUL) => DiffApply(ParseClampRetext(BOX, MIN, MAX) * MUL, ref GEN);
+	private void QueueReset(bool allow = true) {
+		if (modifySettings || !allow)
 			return;
 		if (queueReset <= 0) {
 			gifButton.Enabled = false;
@@ -328,14 +362,17 @@ public partial class GeneratorForm : Form {
 				aTask = Task.Run(Abort, (cancel = new()).Token);
 			else queueAbort = true;
 		}
+		ResetRestart();
 		queueReset = abortDelay;
+		restartButton.Enabled = false;
 	}
 	bool CutSelectEnabled((string, Fractal.CutFunction)[] cf) => cutSelect.Enabled = cf != null && cf.Length > 0;
+	// Query the number of seeds from the CutFunction
+	private bool CutParamBoxEnabled(Fractal.CutFunction cf) => cutparamBox.Enabled = 0 < (generator.cutparamMaximum = (short)(cf == null || cf(0, -1) <= 0 ? 0 : (cf(0, 1 - (1 << 16)) + 1) / cf(0, -1)));
 	/// <summary>
-	/// Fractal definition selection
+	/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
 	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
+	private void FillCutParams() => CutParamBoxEnabled(generator.GetCutFunction());
 	private void FractalSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		void FillSelects() {
 			var f = generator.GetFractal();
@@ -373,383 +410,78 @@ public partial class GeneratorForm : Form {
 			FillSelects();
 			FillCutParams();
 		}
-		//ResetGenerate();
 	}
-	/// <summary>
-	/// Select child angles definition
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void AngleSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (generator.SelectAngle((short)Math.Max(0, angleSelect.SelectedIndex)))
-			return;
-		// Angle children definition is different - change the setting and restart generation
-		QueueReset();
-	}
-	/// <summary>
-	/// Select child colors definition
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	/// <returns></returns>
-	private void ColorSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (generator.SelectColor((short)Math.Max(0, colorSelect.SelectedIndex)))
-			return;
-		// Color children definition is different - change the setting and restart generation
-		QueueReset();
-	}
-	/// <summary>
-	/// Select CutFunction definition
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	/// <returns></returns>
+	private void AngleSelect_SelectedIndexChanged(object sender, EventArgs e) => DiffApply((short)Math.Max(0, angleSelect.SelectedIndex), ref generator.selectChildAngle);
+	private void ColorSelect_SelectedIndexChanged(object sender, EventArgs e) => DiffApply((short)Math.Max(0, colorSelect.SelectedIndex), ref generator.selectChildColor);
 	private void CutSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (generator.SelectCutFunction((short)Math.Max(0, cutSelect.SelectedIndex)))
-			return;
-		// Cutfunction is different - change the setting and restart generation
-		//Abort();
-		FillCutParams();
-		QueueReset();
+		if (!DiffApply((short)Math.Max(0, cutSelect.SelectedIndex), ref generator.selectCut)) FillCutParams();
 	}
-	/// <summary>
-	/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
-	/// </summary>
-	/// <returns></returns>
-
-	private void FillCutParams() => CutParamBoxEnabled(generator.GetCutFunction());
-	// query the number of seeds from the CutFunction
-	bool CutParamBoxEnabled(Fractal.CutFunction cf) => cutparamBox.Enabled = 0 < (cutparamMaximum = cf == null || cf(0, -1) <= 0 ? 0 : (cf(0, 1 - (1 << 16)) + 1) / cf(0, -1));
-
-
-	/*T ClampParam<T>(TextBox BOX, T MIN, T MAX) where T : struct, IComparable<T> {
-		T.TryParse(BOX.Text, out T NEW);
-		cutparamBox.Text = (NEW = Math.Clamp(NEW, (T)0, (T)MAX)).ToString();
-		return NEW;
-	}*/
-
-	void ApplyClampParam<T>(T NEW, ref T GEN, T MIN, T MAX, TextBox TEXT) where T : struct, IComparable<T> {
-		if (NEW.CompareTo(MIN) < 0)
-			NEW = MIN;
-		if (NEW.CompareTo(MAX) > 0)
-			NEW = MAX;
-		if (TEXT != null)
-			TEXT.Text = NEW.ToString();
-		ApplyDiffParam(NEW, ref GEN);
-	}
-	void ApplyModParam<T>(T NEW, ref T GEN, T MIN, T MAX) where T : struct, IComparable<T> {
-		var D = (dynamic)MAX - MIN;
-		while (NEW.CompareTo(MIN) < 0)
-			NEW = (T)(NEW + D);
-		while (NEW.CompareTo(MAX) > 0)
-			NEW = (T)(NEW - D);
-		ApplyDiffParam(NEW, ref GEN);
-	}
-	bool DiffParam<T>(T NEW, T GEN) where T : struct, IComparable<T> {
-		return GEN.CompareTo(NEW) == 0;
-	}
-	bool ApplyDiffParam<T>(T NEW, ref T GEN) where T : struct, IComparable<T> {
-		if (DiffParam(NEW, GEN))
-			return true;
-		ApplyParam(NEW, ref GEN);
-		return false;
-	}
-	void ApplyParam<T>(T NEW, ref T GEN) {
-		GEN = NEW; QueueReset();
-	}
-
-	/// <summary>
-	/// Change the CutFunction seed parameter through the textBox typing
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void CutparamBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(cutparamBox.Text, out var newcutparam))
-			newcutparam = 0;
-		ApplyClampParam(newcutparam, ref generator.selectCutparam, (short)0, (short)cutparamMaximum, cutparamBox);
-	}
-	/// <summary>
-	/// Resolution Changed Event
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void Resolution_Changed(object sender, EventArgs e) {
-		if (TryResize())
-			QueueReset();//AbortGenerate();
-	}
-	/// <summary>
-	/// Number Of Animation Frames to reach the center Self Similar (the total frames can be higher if the center child has a different color or rotation)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void PeriodBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(periodBox.Text, out var newPeriod))
-			newPeriod = 120;
-		ApplyClampParam(newPeriod, ref generator.selectPeriod, (short)1, (short)1000, periodBox);
-	}
-	/// <summary>
-	/// Multiplies the number of loop frames, keeping the spin and huecycle the same speed (you can speed up either with options below)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(periodMultiplierBox.Text, out var newPeriod))
-			newPeriod = 1;
-		ApplyClampParam(newPeriod, ref generator.selectPeriodMultiplier, (short)1, (short)10, periodMultiplierBox);
-	}
-	/// <summary>
-	/// Zoom direction (-> Forward zoom in, <- Backwards zoom out)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void ZoomButton_Click(object sender, EventArgs e) {
-		// zoom is different - change the setting and restart generation
-		//Abort();
-		generator.selectZoom = (short)-generator.selectZoom;
-		zoomButton.Text = "Zoom: " + ((generator.selectZoom > 0) ? "->" : "<-");
-		QueueReset();//ResetGenerate();
-	}
-	/// <summary>
-	/// Default Zoom value on first frame (in skipped frames)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void DefaultZoom_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(defaultZoom.Text, out var newZoom))
-			newZoom = 0;
-		var finalPeriod = (short)(generator.selectPeriod * generator.GetFinalPeriod());
-		ApplyModParam(newZoom, ref generator.selectDefaultZoom, (short)0, finalPeriod);
-	}
-	/// <summary>
-	/// Select the spin mode (clockwise, counterclockwise, or antispin where the child spins in opposite direction)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		var newSpin = (short)(spinSelect.SelectedIndex - 2);
-		ApplyClampParam(newSpin, ref generator.selectDefaultSpin, (short)-2, (short)2, null);
-	}
-	/// <summary>
-	/// Select the extra spin of symmentry angle per loop (so it spins faster)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void SpinSpeedBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(spinSpeedBox.Text, out var newSpeed))
-			newSpeed = 0;
-		//byte newSpeedByte = (byte)Math.Clamp(newSpeed, (short)0, (short)255);
-		spinSpeedBox.Text = newSpeed.ToString();
-		ApplyClampParam(newSpeed, ref generator.selectExtraSpin, (short)0, (short)255, spinSpeedBox);
-	}
-	/// <summary>
-	/// Default spin angle on first frame (in degrees)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void DefaultAngle_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(defaultAngle.Text, out var newAngle))
-			newAngle = 0;
-		ApplyModParam(newAngle, ref generator.selectDefaultAngle, (short)0, (short)360);
-	}
-	/// <summary>
-	/// Select the hue pallete and cycling
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void HueSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		var colorChoice = (byte)(hueSelect.SelectedIndex % 6);
-		var newHueCycle = (short)((colorChoice / 2 + 1) % 3 - 1);
-		if (generator.SelectColorPalette((byte)(colorChoice % 2)) && newHueCycle == generator.selectHueCycle)
-			return;
-		ApplyParam(newHueCycle, ref generator.selectHueCycle);
-	}
-	/// <summary>
-	/// Select the extra hue cycling speed of extra full 360° color loops per full animation loop (so it hue cycles spins faster)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
+	private void CutparamBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(cutparamBox, ref generator.selectCutparam, -1, generator.cutparamMaximum);
+	private void Resolution_Changed(object sender, EventArgs e) => QueueReset(TryResize());
+	private void PeriodBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(periodBox, ref generator.selectPeriod, -1, 1000);
+	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(periodMultiplierBox, ref generator.selectPeriodMultiplier, 1, 10);
+	private void ZoomSelect_SelectedIndexChanged(object sender, EventArgs e) => DiffApply((short)((zoomSelect.SelectedIndex + 1) % 3 - 1), ref generator.selectZoom);
+	private void DefaultZoom_TextChanged(object sender, EventArgs e) => ParseDiffApply(defaultZoom, ref generator.selectDefaultZoom);
+	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e) => ClampDiffApply((short)(spinSelect.SelectedIndex - 2), ref generator.selectSpin, (short)-2, (short)2);
+	private void SpinSpeedBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(spinSpeedBox, ref generator.selectExtraSpin, 0, 255);
+	private void DefaultAngle_TextChanged(object sender, EventArgs e) => ParseModDiffApply(defaultAngle, ref generator.selectDefaultAngle, 0, 360);
+	private void HueSelect_SelectedIndexChanged(object sender, EventArgs e) => DiffApply((short)(hueSelect.SelectedIndex == 0 ? -1 : (hueSelect.SelectedIndex - 1) % 6), ref generator.selectHue);
 	private void HueSpeedBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(hueSpeedBox.Text, out var newSpeed) || newSpeed < 0)
-			newSpeed = 0;
-		byte newSpeedByte = (byte)Math.Clamp(newSpeed, (short)0, (short)255);
-		hueSpeedBox.Text = newSpeedByte.ToString();
-		if (DiffParam(newSpeedByte, generator.selectExtraHue))
+		var newSpeed = ParseClampRetext(hueSpeedBox, 0, 255);
+		if (Diff(newSpeed, generator.selectExtraHue))
 			return;
 		// hue speed is different - change the setting and if it's actually huecycling restart generation
-		if (generator.selectHueCycle != 0)
-			ApplyParam(newSpeedByte, ref generator.selectExtraHue);
-		else generator.selectExtraHue = newSpeedByte;
+		if (generator.selectHue is not 0 and not 1)
+			Apply(newSpeed, ref generator.selectExtraHue);
+		else generator.selectExtraHue = newSpeed;
 	}
-	/// <summary>
-	/// Defaul hue angle on first frame (in degrees)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void DefaultHue_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(defaultHue.Text, out var newHue))
-			newHue = 0;
-		ApplyModParam(newHue, ref generator.selectDefaultHue, (short)0, (short)360);
-	}
-	/// <summary>
-	/// The strenghts (lightness) of the dark void outside between the fractal points
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void AmbBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(ambBox.Text, out var newAmb))
-			newAmb = 0;
-		ambBox.Text = (newAmb = Math.Clamp(newAmb, (byte)0, (byte)30)).ToString();
-		ApplyDiffParam((short)(4 * newAmb), ref generator.selectAmbient);
-	}
-	/// <summary>
-	/// Level of void Noise of the dark void outside between the fractal points
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void NoiseBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(noiseBox.Text, out var newNoise))
-			newNoise = 0;
-		noiseBox.Text = (newNoise = Math.Clamp(newNoise, (short)0, (short)30)).ToString();
-		ApplyDiffParam(newNoise * .1f, ref generator.selectNoise);
-	}
-	/// <summary>
-	/// Saturation Setting - ramp up saturation to maximum if all the wat to the right
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void SaturateBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(saturateBox.Text, out var newSaturate))
-			newSaturate = 0;
-		saturateBox.Text = (newSaturate = Math.Clamp(newSaturate, (short)0, (short)10)).ToString();
-		ApplyDiffParam(newSaturate * .1f, ref generator.selectSaturate);
-	}
-	/// <summary>
-	/// Detail, how small the split fractal shaped have to get, until they draw a dot of their color to the image buffer (the smaller the finer)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
+	private void DefaultHue_TextChanged(object sender, EventArgs e) => ParseModDiffApply(defaultHue, ref generator.selectDefaultHue, 0, 360);
+	private void AmbBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(ambBox, ref generator.selectAmbient, 0, 30, 4);
+	private void NoiseBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(noiseBox, ref generator.selectNoise, 0, 30, .1f);
+	private void SaturateBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(saturateBox, ref generator.selectSaturate, 0, 10, .1f);
 	private void DetailBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(detailBox.Text, out var newDetail))
-			newDetail = 0;
-		detailBox.Text = (newDetail = Math.Clamp(newDetail, (short)0, (short)10)).ToString();
-		if (ApplyDiffParam(newDetail * .1f * generator.GetFractal().minSize, ref generator.detail))
-			return;
-		generator.SetMaxIterations();
+		if (!ParseClampRetextMulDiffApply(detailBox, ref generator.selectDetail, 0, 10, .1f * generator.GetFractal().minSize)) generator.SetMaxIterations();
 	}
-	/// <summary>
-	/// Bloom strength. 0 = crisp, more - expanded and blurry
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void BloomBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(bloomBox.Text, out var newBloom))
-			newBloom = 0;
-		bloomBox.Text = (newBloom = Math.Clamp(newBloom, (byte)0, (byte)40)).ToString();
-		ApplyDiffParam(newBloom * .25f, ref generator.selectBloom);
-	}
-	/// <summary>
-	/// Level of blur smear frames (renders multiple fractals of slighlty increased time until the frame deltatime over each other)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void BlurBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(blurBox.Text, out var newBlur))
-			newBlur = 0;
-		blurBox.Text = (newBlur = Math.Clamp(newBlur, (byte)0, (byte)40)).ToString();
-		ApplyDiffParam(++newBlur, ref generator.selectBlur);
-	}
-	/// <summary>
-	/// Type the brightness to which to normalize (0 - black, 100 - max, 300 - 3x max)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void BrightnessBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(brightnessBox.Text, out var newBrightness))
-			newBrightness = 0;
-		brightnessBox.Text = (newBrightness = Math.Clamp(newBrightness, (short)0, (short)300)).ToString();
-		ApplyDiffParam(newBrightness, ref generator.selectBrightness);
-	}
-	/// <summary>
-	/// Iteration Threading - How many iterations deep have Self Similars a new thread
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
+	private void BloomBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(bloomBox, ref generator.selectBloom, 0, 40, .25f);
+	private void BlurBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(blurBox, ref generator.selectBlur, 1, 40);
+	private void BrightnessBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(brightnessBox, ref generator.selectBrightness, 0, 300);
 	private void Parallel_Changed(object sender, EventArgs e) {
-		if (!short.TryParse(threadsBox.Text, out var newThreads))
-			newThreads = 0;
-		threadsBox.Text = (newThreads = (short)Math.Clamp(newThreads, 0, maxTasks)).ToString();
-		threadsLabel.Text = "Maximum threads (0-" + maxTasks + "):";
+		short newThreads = ParseClampRetext(threadsBox, 0, (short)maxTasks);
 		generator.selectMaxTasks = (short)(newThreads > 0 ? newThreads : -1);
-		generator.maxGenerationTasks = (short)(generator.selectMaxTasks - 1);
+		generator.selectMaxGenerationTasks = Math.Max((short)1, (short)(generator.selectMaxTasks - 1));
 		generator.SelectThreadingDepth();
 	}
-	/// <summary>
-	/// Toggles between parallelism of single images and parallelism of batching animation frames
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void ParallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) => generator.parallelType = (byte)parallelTypeBox.SelectedIndex;
-	/// <summary>
-	/// Milisecond delay from settings change to generator restart
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void abortBox_TextChanged(object sender, EventArgs e) {
-		short.TryParse(abortBox.Text, out abortDelay);
-		abortBox.Text = (abortDelay = Math.Clamp(abortDelay, (short)1, (short)10000)).ToString();
-	}
-	/// <summary>
-	/// Framerate Delay (for previes and for gif encode, so if encoding gif, it will restart the generation)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
+	private void ParallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) => generator.selectParallelType = (byte)parallelTypeBox.SelectedIndex;
+	private void AbortBox_TextChanged(object sender, EventArgs e) => abortDelay = ParseClampRetext(abortBox, 0, 10000);
 	private void DelayBox_TextChanged(object sender, EventArgs e) {
-		if (!short.TryParse(delayBox.Text, out var newDelay) || newDelay <= 0)
-			newDelay = 5;
-		delayBox.Text = newDelay.ToString();
-		if (generator.delay == newDelay)
+		var newDelay = ParseClampRetext(delayBox, 1, 500);
+		if (generator.selectDelay == newDelay)
 			return;
 		// Delay is diffenret, change it, and restart the generation if ou were encoding a gif
-		generator.delay = newDelay;
-		var fpsrate = 100 / generator.delay;
-		timer.Interval = generator.delay * 10;
+		generator.selectDelay = newDelay;
+		var fpsrate = 100 / generator.selectDelay;
+		timer.Interval = generator.selectDelay * 10;
 		delayLabel.Text = "Abort / FPS: " + fpsrate.ToString();
-		if (generator.encode == 2)
-			QueueReset();//ResetGenerate();
+		if (generator.selectEncode == 2)
+			QueueReset();
 	}
-	/// <summary>
-	/// Select Previous frame to display
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void PrevButton_Click(object sender, EventArgs e) {
-		animated = false;
-		var b = generator.GetBitmapsFinished();
-		currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b - 1) % b;
-	}
-	/// <summary>
-	/// Select Next frame to display
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void NextButton_Click(object sender, EventArgs e) {
-		animated = false;
-		var b = generator.GetBitmapsFinished();
-		currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + 1) % b;
-	}
-	/// <summary>
-	/// Toggle display animation
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
+	private void MoveFrame(int move) { animated = false; var b = generator.GetBitmapsFinished(); currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b; }
+	private void PrevButton_Click(object sender, EventArgs e) => MoveFrame(-1);
 	private void AnimateButton_Click(object sender, EventArgs e) => animateButton.Text = (animated = !animated) ? "Playing" : "Paused";
-	/// <summary>
-	/// Toggle level of generation (SingleImage - Animation - GIF)
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void encodeButton_Click(object sender, EventArgs e) {
-		switch (generator.encode = (byte)((generator.encode + 1) % 3)) {
+	private void NextButton_Click(object sender, EventArgs e) => MoveFrame(1);
+	private void RestartButton_Click(object sender, EventArgs e) {
+		if (restartButton.Text == "! RESTART !") {
+			restartButton.Text = "ARE YOU SURE?";
+			restartTimer = 2000;
+			return;
+		}
+		restartTimer = 0;
+		restartButton.Text = "! RESTART !";
+		restartButton.Enabled = false;
+		QueueReset(true);
+	}
+	private void EncodeButton_Click(object sender, EventArgs e) {
+		switch (generator.selectEncode = (byte)((generator.selectEncode + 1) % 3)) {
 			case 0:
 				// Only generates one image
 				encodeButton.Text = "Only Image";
@@ -766,27 +498,15 @@ public partial class GeneratorForm : Form {
 				break;
 		}
 	}
-	/// <summary>
-	/// Show readme help
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
 	private void HelpButton_Click(object sender, EventArgs e) {
 		helpPanel.Visible = screenPanel.Visible;
 		screenPanel.Visible = !screenPanel.Visible;
 	}
-	/// <summary>
-	/// Save Frame
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	private void png_Click(object sender, EventArgs e) => savePng.ShowDialog();
-	/// <summary>
-	/// Save Gif
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
+	private void Png_Click(object sender, EventArgs e) => savePng.ShowDialog();
 	private void Gif_Click(object sender, EventArgs e) => saveGif.ShowDialog();
+	#endregion
+
+	#region Output
 	/// <summary>
 	/// Invalidation event of screen display - draws the current display frame bitmap.
 	/// Get called repeatedly with new frame to animate the preview, if animation is toggled
@@ -810,9 +530,6 @@ public partial class GeneratorForm : Form {
 			}
 		}
 	}
-	#endregion
-
-	#region Output
 	/// <summary>
 	/// User inputed the path and name for saving PNG
 	/// </summary>

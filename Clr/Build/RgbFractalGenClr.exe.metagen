@@ -19,51 +19,41 @@ Class DoubleBufferedPanel: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
     Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
 Struct Vector: AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit
   :System.ValueType
-Class ManagedVector: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
-    Void .ctor(Single, Single, Single): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
-  Fields:
-    Single X : Public
-    Single Y : Public
-    Single Z : Public
-  Methods:
-    ToNative(Vector*): PrivateScope, Public, HideBySig
-    FromVector(Vector* IsImplicitlyDereferenced): PrivateScope, Public, HideBySig
-Class VecRefWrapper: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
-    Void .ctor(Vector***, ManagedVector, ManagedVector): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
-  Fields:
-    Vector*** T IsImplicitlyDereferenced : Public
-    ManagedVector I : Public
-    ManagedVector H : Public
+Struct RgbFractalGenClr.FractalTask: AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit
+  :System.ValueType
 Class RgbFractalGenClr.FractalGenerator: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
     Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
   Fields:
-    Single detail : Public
-    Single noise : Public
-    Single saturate : Public
-    Single bloom : Public
-    Byte parallelType : Public
-    Byte encode : Public
-    SByte zoom : Public
-    SByte hueCycle : Public
-    UInt16 debug : Public
-    UInt16 width : Public
-    UInt16 height : Public
-    UInt16 period : Public
-    UInt16 delay : Public
-    UInt16 defaultZoom : Public
-    UInt16 defaultAngle : Public
-    UInt16 defaultHue : Public
-    UInt16 amb : Public
-    UInt16 selectBlur : Public
-    UInt16 extraSpin : Public
-    UInt16 extraHue : Public
-    Int16 select : Public
-    Int16 maxTasks : Public
-    Int16 maxGenerationTasks : Public
-    Int16 cutparam : Public
-    Int16 defaultSpin : Public
-    Int16 maxDepth : Public
-    Int16 periodMultiplier : Public
+    Int16 selectFractal : Public
+    Int16 selectChildAngle : Public
+    Int16 selectChildColor : Public
+    Int16 selectCut : Public
+    Int16 selectCutparam : Public
+    UInt16 selectWidth : Public
+    UInt16 selectHeight : Public
+    Int16 selectPeriod : Public
+    Int16 selectPeriodMultiplier : Public
+    Int16 selectZoom : Public
+    Int16 selectDefaultZoom : Public
+    Int16 selectExtraSpin : Public
+    Int16 selectDefaultAngle : Public
+    Int16 selectSpin : Public
+    Int16 selectHue : Public
+    Int16 selectExtraHue : Public
+    Int16 selectDefaultHue : Public
+    Int16 selectAmbient : Public
+    Single selectNoise : Public
+    Single selectSaturate : Public
+    Single selectDetail : Public
+    Single selectBloom : Public
+    Int16 selectBlur : Public
+    Int16 selectBrightness : Public
+    Byte selectParallelType : Public
+    Int16 selectMaxTasks : Public
+    Int16 selectMaxGenerationTasks : Public
+    Int16 selectDelay : Public
+    Byte selectEncode : Public
+    Int16 cutparamMaximum : Public
   Methods:
     StartGenerate(): PrivateScope, Public, HideBySig
     ResetGenerator(): PrivateScope, Public, HideBySig
@@ -72,12 +62,9 @@ Class RgbFractalGenClr.FractalGenerator: AutoLayout, AnsiClass, Class, Public, B
     DebugStart(): PrivateScope, Public, HideBySig
     SelectFractal(UInt16 IsConst): PrivateScope, Public, HideBySig
     SetupFractal(): PrivateScope, Public, HideBySig
-    SelectAngle(UInt16 IsConst): PrivateScope, Public, HideBySig
+    SetMaxIterations(Boolean(HasFieldMarshal)): PrivateScope, Public, HideBySig
     SetupAngle(): PrivateScope, Public, HideBySig
-    SelectColor(UInt16 IsConst): PrivateScope, Public, HideBySig
-    SelectColorPalette(Byte IsConst): PrivateScope, Public, HideBySig
     SetupColor(): PrivateScope, Public, HideBySig
-    SelectCutFunction(UInt16 IsConst): PrivateScope, Public, HideBySig
     SetupCutFunction(): PrivateScope, Public, HideBySig
     SelectThreadingDepth(): PrivateScope, Public, HideBySig
     GetFractals(): PrivateScope, Public, HideBySig
@@ -89,6 +76,8 @@ Class RgbFractalGenClr.FractalGenerator: AutoLayout, AnsiClass, Class, Public, B
     IsGifReady(): PrivateScope, Public, HideBySig
     GetCutFunction(): PrivateScope, Public, HideBySig
     ConvertToStdString(basic_string<char\,std::char_traits<char>\,std::allocator<char> >*, String): PrivateScope, Public, HideBySig
+    pack(Single, Single): PrivateScope, Public, HideBySig
+    unpack(Double, Single* IsImplicitlyDereferenced, Single* IsImplicitlyDereferenced): PrivateScope, Public, HideBySig
 Class RgbFractalGenClr.GeneratorForm: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
   :System.Windows.Forms.Form
     Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName

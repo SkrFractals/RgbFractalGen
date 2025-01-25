@@ -24,6 +24,7 @@
 		/// </summary>
 		private void InitializeComponent() {
 			components = new System.ComponentModel.Container();
+			var resources = new System.ComponentModel.ComponentResourceManager(typeof(GeneratorForm));
 			toolTips = new System.Windows.Forms.ToolTip(components);
 			resX = new System.Windows.Forms.TextBox();
 			cutSelect = new System.Windows.Forms.ComboBox();
@@ -32,10 +33,8 @@
 			fractalSelect = new System.Windows.Forms.ComboBox();
 			resY = new System.Windows.Forms.TextBox();
 			cutparamBox = new System.Windows.Forms.TextBox();
-			previewBox = new System.Windows.Forms.CheckBox();
 			periodBox = new System.Windows.Forms.TextBox();
 			delayBox = new System.Windows.Forms.TextBox();
-			zoomButton = new System.Windows.Forms.Button();
 			prevButton = new System.Windows.Forms.Button();
 			nextButton = new System.Windows.Forms.Button();
 			animateButton = new System.Windows.Forms.Button();
@@ -81,7 +80,10 @@
 			abortBox = new System.Windows.Forms.TextBox();
 			threadsLabel = new System.Windows.Forms.Label();
 			brightnessBox = new System.Windows.Forms.TextBox();
-			label1 = new System.Windows.Forms.Label();
+			brightnessLabel = new System.Windows.Forms.Label();
+			zoomSelect = new System.Windows.Forms.ComboBox();
+			restartButton = new System.Windows.Forms.Button();
+			resSelect = new System.Windows.Forms.ComboBox();
 			helpPanel.SuspendLayout();
 			SuspendLayout();
 			// 
@@ -159,18 +161,6 @@
 			cutparamBox.Text = "0";
 			cutparamBox.TextChanged += CutparamBox_TextChanged;
 			// 
-			// previewBox
-			// 
-			previewBox.AutoSize = true;
-			previewBox.Location = new System.Drawing.Point(125, 134);
-			previewBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
-			previewBox.Name = "previewBox";
-			previewBox.Size = new System.Drawing.Size(101, 19);
-			previewBox.TabIndex = 9;
-			previewBox.Text = "Preview Mode";
-			previewBox.UseVisualStyleBackColor = true;
-			previewBox.CheckedChanged += Resolution_Changed;
-			// 
 			// periodBox
 			// 
 			periodBox.Location = new System.Drawing.Point(17, 159);
@@ -183,7 +173,7 @@
 			// 
 			// delayBox
 			// 
-			delayBox.Location = new System.Drawing.Point(114, 463);
+			delayBox.Location = new System.Drawing.Point(91, 461);
 			delayBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			delayBox.Name = "delayBox";
 			delayBox.Size = new System.Drawing.Size(66, 23);
@@ -191,34 +181,23 @@
 			delayBox.Text = "5";
 			delayBox.TextChanged += DelayBox_TextChanged;
 			// 
-			// zoomButton
-			// 
-			zoomButton.Location = new System.Drawing.Point(17, 188);
-			zoomButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
-			zoomButton.Name = "zoomButton";
-			zoomButton.Size = new System.Drawing.Size(86, 27);
-			zoomButton.TabIndex = 12;
-			zoomButton.Text = "Zoom ->";
-			zoomButton.UseVisualStyleBackColor = true;
-			zoomButton.Click += ZoomButton_Click;
-			// 
 			// prevButton
 			// 
-			prevButton.Location = new System.Drawing.Point(17, 492);
+			prevButton.Location = new System.Drawing.Point(17, 489);
 			prevButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			prevButton.Name = "prevButton";
-			prevButton.Size = new System.Drawing.Size(66, 27);
+			prevButton.Size = new System.Drawing.Size(30, 27);
 			prevButton.TabIndex = 29;
-			prevButton.Text = "<- Frame";
+			prevButton.Text = "<-";
 			prevButton.UseVisualStyleBackColor = true;
 			prevButton.Click += PrevButton_Click;
 			// 
 			// nextButton
 			// 
-			nextButton.Location = new System.Drawing.Point(114, 492);
+			nextButton.Location = new System.Drawing.Point(127, 489);
 			nextButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			nextButton.Name = "nextButton";
-			nextButton.Size = new System.Drawing.Size(66, 27);
+			nextButton.Size = new System.Drawing.Size(30, 27);
 			nextButton.TabIndex = 30;
 			nextButton.Text = "Frame ->";
 			nextButton.UseVisualStyleBackColor = true;
@@ -226,10 +205,10 @@
 			// 
 			// animateButton
 			// 
-			animateButton.Location = new System.Drawing.Point(191, 492);
+			animateButton.Location = new System.Drawing.Point(55, 489);
 			animateButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			animateButton.Name = "animateButton";
-			animateButton.Size = new System.Drawing.Size(109, 27);
+			animateButton.Size = new System.Drawing.Size(64, 27);
 			animateButton.TabIndex = 31;
 			animateButton.Text = "Playing";
 			animateButton.UseVisualStyleBackColor = true;
@@ -237,21 +216,21 @@
 			// 
 			// pngButton
 			// 
-			pngButton.Location = new System.Drawing.Point(114, 558);
+			pngButton.Location = new System.Drawing.Point(91, 555);
 			pngButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			pngButton.Name = "pngButton";
 			pngButton.Size = new System.Drawing.Size(66, 27);
 			pngButton.TabIndex = 34;
 			pngButton.Text = "Save PNG";
 			pngButton.UseVisualStyleBackColor = true;
-			pngButton.Click += png_Click;
+			pngButton.Click += Png_Click;
 			// 
 			// gifButton
 			// 
-			gifButton.Location = new System.Drawing.Point(191, 558);
+			gifButton.Location = new System.Drawing.Point(165, 555);
 			gifButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			gifButton.Name = "gifButton";
-			gifButton.Size = new System.Drawing.Size(109, 27);
+			gifButton.Size = new System.Drawing.Size(135, 27);
 			gifButton.TabIndex = 35;
 			gifButton.Text = "Save GIF";
 			gifButton.UseVisualStyleBackColor = true;
@@ -278,6 +257,7 @@
 			// fractalLabel
 			// 
 			fractalLabel.AutoSize = true;
+			fractalLabel.ForeColor = System.Drawing.Color.White;
 			fractalLabel.Location = new System.Drawing.Point(17, 17);
 			fractalLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			fractalLabel.Name = "fractalLabel";
@@ -288,7 +268,8 @@
 			// delayLabel
 			// 
 			delayLabel.AutoSize = true;
-			delayLabel.Location = new System.Drawing.Point(191, 466);
+			delayLabel.ForeColor = System.Drawing.Color.White;
+			delayLabel.Location = new System.Drawing.Point(167, 464);
 			delayLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			delayLabel.Name = "delayLabel";
 			delayLabel.Size = new System.Drawing.Size(67, 15);
@@ -298,7 +279,8 @@
 			// voidLabel
 			// 
 			voidLabel.AutoSize = true;
-			voidLabel.Location = new System.Drawing.Point(17, 322);
+			voidLabel.ForeColor = System.Drawing.Color.White;
+			voidLabel.Location = new System.Drawing.Point(17, 319);
 			voidLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			voidLabel.Name = "voidLabel";
 			voidLabel.Size = new System.Drawing.Size(151, 15);
@@ -308,7 +290,8 @@
 			// dotLabel
 			// 
 			dotLabel.AutoSize = true;
-			dotLabel.Location = new System.Drawing.Point(17, 351);
+			dotLabel.ForeColor = System.Drawing.Color.White;
+			dotLabel.Location = new System.Drawing.Point(17, 348);
 			dotLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			dotLabel.Name = "dotLabel";
 			dotLabel.Size = new System.Drawing.Size(122, 15);
@@ -318,7 +301,8 @@
 			// statusLabel
 			// 
 			statusLabel.AutoSize = true;
-			statusLabel.Location = new System.Drawing.Point(17, 531);
+			statusLabel.ForeColor = System.Drawing.Color.White;
+			statusLabel.Location = new System.Drawing.Point(17, 528);
 			statusLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			statusLabel.Name = "statusLabel";
 			statusLabel.Size = new System.Drawing.Size(64, 15);
@@ -328,7 +312,8 @@
 			// infoLabel
 			// 
 			infoLabel.AutoSize = true;
-			infoLabel.Location = new System.Drawing.Point(114, 531);
+			infoLabel.ForeColor = System.Drawing.Color.White;
+			infoLabel.Location = new System.Drawing.Point(114, 528);
 			infoLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			infoLabel.Name = "infoLabel";
 			infoLabel.Size = new System.Drawing.Size(28, 15);
@@ -339,7 +324,8 @@
 			// blurLabel
 			// 
 			blurLabel.AutoSize = true;
-			blurLabel.Location = new System.Drawing.Point(17, 380);
+			blurLabel.ForeColor = System.Drawing.Color.White;
+			blurLabel.Location = new System.Drawing.Point(17, 377);
 			blurLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			blurLabel.Name = "blurLabel";
 			blurLabel.Size = new System.Drawing.Size(147, 15);
@@ -348,7 +334,7 @@
 			// 
 			// defaultZoom
 			// 
-			defaultZoom.Location = new System.Drawing.Point(111, 191);
+			defaultZoom.Location = new System.Drawing.Point(111, 188);
 			defaultZoom.Name = "defaultZoom";
 			defaultZoom.Size = new System.Drawing.Size(60, 23);
 			defaultZoom.TabIndex = 13;
@@ -357,7 +343,7 @@
 			// 
 			// defaultAngle
 			// 
-			defaultAngle.Location = new System.Drawing.Point(177, 241);
+			defaultAngle.Location = new System.Drawing.Point(177, 238);
 			defaultAngle.Name = "defaultAngle";
 			defaultAngle.Size = new System.Drawing.Size(123, 23);
 			defaultAngle.TabIndex = 16;
@@ -366,17 +352,17 @@
 			// 
 			// encodeButton
 			// 
-			encodeButton.Location = new System.Drawing.Point(191, 525);
+			encodeButton.Location = new System.Drawing.Point(165, 522);
 			encodeButton.Name = "encodeButton";
-			encodeButton.Size = new System.Drawing.Size(109, 27);
+			encodeButton.Size = new System.Drawing.Size(135, 27);
 			encodeButton.TabIndex = 32;
 			encodeButton.Text = "Encode GIF";
 			encodeButton.UseVisualStyleBackColor = true;
-			encodeButton.Click += encodeButton_Click;
+			encodeButton.Click += EncodeButton_Click;
 			// 
 			// defaultHue
 			// 
-			defaultHue.Location = new System.Drawing.Point(177, 290);
+			defaultHue.Location = new System.Drawing.Point(177, 287);
 			defaultHue.Name = "defaultHue";
 			defaultHue.Size = new System.Drawing.Size(123, 23);
 			defaultHue.TabIndex = 19;
@@ -396,6 +382,7 @@
 			// periodLabel
 			// 
 			periodLabel.AutoSize = true;
+			periodLabel.ForeColor = System.Drawing.Color.White;
 			periodLabel.Location = new System.Drawing.Point(181, 162);
 			periodLabel.Name = "periodLabel";
 			periodLabel.Size = new System.Drawing.Size(119, 15);
@@ -404,7 +391,7 @@
 			// 
 			// helpButton
 			// 
-			helpButton.Location = new System.Drawing.Point(17, 558);
+			helpButton.Location = new System.Drawing.Point(17, 555);
 			helpButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			helpButton.Name = "helpButton";
 			helpButton.Size = new System.Drawing.Size(66, 27);
@@ -416,6 +403,7 @@
 			// cutLabel
 			// 
 			cutLabel.AutoSize = true;
+			cutLabel.ForeColor = System.Drawing.Color.White;
 			cutLabel.Location = new System.Drawing.Point(17, 104);
 			cutLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			cutLabel.Name = "cutLabel";
@@ -426,6 +414,7 @@
 			// angleLabel
 			// 
 			angleLabel.AutoSize = true;
+			angleLabel.ForeColor = System.Drawing.Color.White;
 			angleLabel.Location = new System.Drawing.Point(17, 46);
 			angleLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			angleLabel.Name = "angleLabel";
@@ -436,6 +425,7 @@
 			// colorLabel
 			// 
 			colorLabel.AutoSize = true;
+			colorLabel.ForeColor = System.Drawing.Color.White;
 			colorLabel.Location = new System.Drawing.Point(17, 75);
 			colorLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			colorLabel.Name = "colorLabel";
@@ -450,7 +440,7 @@
 			helpPanel.Controls.Add(helpLabel);
 			helpPanel.Location = new System.Drawing.Point(309, 14);
 			helpPanel.Name = "helpPanel";
-			helpPanel.Size = new System.Drawing.Size(763, 582);
+			helpPanel.Size = new System.Drawing.Size(763, 568);
 			helpPanel.TabIndex = 0;
 			// 
 			// helpLabel
@@ -465,8 +455,8 @@
 			// spinSelect
 			// 
 			spinSelect.FormattingEnabled = true;
-			spinSelect.Items.AddRange(new object[] { "->|<-", "->", "X", "<-", "<-|->" });
-			spinSelect.Location = new System.Drawing.Point(17, 241);
+			spinSelect.Items.AddRange(new object[] { "Random", "Clock", "None", "Counterclock", "Antispin" });
+			spinSelect.Location = new System.Drawing.Point(17, 238);
 			spinSelect.Name = "spinSelect";
 			spinSelect.Size = new System.Drawing.Size(86, 23);
 			spinSelect.TabIndex = 14;
@@ -476,7 +466,8 @@
 			// zoomLabel
 			// 
 			zoomLabel.AutoSize = true;
-			zoomLabel.Location = new System.Drawing.Point(181, 194);
+			zoomLabel.ForeColor = System.Drawing.Color.White;
+			zoomLabel.Location = new System.Drawing.Point(181, 191);
 			zoomLabel.Name = "zoomLabel";
 			zoomLabel.Size = new System.Drawing.Size(122, 15);
 			zoomLabel.TabIndex = 40;
@@ -485,8 +476,8 @@
 			// hueSelect
 			// 
 			hueSelect.FormattingEnabled = true;
-			hueSelect.Items.AddRange(new object[] { "RGB (static)", "BGR (static)", "RGB->GBR", "BGR->RBG", "RGB->BRG", "BGR->GRB" });
-			hueSelect.Location = new System.Drawing.Point(17, 290);
+			hueSelect.Items.AddRange(new object[] { "Random", "RGB (static)", "BGR (static)", "RGB->GBR", "BGR->RBG", "RGB->BRG", "BGR->GRB" });
+			hueSelect.Location = new System.Drawing.Point(17, 287);
 			hueSelect.Name = "hueSelect";
 			hueSelect.Size = new System.Drawing.Size(86, 23);
 			hueSelect.TabIndex = 17;
@@ -496,7 +487,8 @@
 			// spinLabel
 			// 
 			spinLabel.AutoSize = true;
-			spinLabel.Location = new System.Drawing.Point(17, 223);
+			spinLabel.ForeColor = System.Drawing.Color.White;
+			spinLabel.Location = new System.Drawing.Point(17, 220);
 			spinLabel.Name = "spinLabel";
 			spinLabel.Size = new System.Drawing.Size(261, 15);
 			spinLabel.TabIndex = 41;
@@ -505,7 +497,8 @@
 			// hueLabel
 			// 
 			hueLabel.AutoSize = true;
-			hueLabel.Location = new System.Drawing.Point(17, 272);
+			hueLabel.ForeColor = System.Drawing.Color.White;
+			hueLabel.Location = new System.Drawing.Point(17, 269);
 			hueLabel.Name = "hueLabel";
 			hueLabel.Size = new System.Drawing.Size(252, 15);
 			hueLabel.TabIndex = 42;
@@ -513,7 +506,7 @@
 			// 
 			// spinSpeedBox
 			// 
-			spinSpeedBox.Location = new System.Drawing.Point(109, 241);
+			spinSpeedBox.Location = new System.Drawing.Point(109, 238);
 			spinSpeedBox.Name = "spinSpeedBox";
 			spinSpeedBox.Size = new System.Drawing.Size(62, 23);
 			spinSpeedBox.TabIndex = 43;
@@ -522,7 +515,7 @@
 			// 
 			// hueSpeedBox
 			// 
-			hueSpeedBox.Location = new System.Drawing.Point(109, 290);
+			hueSpeedBox.Location = new System.Drawing.Point(109, 287);
 			hueSpeedBox.Name = "hueSpeedBox";
 			hueSpeedBox.Size = new System.Drawing.Size(62, 23);
 			hueSpeedBox.TabIndex = 44;
@@ -533,16 +526,16 @@
 			// 
 			parallelTypeBox.FormattingEnabled = true;
 			parallelTypeBox.Items.AddRange(new object[] { "Of Animation", "Of Depth", "Of Recursion" });
-			parallelTypeBox.Location = new System.Drawing.Point(111, 435);
+			parallelTypeBox.Location = new System.Drawing.Point(114, 432);
 			parallelTypeBox.Name = "parallelTypeBox";
-			parallelTypeBox.Size = new System.Drawing.Size(123, 23);
+			parallelTypeBox.Size = new System.Drawing.Size(120, 23);
 			parallelTypeBox.TabIndex = 27;
 			parallelTypeBox.Text = "Parallelism Type";
 			parallelTypeBox.SelectedIndexChanged += ParallelTypeBox_SelectedIndexChanged;
 			// 
 			// ambBox
 			// 
-			ambBox.Location = new System.Drawing.Point(177, 319);
+			ambBox.Location = new System.Drawing.Point(177, 316);
 			ambBox.Name = "ambBox";
 			ambBox.Size = new System.Drawing.Size(60, 23);
 			ambBox.TabIndex = 20;
@@ -551,7 +544,7 @@
 			// 
 			// noiseBox
 			// 
-			noiseBox.Location = new System.Drawing.Point(240, 319);
+			noiseBox.Location = new System.Drawing.Point(240, 316);
 			noiseBox.Name = "noiseBox";
 			noiseBox.Size = new System.Drawing.Size(60, 23);
 			noiseBox.TabIndex = 21;
@@ -560,7 +553,7 @@
 			// 
 			// saturateBox
 			// 
-			saturateBox.Location = new System.Drawing.Point(177, 348);
+			saturateBox.Location = new System.Drawing.Point(177, 345);
 			saturateBox.Name = "saturateBox";
 			saturateBox.Size = new System.Drawing.Size(60, 23);
 			saturateBox.TabIndex = 22;
@@ -569,7 +562,7 @@
 			// 
 			// detailBox
 			// 
-			detailBox.Location = new System.Drawing.Point(240, 348);
+			detailBox.Location = new System.Drawing.Point(240, 345);
 			detailBox.Name = "detailBox";
 			detailBox.Size = new System.Drawing.Size(60, 23);
 			detailBox.TabIndex = 23;
@@ -578,7 +571,7 @@
 			// 
 			// blurBox
 			// 
-			blurBox.Location = new System.Drawing.Point(240, 377);
+			blurBox.Location = new System.Drawing.Point(240, 374);
 			blurBox.Name = "blurBox";
 			blurBox.Size = new System.Drawing.Size(60, 23);
 			blurBox.TabIndex = 24;
@@ -587,7 +580,7 @@
 			// 
 			// bloomBox
 			// 
-			bloomBox.Location = new System.Drawing.Point(177, 377);
+			bloomBox.Location = new System.Drawing.Point(177, 374);
 			bloomBox.Name = "bloomBox";
 			bloomBox.Size = new System.Drawing.Size(60, 23);
 			bloomBox.TabIndex = 25;
@@ -596,7 +589,7 @@
 			// 
 			// threadsBox
 			// 
-			threadsBox.Location = new System.Drawing.Point(240, 435);
+			threadsBox.Location = new System.Drawing.Point(240, 432);
 			threadsBox.Name = "threadsBox";
 			threadsBox.Size = new System.Drawing.Size(60, 23);
 			threadsBox.TabIndex = 28;
@@ -605,49 +598,88 @@
 			// 
 			// abortBox
 			// 
-			abortBox.Location = new System.Drawing.Point(17, 463);
+			abortBox.Location = new System.Drawing.Point(17, 460);
 			abortBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			abortBox.Name = "abortBox";
 			abortBox.Size = new System.Drawing.Size(66, 23);
 			abortBox.TabIndex = 45;
 			abortBox.Text = "500";
-			abortBox.TextChanged += abortBox_TextChanged;
+			abortBox.TextChanged += AbortBox_TextChanged;
 			// 
 			// threadsLabel
 			// 
 			threadsLabel.AutoSize = true;
-			threadsLabel.Location = new System.Drawing.Point(17, 438);
+			threadsLabel.ForeColor = System.Drawing.Color.White;
+			threadsLabel.Location = new System.Drawing.Point(17, 435);
 			threadsLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			threadsLabel.Name = "threadsLabel";
-			threadsLabel.Size = new System.Drawing.Size(77, 15);
+			threadsLabel.Size = new System.Drawing.Size(92, 15);
 			threadsLabel.TabIndex = 0;
-			threadsLabel.Text = "Max Threads:";
+			threadsLabel.Text = "Parallel Threads:";
 			// 
 			// brightnessBox
 			// 
-			brightnessBox.Location = new System.Drawing.Point(177, 406);
+			brightnessBox.Location = new System.Drawing.Point(177, 403);
 			brightnessBox.Name = "brightnessBox";
 			brightnessBox.Size = new System.Drawing.Size(60, 23);
 			brightnessBox.TabIndex = 46;
 			brightnessBox.Text = "100";
 			brightnessBox.TextChanged += BrightnessBox_TextChanged;
 			// 
-			// label1
+			// brightnessLabel
 			// 
-			label1.AutoSize = true;
-			label1.Location = new System.Drawing.Point(17, 409);
-			label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-			label1.Name = "label1";
-			label1.Size = new System.Drawing.Size(115, 15);
-			label1.TabIndex = 47;
-			label1.Text = "Brightness (0-300%):";
+			brightnessLabel.AutoSize = true;
+			brightnessLabel.ForeColor = System.Drawing.Color.White;
+			brightnessLabel.Location = new System.Drawing.Point(17, 406);
+			brightnessLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			brightnessLabel.Name = "brightnessLabel";
+			brightnessLabel.Size = new System.Drawing.Size(115, 15);
+			brightnessLabel.TabIndex = 47;
+			brightnessLabel.Text = "Brightness (0-300%):";
+			// 
+			// zoomSelect
+			// 
+			zoomSelect.FormattingEnabled = true;
+			zoomSelect.Items.AddRange(new object[] { "Random", "In", "Out" });
+			zoomSelect.Location = new System.Drawing.Point(17, 188);
+			zoomSelect.Name = "zoomSelect";
+			zoomSelect.Size = new System.Drawing.Size(86, 23);
+			zoomSelect.TabIndex = 48;
+			zoomSelect.Text = "Select Zoom";
+			zoomSelect.SelectedIndexChanged += ZoomSelect_SelectedIndexChanged;
+			// 
+			// restartButton
+			// 
+			restartButton.Location = new System.Drawing.Point(165, 489);
+			restartButton.Name = "restartButton";
+			restartButton.Size = new System.Drawing.Size(135, 27);
+			restartButton.TabIndex = 49;
+			restartButton.Text = "! RESTART !";
+			restartButton.UseVisualStyleBackColor = true;
+			restartButton.Click += RestartButton_Click;
+			// 
+			// resSelect
+			// 
+			resSelect.FormattingEnabled = true;
+			resSelect.Items.AddRange(new object[] { "80x80", "Custom:", "256x256", "512x512", "640x480", "1024x768", "1280x720", "720x1280", "1920x1080", "1080x1920", "1600x900", "900x1600", "2560x1440", "1440x2560", "3840x2160", "2160x3840", "5120x2880", "2880x5120", "7680x4320", "4320x7680" });
+			resSelect.Location = new System.Drawing.Point(125, 130);
+			resSelect.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+			resSelect.Name = "resSelect";
+			resSelect.Size = new System.Drawing.Size(123, 23);
+			resSelect.TabIndex = 50;
+			resSelect.Text = "Select Resolution";
+			resSelect.SelectedIndexChanged += Resolution_Changed;
 			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+			BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
 			ClientSize = new System.Drawing.Size(1086, 610);
-			Controls.Add(label1);
+			Controls.Add(resSelect);
+			Controls.Add(restartButton);
+			Controls.Add(zoomSelect);
+			Controls.Add(brightnessLabel);
 			Controls.Add(brightnessBox);
 			Controls.Add(abortBox);
 			Controls.Add(threadsBox);
@@ -685,11 +717,9 @@
 			Controls.Add(fractalSelect);
 			Controls.Add(resX);
 			Controls.Add(resY);
-			Controls.Add(previewBox);
 			Controls.Add(periodBox);
 			Controls.Add(delayLabel);
 			Controls.Add(delayBox);
-			Controls.Add(zoomButton);
 			Controls.Add(prevButton);
 			Controls.Add(nextButton);
 			Controls.Add(animateButton);
@@ -700,9 +730,10 @@
 			Controls.Add(infoLabel);
 			Controls.Add(pngButton);
 			Controls.Add(gifButton);
+			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.82";
+			Text = "RGB Fractal Zoom Generator C# v1.83";
 			FormClosing += GeneratorForm_FormClosing;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();
@@ -718,11 +749,9 @@
 		private System.Windows.Forms.ComboBox fractalSelect;
 		private System.Windows.Forms.TextBox resX;
 		private System.Windows.Forms.TextBox resY;
-		private System.Windows.Forms.CheckBox previewBox;
 		private System.Windows.Forms.TextBox periodBox;
 		private System.Windows.Forms.Label delayLabel;
 		private System.Windows.Forms.TextBox delayBox;
-		private System.Windows.Forms.Button zoomButton;
 		private System.Windows.Forms.Button prevButton;
 		private System.Windows.Forms.Button nextButton;
 		private System.Windows.Forms.Button animateButton;
@@ -767,7 +796,10 @@
 		private System.Windows.Forms.TextBox abortBox;
 		private System.Windows.Forms.Label threadsLabel;
 		private System.Windows.Forms.TextBox brightnessBox;
-		private System.Windows.Forms.Label label1;
+		private System.Windows.Forms.Label brightnessLabel;
+		private System.Windows.Forms.ComboBox zoomSelect;
+		private System.Windows.Forms.Button restartButton;
+		private System.Windows.Forms.ComboBox resSelect;
 	}
 }
 

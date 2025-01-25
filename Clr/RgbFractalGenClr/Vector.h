@@ -66,7 +66,7 @@ static Vector zero(0, 0, 0);
 static Vector Y(const Vector& X) { return Vector(X.Z, X.X, X.Y); }
 static Vector Z(const Vector& X) { return Vector(X.Y, X.Z, X.X); }
 
-public ref struct ManagedVecWrapper {
+/*public ref struct ManagedVecWrapper {
 	Vector**& T;
 	Vector& I;
 	Vector& H;
@@ -98,7 +98,7 @@ public:
 		Y = V.Y;
 		Z = V.Z;
 	}
-};
+};*/
 
 /*public ref struct VecRefWrapper {
 	Vector**& T;

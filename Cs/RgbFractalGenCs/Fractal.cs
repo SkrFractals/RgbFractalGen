@@ -612,7 +612,7 @@ return newFlags;
 	#endregion
 }
 
-internal class VecRefWrapper {
+/*internal class VecRefWrapper {
 	internal Vector3[][] buffT;
 	internal Vector3 H, I;
 	internal (float, float, (float, float)[])[] preIterate;
@@ -621,4 +621,4 @@ internal class VecRefWrapper {
 		this.H = H; this.I = I;
 	}
 
-}
+}*/

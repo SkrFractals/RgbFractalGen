@@ -1,7 +1,6 @@
 ﻿// Allow debug code, comment this when releasing for slightly better performance
 //#define CUSTOMDEBUG
 
-
 #if CUSTOMDEBUG
 using System.Diagnostics;
 #endif
@@ -14,15 +13,61 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal class FractalGenerator {
+
+	private class FractalTask {
+		internal Task task;         // Parallel Animation Tasks
+		internal byte state;      // States of Animation Tasks
+		internal Vector3[][] buffer;    // Buffer for points to print into bmp
+		internal short[][] voidDepth;// Depths of Void
+		internal Queue<(short, short)> voidQueue;
+		internal Vector3 H;           // mixed children color
+		internal Vector3 I;           // pure parent color
+		internal bool taskStarted;   // Additional safety, could remove if it never gets triggered for a while
+		internal short index;
+		internal (float, float, (float, float)[])[]
+			preIterate;// (childSize, childDetail, childSpread, (childX,childY)[])
+		internal FractalTask() {
+			taskStarted = false;
+			state = 2;
+			buffer = null;
+			voidDepth = null;
+			voidQueue = new Queue<(short, short)>();
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		internal bool FinishTask() {
+			if (state == 1) {
+				Join();
+				state = 2;
+			}
+			return state >= 2;
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		internal void Join() {
+			Stop();
+			taskStarted = false;
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		internal void Start() {
+			Stop();
+			taskStarted = true;
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void Stop() {
+			if (taskStarted) {
+				if (task != null) {
+					task.Wait();
+					task = null;
+				}// else { }
+			}// else { }
+		}
+	}
 
 #if CUSTOMDEBUG
 	// Debug variables
@@ -31,85 +76,113 @@ internal class FractalGenerator {
 	private double initTimes, iterTimes, voidTimes, drawTimes, gifTimes;
 #endif
 
-	// Fractal definitions
+	// Definitions
 	private readonly Fractal[] fractals;            // Fractal definitions
 	private Fractal f;                              // Selected fractal definition
-
-	// Generated data
-	private Vector3[][][] buffer;                   // Buffer for points to print into bmp
-	private short[][][] voidDepth;                  // Depths of Void
-	private Queue<(short, short)>[] voidQueue;
-	private readonly byte[] childColor;             // A copy of childColor for allowing BGR
 	private float[] childAngle;                     // A copy of selected childAngle
-	private Bitmap[] bitmap;                        // Prerender as an array of bitmaps
-	private byte[] bitmapState;                     // 0 - not exists, 1 - spawned and locked, 2 - finished drawing locked, 3 - started gif locked, 4 - finished unlocked
-	private BitmapData[] bitmapData;                // Locked Bits for bitmaps
-	((float, float), (float, float), byte, int, byte)[] tuples; // Queue struct for GenerateDots_OfDepth ((x,y), angle, aa, color, -cutparam, depth);
+	private float periodAngle;                      // Angle symmetry of current fractal
+	private readonly byte[] childColor;             // A copy of childColor for allowing BGR
+	private Vector3 colorBlend;                     // Color blend of a selected fractal for more seamless loop (between single color to the sum of children)
+	private Fractal.CutFunction cutFunction;        // Selected CutFunction pointer
+	private short applyCutparam;					// Applied cutparam (selected or random)
+	private short maxIterations = -1;               // maximum depth of iteration (dependent on fractal/detail/resolution)
+	//(float, float, (float, float)[])[][] preIterate;// (childSize, childDetail, childSpread, (childX,childY)[])
+	private float logBase;                          // Size Log Base
+
+	// Resolution
+	private short allocatedWidth;	// How much buffer width is currently allocated?
+	private short allocatedHeight;	// How much buffer height is currently allocated?
+	private short widthBorder;		// Precomputed maximum x coord fot pixel input
+	private short heightBorder;		// Precomputed maximum y coord for pixel input
+	private float upleftStart;		// Precomputed minimum x/y for dot iteration/application
+	private float rightEnd;			// Precomputed maximum -x- for dot iteration/application
+	private float downEnd;			// Precomputed maximum -y- for dot iteration/application
+
+	// Frames
+	//private Vector3[][][] buffer;		// Buffer for points to print into bmp
+	private Bitmap[] bitmap;			// Prerender as an array of bitmaps
+	private byte[] bitmapState;			// 0 - not exists, 1 - spawned and locked, 2 - finished drawing locked, 3 - started gif locked, 4 - finished unlocked
+	private BitmapData[] bitmapData;	// Locked Bits for bitmaps
+	private short finalPeriodMultiplier;// How much will the period get finally stretched? (calculated for seamless + user multiplier)
+	private short debug;				// Debug frame count override
+	private short bitmapsFinished;		// How many bitmaps are completely finished generating? (ready to display, encoded if possible)
+	private short nextBitmap;			// How many bitmaps have started generating? (next task should begin with this one)
+	private short allocatedFrames;      // How many bitmap frames are currently allocated?
+	private short applyZoom;			// Applied zoom (selected or random)
+
+	// Color
+	private short applyColorPalette;    // RGB or BGR? (0/1)
+	private short applyHueCycle;		// Hue Cycling Direction (-1,0,1)
+	private byte hueCycleMultiplier;	// How fast should the hue shift to loop seamlessly?
+
+	// Void
+	//private short[][][] voidDepth;              // Depths of Void
+	//private Queue<(short, short)>[] voidQueue;	// Queue for Void Dijkra
+	private short ambnoise;                     // Normalizer for maximum void depth - Precomputed amb * noise
+	private float bloom1;                       // Precomputed bloom+1
+	private readonly Random random = new();     // Random generator
 
 	// Threading
-	private readonly object taskLock = new();       // Monitor lock
-	private CancellationTokenSource cancel;         // Cancellation Token Source
-	private Task mainTask;                          // Main Generation Task
-	private ConcurrentBag<Task> imageTasks;         // Parallel Image Tasks
-	private Task[] parallelTasks;                   // Parallel Animation Tasks
-	private byte[] parallelTaskFinished;            // States of Animation Tasks
-	private readonly List<Task> taskSnapshot;       // Snapshot for safely checking imageTasks Wait
+	private FractalTask[] tasks;
+	private byte applyParallelType;								// Safely copy parallelType in here so it doesn't change in the middle of generation
+	private short applyMaxTasks;								// Safely copy maxTasks in here so it doesn't change in the middle of generation
+	private short applyMaxGenerationTasks;						// Safely copy maxGenerationTasks in here so it doesn't change in the middle of generation
+	private short maxDepth;										// Maximum depth for Recusrion parallelism
+	private short allocatedTasks;								// How many buffer tasks are currently allocated?
+	private readonly object taskLock = new();					// Monitor lock
+	private CancellationTokenSource cancel;						// Cancellation Token Source
+	private Task mainTask;										// Main Generation Task
+	private ConcurrentBag<Task> imageTasks;						// Parallel Image Tasks
+	//private Task[] parallelTasks;								// Parallel Animation Tasks
+	//private byte[] parallelTaskFinished;						// States of Animation Tasks
+	private readonly List<Task> taskSnapshot;					// Snapshot for safely checking imageTasks Wait
+	(short, (float, float), (float, float), byte, int, byte)[] tuples; // Queue struct for GenerateDots_OfDepth ((x,y), angle, aa, color, -cutparam, depth);
+	//private bool[] taskStarted;									// Additional safety, could remove if it never gets triggered for a while
 
-	private bool[] taskStarted;                     // Additional safety, could remove if it never gets triggered for a while
+	// Export
+	private AnimatedGifEncoder gifEncoder;	// Export GIF encoder
+	private bool gifSuccess, exportingGif;	// Temp GIF file "gif.tmp" successfuly created | flag only allowing one GIF Encoding thread
+	private string gifTempPath;				// Temporary GIF file name
+	private System.Drawing.Rectangle rect;  // Bitmap rectangle TODO implement
 
-	// Generation variables
-	private byte hueCycleMultiplier;                // How fast should the hue shift to loop seamlessly?
-	private byte applyParallelType;                 // Safely copy parallelType in here so it doesn't change in the middle of generation
-
-	private short selectColorPalette;               // RGB or BGR?
-
-	private short bitmapsFinished;                  // How many bitmaps are completely finished generating? (ready to display, encoded if possible)
-	private short nextBitmap;                       // How many bitmaps have started generating? (next task should begin with this one)
-	private short finalPeriodMultiplier;            // How much will the period get finally stretched? (calculated for seamless + user multiplier)
-
-	private short selectColor;                      // Selected childColor definition
-	private short selectAngle;                      // Selected childAngle definition
-	private short selectCut;                        // Selected CutFunction
-	private short allocatedWidth;                   // How much buffer width is currently allocated?
-	private short allocatedHeight;                  // How much buffer height is currently allocated?
-	private short allocatedTasks;                   // How many buffer tasks are currently allocated?
-	private short allocatedFrames;                  // How many bitmap frames are currently allocated?
-	private short applyMaxTasks;                    // Safely copy maxTasks in here so it doesn't change in the middle of generation
-	private short applyMaxGenerationTasks;          // Safely copy maxGenerationTasks in here so it doesn't change in the middle of generation
-	private short maxIterations = -1;               // maximum depth of iteration (dependent on fractal/detail/resolution)
-	(float, float, (float, float)[])[][] preIterate;// (childSize, childDetail, childSpread, (childX,childY)[])
-
-	private short widthBorder;                      // Precomputed maximum x coord fot pixel input
-	private short heightBorder;                     // Precomputed maximum y coord for pixel input
-	private float upleftStart;                      // Precomputed minimum x/y for dot iteration/application
-	private float rightEnd;                         // Precomputed maximum -x- for dot iteration/application
-	private float downEnd;                          // Precomputed maximum -y- for dot iteration/application
-
-	private Fractal.CutFunction cutFunction;        // Selected CutFunction pointer
-	private bool gifSuccess, exportingGif;          // Temp GIF file "gif.tmp" successfuly created | flag only allowing one GIF Encoding thread
-	private AnimatedGifEncoder gifEncoder;          // Export GIF encoder
-	private float logBase, periodAngle, bloom1;     // Size Log Base | Angle symmetry of current fractal | Precomputed bloom+1
-	private Vector3 colorBlend;                     // Color blend of a selected fractal for more seamless loop (between single color to the sum of children)
-	private System.Drawing.Rectangle rect;          // Bitmap rectangle TODO implement
-	private string gifTempPath;                     // Temporary GIF file name
-
-	private readonly Random random = new();         // Random generator
-	private short ambnoise;                         // Normalizer for maximum void depth - Precomputed amb * noise
-
-
-	// Settings
-	internal float detail, selectNoise, selectSaturate, selectBloom;
-	internal byte parallelType, encode;
-	internal short selectZoom, selectHueCycle;
-	internal short debug, width, height, selectPeriod, delay, selectDefaultZoom, selectDefaultAngle, selectDefaultHue, selectAmbient, selectBlur, selectExtraSpin, selectExtraHue;
-	internal short select, selectMaxTasks, maxGenerationTasks, selectCutparam, selectDefaultSpin, maxDepth, selectPeriodMultiplier, selectBrightness;
+	// Selected Settings
+	internal short selectFractal,		// Fractal definition (0-fractals.Length)
+		selectChildAngle,				// Child angle definition (0-childAngle.Length)
+		selectChildColor,				// Child color definition (0-childColor.Length)
+		selectCut,						// Selected CutFunction index (0-cutFunction.Length)
+		selectCutparam,					// Cutparam seed (0-maxCutparam)
+		selectWidth,					// Resolution width (1-X)
+		selectHeight,					// Resolution height (1-X)
+		selectPeriod,					// Parent to child frames period (1-X)
+		selectPeriodMultiplier,			// Multiplier of frames period (1-X)
+		selectZoom,						// Zoom direction (-1 out, 0 random, 1 in)
+		selectDefaultZoom,				// Default skipped frames of zoom (0-frames)
+		selectExtraSpin,				// Extra spin speed (0-X)
+		selectDefaultAngle,				// Default spin angle (0-360)
+		selectSpin,						// Spin direction (-2 random, -1 anticlockwise, 0 none, 1 clockwise, 2 antispin)
+		selectHue,						// -1 = random, 0 = RGB, 1 = BGR, 2 = RGB->GBR, 3 = BGR->RBG, 4 =RGB->BRG, 5 = BGR->GRB
+		selectExtraHue,					// Extra hue angle speed (0-X)
+		selectDefaultHue,				// Default hue angle (0-360)
+		selectAmbient;					// Void ambient strength (0-120)
+	internal float selectNoise,			// Void noise strength (0-3)
+		selectSaturate,					// Saturation boost level (0-1)
+		selectDetail,					// MinSize multiplier (1-10)
+		selectBloom;					// Dot bloom level (pixels)
+	internal short selectBlur,			// Dot blur level
+		selectBrightness;				// Light normalizer brightness (0-300)
+	internal byte selectParallelType;	// 0 = Animation, 1 = Depth, 2 = Recursion
+	internal short selectMaxTasks,		// Maximum allowed total tasks
+		selectMaxGenerationTasks,		// Maximum allowed tasks for GenerateDot and GenerateBitmap
+		selectDelay;					// Animation frame delay
+	internal byte selectEncode;			// 0 = Only Image, 1 = Animation, 2 = Animation + GIF
+	internal short cutparamMaximum;		// Maximum seed for the selected CutFunction
 
 	#region Init
 	internal FractalGenerator() {
-		selectCutparam = debug = selectDefaultHue = selectDefaultZoom = selectDefaultAngle = selectExtraSpin = selectExtraHue = parallelType = 0;
+		selectCutparam = debug = selectDefaultHue = selectDefaultZoom = selectDefaultAngle = selectExtraSpin = selectExtraHue = selectParallelType = 0;
 		selectZoom = 1;
-		select = selectColor = selectAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = selectDefaultSpin = selectColorPalette = -1;
-		encode = 2;
+		selectFractal = selectChildColor = selectChildAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = selectSpin = selectHue = -1;
+		selectEncode = 2;
 		gifEncoder = null;
 		bitmap = null;
 		gifSuccess = false;
@@ -234,7 +307,7 @@ internal class FractalGenerator {
 				("NoCorner + TriangleHoles", Fractal.Tetraflake_NoCornerTriangleHolesParam),
 				]
 			),
-			new("SierpinskiCarpet", 9, 3, .9f, .25f, .9f, cx, cy,
+			new("SierpinskiCarpet", 9, 3, 1.0f, .25f, .9f, cx, cy,
 			[
 			("Classic", [SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0]),
 			("H-I De Rivera O (opposites)", [SYMMETRIC + pi, 0, 0, 0, pi / 2, 0, 0, 0, pi / 2]),
@@ -308,34 +381,39 @@ internal class FractalGenerator {
 	#region Generate_Tasks
 	private void GenerateAnimation() {
 		#region InitData
-		short NewBuffer(short taskIndex) {
-			var voidT = voidDepth[taskIndex] = new short[height][];
-			var buffT = buffer[taskIndex] = new Vector3[height][];
-			for (var y = 0; y < height; voidT[y++] = new short[width]) {
-				var buffY = buffT[y] = new Vector3[width];
-				for (var x = 0; x < width; buffY[x++] = Vector3.Zero) ;
+		void NewBuffer(FractalTask task) {
+			var voidT = task.voidDepth = new short[selectHeight][];
+			var buffT = task.buffer = new Vector3[selectHeight][];
+			for (var y = 0; y < selectHeight; voidT[y++] = new short[selectWidth]) {
+				var buffY = buffT[y] = new Vector3[selectWidth];
+				for (var x = 0; x < selectWidth; buffY[x++] = Vector3.Zero) ;
 			}
-			return ++taskIndex;
 		}
 		#endregion
 		#region GenerateTasks
-		void GenerateImage(short bitmapIndex, short taskIndex, float size, float angle, short spin, float hueAngle, byte color) {
+		void GenerateImage(short bitmapIndex, short stateIndex, float size, float angle, short spin, float hueAngle, byte color) {
 			#region GenerateDots_Inline
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			void ApplyDot(VecRefWrapper R, float inX, float inY, float inDetail, float inColor) {
-				Vector3 GetDotColor() => Vector3.Lerp(R.H, R.I, inDetail);
-				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				Vector3 Y(Vector3 X) => new(X.Z, X.X, X.Y);
-				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				Vector3 Z(Vector3 X) => new(X.Y, X.Z, X.X);
-				var dotColor = inColor switch { 1 => Y(GetDotColor()), 2 => Z(GetDotColor()), _ => GetDotColor() };
-				// Iterated deep into a single point - Interpolate inbetween 4 pixels and Stop
-				int ys = Math.Max(1, (int)MathF.Floor(inY - selectBloom)), xe = Math.Min(widthBorder, (int)MathF.Ceiling(inX + selectBloom)), ye = Math.Min(heightBorder, (int)MathF.Ceiling(inY + selectBloom));
-				for (int y, x = Math.Max(1, (int)MathF.Floor(inX - selectBloom)); x <= xe; x++) {
-					var xd = bloom1 - MathF.Abs(x - inX);
-					for (y = ys; y <= ye; y++)
-						R.buffT[y][x] += xd * (bloom1 - MathF.Abs(y - inY)) * dotColor;
+			bool ApplyDot(bool apply, FractalTask task, float inX, float inY, float inDetail, float inColor) {
+				if (apply) {
+					Vector3 GetDotColor() => Vector3.Lerp(task.H, task.I, inDetail);
+					[MethodImpl(MethodImplOptions.AggressiveInlining)]
+					Vector3 Y(Vector3 X) => new(X.Z, X.X, X.Y);
+					[MethodImpl(MethodImplOptions.AggressiveInlining)]
+					Vector3 Z(Vector3 X) => new(X.Y, X.Z, X.X);
+					var dotColor = inColor switch { 1 => Y(GetDotColor()), 2 => Z(GetDotColor()), _ => GetDotColor() };
+					var buffT = task.buffer;
+					// Iterated deep into a single point - Interpolate inbetween 4 pixels and Stop
+					int startX = Math.Max(1, (int)MathF.Floor(inX - selectBloom)), endX = Math.Min(widthBorder, (int)MathF.Ceiling(inX + selectBloom)), endY = Math.Min(heightBorder, (int)MathF.Ceiling(inY + selectBloom));
+					for (int x, y = Math.Max(1, (int)MathF.Floor(inY - selectBloom)); y <= endY; ++y) {
+						var yd = bloom1 - MathF.Abs(y - inY);
+						var buffY = buffT[y];
+						for (x = startX; x <= endX; ++x) 
+							buffY[x] += (yd * (bloom1 - MathF.Abs(x - inX))) * dotColor;
+					}
+					return true;
 				}
+				return false;
 			}
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
 			int CalculateFlags(int index, int inFlags) => cutFunction == null ? inFlags : cutFunction(index, inFlags);
@@ -351,19 +429,15 @@ internal class FractalGenerator {
 			}
 			#endregion
 			#region GenerateDots
-			void GenerateDots_SingleTask(VecRefWrapper R,
+			void GenerateDots_SingleTask(short taskIndex,
 				(float, float) inXY, (float, float) inAngle, byte inColor, int inFlags, byte inDepth
 			) {
-				var preIterated = R.preIterate[inDepth];
-
-				//var inAngleF = inAngle.Item1;
-
-				if (preIterated.Item1 < detail) {
-					ApplyDot(R, inXY.Item1, inXY.Item2, preIterated.Item2, inColor);
+				var task = tasks[taskIndex];
+				var preIterated = task.preIterate[inDepth];
+				if (ApplyDot(preIterated.Item1 < selectDetail, task, inXY.Item1, inXY.Item2, preIterated.Item2, inColor))
 					return;
-				}
 				// Split Iteration Deeper
-				var newPreIterated = R.preIterate[++inDepth];
+				var newPreIterated = task.preIterate[++inDepth];
 				var i = f.childCount;
 				while (0 <= --i) {
 					if (cancel.Token.IsCancellationRequested)
@@ -377,23 +451,22 @@ internal class FractalGenerator {
 					var newXY = NewXY(inXY, XY, inAngle.Item1);
 
 					if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1))
-						GenerateDots_SingleTask(R, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
+						GenerateDots_SingleTask(taskIndex, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
 				}
 			}
-			void GenerateDots_OfDepth(VecRefWrapper R) {
+			void GenerateDots_OfDepth() {
 				int index = 0, insertTo = 1,
 					max = applyMaxGenerationTasks * 8,
 					maxcount = max - f.childCount - 1,
 					count = (max + insertTo - index) % max;
 				while (count > 0 && count < maxcount) {
-					(var inXY, var inAngle, var inColor, var inFlags, var inDepth) = tuples[index++];
-					var preIterated = R.preIterate[inDepth];
-					if (preIterated.Item1 < detail) {
-						ApplyDot(R, inXY.Item1, inXY.Item2, preIterated.Item2, inColor);
+					(var taskIndex, var inXY, var inAngle, var inColor, var inFlags, var inDepth) = tuples[index++];
+					var task = tasks[taskIndex];
+					var preIterated = task.preIterate[inDepth];
+					if (ApplyDot(preIterated.Item1 < selectDetail, task, inXY.Item1, inXY.Item2, preIterated.Item2, inColor))
 						continue;
-					}
 					// Split Iteration Deeper
-					var newPreIterated = R.preIterate[++inDepth];
+					var newPreIterated = task.preIterate[++inDepth];
 					var i = f.childCount;
 					while (0 <= --i) {
 						if (cancel.Token.IsCancellationRequested)
@@ -406,7 +479,7 @@ internal class FractalGenerator {
 						var XY = preIterated.Item3[i];
 						var newXY = NewXY(inXY, XY, inAngle.Item1);
 						if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1))
-							tuples[insertTo++] = (newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
+							tuples[insertTo++] = (taskIndex, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
 						insertTo %= max;
 					}
 					count = (max + insertTo - index) % max;
@@ -415,23 +488,24 @@ internal class FractalGenerator {
 					// more parallels to compute
 					var tasksRemaining = true;
 					while (tasksRemaining) {
-						if (FinishTask(applyMaxGenerationTasks))
-							TryGif(applyMaxGenerationTasks);
+						var gif = tasks[applyMaxGenerationTasks];
+						if (gif.FinishTask())
+							TryGif(gif);
 						tasksRemaining = false;
 						// Check every task
-						for (var task = 0; task < applyMaxGenerationTasks; ++task) {
-							if (FinishTask(task)) {
-								if (parallelTaskFinished[task] >= 2 && count > 0 && !cancel.Token.IsCancellationRequested) {
+						for (var t = 0; t < applyMaxGenerationTasks; ++t) {
+							var task = tasks[t];
+							if (task.FinishTask()) {
+								if (task.state >= 2 && count > 0 && !cancel.Token.IsCancellationRequested) {
 									// Start another task when previous was finished
-									parallelTaskFinished[task] = 0;
-									var taskindex = task;
+									task.state = 0;
+									var taskindex = t;
 									var tupleIndex = index++;
-									Start(task);
-									//parallelTasks[task] = Task.Run(() => Task_OfDepth(R, t, i));
-									parallelTasks[task] = Task.Run(() => {
-										(var inXY, var inAngle, var inColor, var inFlags, var inDepth) = tuples[tupleIndex];
-										GenerateDots_SingleTask(R, inXY, inAngle, inColor, inFlags, inDepth);
-										parallelTaskFinished[taskindex] = 1;
+									task.Start();
+									task.task = Task.Run(() => {
+										(var taskIndex, var inXY, var inAngle, var inColor, var inFlags, var inDepth) = tuples[tupleIndex];
+										GenerateDots_SingleTask(taskIndex, inXY, inAngle, inColor, inFlags, inDepth);
+										tasks[taskIndex].state = 1;
 									});
 									index %= max;
 									count = (max + insertTo - index) % max;
@@ -442,17 +516,16 @@ internal class FractalGenerator {
 					}
 				}
 			}
-			void GenerateDots_OfRecursion(VecRefWrapper R,
+			void GenerateDots_OfRecursion(short taskIndex,
 				(float, float) inXY, (float, float) inAngle,
 				byte inColor, int inFlags, byte inDepth
 			) {
-				var preIterated = R.preIterate[inDepth];
-				if (preIterated.Item1 < detail) {
-					ApplyDot(R, inXY.Item1, inXY.Item2, preIterated.Item2, inColor);
+				var task = tasks[taskIndex];
+				var preIterated = task.preIterate[inDepth];
+				if (ApplyDot(preIterated.Item1 < selectDetail, task, inXY.Item1, inXY.Item2, preIterated.Item2, inColor))
 					return;
-				}
 				// Split Iteration Deeper
-				var newPreIterated = R.preIterate[++inDepth];
+				var newPreIterated = task.preIterate[++inDepth];
 				var i = f.childCount;
 				while (0 <= --i) {
 					if (cancel.Token.IsCancellationRequested)
@@ -467,11 +540,8 @@ internal class FractalGenerator {
 					if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1)) {
 						if (imageTasks != null && imageTasks.Count < applyMaxGenerationTasks && inDepth < maxDepth) {
 							int index = i;
-							imageTasks.Add(Task.Run(() => GenerateDots_OfRecursion(R, newXY, index == 0 ? (inAngle.Item1 + childAngle[index] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[index], inAngle.Item2), (byte)((inColor + childColor[index]) % 3), newFlags, inDepth)));
-						}
-							
-						else
-							GenerateDots_OfRecursion(R, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
+							imageTasks.Add(Task.Run(() => GenerateDots_OfRecursion(taskIndex, newXY, index == 0 ? (inAngle.Item1 + childAngle[index] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[index], inAngle.Item2), (byte)((inColor + childColor[index]) % 3), newFlags, inDepth)));
+						} else GenerateDots_OfRecursion(taskIndex, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
 					}
 				}
 			}
@@ -509,13 +579,15 @@ internal class FractalGenerator {
 			initTime.Start();
 #endif
 			// Init buffer with zeroes
-			var bufferIndex = (short)(taskIndex % applyMaxTasks);
-			var buffT = buffer[bufferIndex];
-			for (var y = 0; y < height; ++y) {
+			var taskIndex = (short)(stateIndex % applyMaxTasks);
+			var state = tasks[stateIndex];
+			var task = tasks[taskIndex];
+			var buffT = task.buffer;
+			for (var y = 0; y < selectHeight; ++y) {
 				var buffY = buffT[y];
-				for (var x = 0; x < width; buffY[x++] = Vector3.Zero) ;
+				for (var x = 0; x < selectWidth; buffY[x++] = Vector3.Zero) ;
 			}
-			var voidT = voidDepth[bufferIndex];
+			var voidT = task.voidDepth;
 #if CUSTOMDEBUG
 			initTime.Stop();
 			Log(ref threadString, "Init:" + bitmapIndex + " time = " + initTime.Elapsed.TotalMilliseconds + " ms.");
@@ -524,23 +596,22 @@ internal class FractalGenerator {
 #endif
 			// Generate the fractal frame recursively
 			if (cancel.Token.IsCancellationRequested) {
-				parallelTaskFinished[taskIndex] = 2;
+				state.state = 2;
 				return;
 			}
-			var R = new VecRefWrapper(buffT, Vector3.Zero, Vector3.Zero);
 			for (var b = 0; b < selectBlur; ++b) {
 				ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 				// Preiterate values that change the same way as iteration goes deeper, so they only get calculated once
-				R.preIterate = preIterate[bufferIndex];
+				var preIterateTask = task.preIterate;
 				float inSize = size;
 				for (int i = 0; i < maxIterations; ++i) {
-					R.preIterate[i].Item2 = (float)Math.Log(detail / (R.preIterate[i].Item1 = inSize)) / logBase;
+					preIterateTask[i].Item2 = (float)Math.Log(selectDetail / (preIterateTask[i].Item1 = inSize)) / logBase;
 					//var inDetail = inSize;
-					var inDetail = -inSize * Math.Max(-1, R.preIterate[i].Item2 = (float)Math.Log(detail / (R.preIterate[i].Item1 = inSize)) / logBase);
-					if (R.preIterate[i].Item3 == null || R.preIterate[i].Item3.Length < f.childCount)
-						R.preIterate[i].Item3 = new (float, float)[f.childCount];
+					var inDetail = -inSize * Math.Max(-1, preIterateTask[i].Item2 = (float)Math.Log(selectDetail / (preIterateTask[i].Item1 = inSize)) / logBase);
+					if (preIterateTask[i].Item3 == null || preIterateTask[i].Item3.Length < f.childCount)
+						preIterateTask[i].Item3 = new (float, float)[f.childCount];
 					for (int c = 0; c < f.childCount; ++c)
-						R.preIterate[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
+						preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					inSize /= f.childSize;
 				}
 				
@@ -549,30 +620,30 @@ internal class FractalGenerator {
 				var lerp = hueAngle % 1.0f;
 				switch ((byte)hueAngle % 3) {
 					case 0:
-						R.I = Vector3.Lerp(Vector3.UnitX, Vector3.UnitY, lerp);
-						R.H = Vector3.Lerp(colorBlend, new Vector3(colorBlend.Z, colorBlend.X, colorBlend.Y), lerp);
+						task.I = Vector3.Lerp(Vector3.UnitX, Vector3.UnitY, lerp);
+						task.H = Vector3.Lerp(colorBlend, new Vector3(colorBlend.Z, colorBlend.X, colorBlend.Y), lerp);
 						break;
 					case 1:
-						R.I = Vector3.Lerp(Vector3.UnitY, Vector3.UnitZ, lerp);
-						R.H = Vector3.Lerp(new Vector3(colorBlend.Z, colorBlend.X, colorBlend.Y), new Vector3(colorBlend.Y, colorBlend.Z, colorBlend.X), lerp);
+						task.I = Vector3.Lerp(Vector3.UnitY, Vector3.UnitZ, lerp);
+						task.H = Vector3.Lerp(new Vector3(colorBlend.Z, colorBlend.X, colorBlend.Y), new Vector3(colorBlend.Y, colorBlend.Z, colorBlend.X), lerp);
 						break;
 					case 2:
-						R.I = Vector3.Lerp(Vector3.UnitZ, Vector3.UnitX, lerp);
-						R.H = Vector3.Lerp(new Vector3(colorBlend.Y, colorBlend.Z, colorBlend.X), colorBlend, lerp);
+						task.I = Vector3.Lerp(Vector3.UnitZ, Vector3.UnitX, lerp);
+						task.H = Vector3.Lerp(new Vector3(colorBlend.Y, colorBlend.Z, colorBlend.X), colorBlend, lerp);
 						break;
 				}
 				if (applyMaxGenerationTasks <= 1)
-					GenerateDots_SingleTask(R, (width * .5f, height * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, -selectCutparam, 0);
+					GenerateDots_SingleTask(taskIndex, (selectWidth * .5f, selectHeight * .5f), (angle, spin > 1 ? 2 * angle : 0), color, -applyCutparam, 0);
 				else switch (applyParallelType) {
 						case 0:
-							GenerateDots_SingleTask(R, (width * .5f, height * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, -selectCutparam, 0);
+							GenerateDots_SingleTask(taskIndex, (selectWidth * .5f, selectHeight * .5f), (angle, spin > 1 ? 2 * angle : 0), color, -applyCutparam, 0);
 							break;
 						case 1:
-							tuples[0] = ((width * .5f, height * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, -selectCutparam, 0);
-							GenerateDots_OfDepth(R);
+							tuples[0] = (0, (selectWidth * .5f, selectHeight * .5f), (angle, spin > 1 ? 2 * angle : 0), color, -applyCutparam, 0);
+							GenerateDots_OfDepth();
 							break;
 						case 2:
-							GenerateDots_OfRecursion(R, (width * .5f, height * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, -selectCutparam, 0);
+							GenerateDots_OfRecursion(taskIndex, (selectWidth * .5f, selectHeight * .5f), (angle, spin > 1 ? 2 * angle : 0), color, -applyCutparam, 0);
 							if (imageTasks == null)
 								return;
 							// Wait for image parallelism threads to complete
@@ -595,7 +666,7 @@ internal class FractalGenerator {
 					}
 				IncrFrameParameters(ref size, ref angle, spin, ref hueAngle, selectBlur);
 				if (cancel.Token.IsCancellationRequested) {
-					parallelTaskFinished[taskIndex] = 2;
+					state.state = 2;
 					return;
 				}
 			}
@@ -607,14 +678,14 @@ internal class FractalGenerator {
 #endif
 			// Generate the grey void areas
 			float lightNormalizer = 0.1f, voidDepthMax = 1.0f;
-			var queueT = voidQueue[bufferIndex];
-			short voidYX, w1 = (short)(width - 1), h1 = (short)(height - 1);
+			var queueT = task.voidQueue;
+			short voidYX, w1 = (short)(selectWidth - 1), h1 = (short)(selectHeight - 1);
 			if (selectAmbient > 0) {
 				// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
 				float lightMax;
 				for (short y = 1; y < h1; ++y) {
 					if (cancel.Token.IsCancellationRequested) {
-						parallelTaskFinished[taskIndex] = 2;
+						state.state = 2;
 						queueT.Clear();
 						return;
 					}
@@ -634,7 +705,7 @@ internal class FractalGenerator {
 				}
 				var void0 = voidT[0];
 				var voidH = voidT[h1];
-				for (short x = 0; x < width; ++x) {
+				for (short x = 0; x < selectWidth; ++x) {
 					void0[x] = voidH[x] = 0;
 					queueT.Enqueue((0, x));
 					queueT.Enqueue((h1, x));
@@ -645,27 +716,27 @@ internal class FractalGenerator {
 					(var y, var x) = queueT.Dequeue();
 					short ym = (short)(y - 1), yp = (short)(y + 1), xm = (short)(x - 1), xp = (short)(x + 1);
 					voidMax = Math.Max(voidMax, voidYX = (short)(voidT[y][x] + 1));
-					if (xp < width && voidT[y][xp] == -1) { voidT[y][xp] = voidYX; queueT.Enqueue((y, xp)); }
-					if (yp < height && voidT[yp][x] == -1) { voidT[yp][x] = voidYX; queueT.Enqueue((yp, x)); }
+					if (xp < selectWidth && voidT[y][xp] == -1) { voidT[y][xp] = voidYX; queueT.Enqueue((y, xp)); }
+					if (yp < selectHeight && voidT[yp][x] == -1) { voidT[yp][x] = voidYX; queueT.Enqueue((yp, x)); }
 					if (xm >= 0 && voidT[y][xm] == -1) { voidT[y][xm] = voidYX; queueT.Enqueue((y, xm)); }
 					if (ym >= 0 && voidT[ym][x] == -1) { voidT[ym][x] = voidYX; queueT.Enqueue((ym, x)); }
 				}
 				voidDepthMax = voidMax;
 			} else
-				for (short y = 0; y < height; ++y) {
+				for (short y = 0; y < selectHeight; ++y) {
 					if (cancel.Token.IsCancellationRequested) {
-						parallelTaskFinished[taskIndex] = 2;
+						state.state = 2;
 						return;
 					}
 					var buffY = buffT[y];
-					for (short x = 0; x < width; ++x) {
+					for (short x = 0; x < selectWidth; ++x) {
 						var buffYX = buffY[x];
 						lightNormalizer = MathF.Max(lightNormalizer, MathF.Max(buffYX.X, MathF.Max(buffYX.Y, buffYX.Z)));
 					}
 				}
 			lightNormalizer = selectBrightness * 2.55f / lightNormalizer;
 			if (cancel.Token.IsCancellationRequested) {
-				parallelTaskFinished[taskIndex] = 2;
+				state.state = 2;
 				return;
 			}
 #if CUSTOMDEBUG
@@ -677,17 +748,17 @@ internal class FractalGenerator {
 			// Draw the generated pixel to bitmap data
 			//GenerateBitmap(bitmapIndex, buffT, voidT, lightNormalizer, voidDepthMax);
 			unsafe {
-				[MethodImpl(MethodImplOptions.AggressiveInlining)] Vector3 Normalize(Vector3 pixel, float lightNormalizer) {
-					//pixel = lightNormalizer * pixel;
-					float max = MathF.Max(pixel.X, MathF.Max(pixel.Y, pixel.Z)) / 254.0f;
-					return lightNormalizer * max > 1.0f ? (1.0f / max) * pixel : lightNormalizer * pixel;
+				Vector3 Normalize(Vector3 pixel, float lightNormalizer) {
+					//float max = MathF.Max(pixel.X, MathF.Max(pixel.Y, pixel.Z)) / 254.0f;
+					//return lightNormalizer * max > 1.0f ? (1.0f / max) * pixel : lightNormalizer * pixel;
+					float max = MathF.Max(pixel.X, MathF.Max(pixel.Y, pixel.Z));
+					return lightNormalizer * max > 254.0f ? (254.0f / max) * pixel : lightNormalizer * pixel;
 				}
-
 				[MethodImpl(MethodImplOptions.AggressiveInlining)]
 				void NoiseSaturate(Vector3[] buffY, short[] voidY, ref byte* p, Random rand, float lightNormalizer, float voidDepthMax) {
 					if (selectAmbient <= 0)
-						for (var x = 0; x < width; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
-					else for (var x = 0; x < width; ++x) {
+						for (var x = 0; x < selectWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
+					else for (var x = 0; x < selectWidth; ++x) {
 							var voidAmb = voidY[x] / voidDepthMax;
 							ApplyRGBToBytePointer(ApplyAmbientNoise(ApplySaturate(Normalize(buffY[x], lightNormalizer)), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb, rand), ref p);
 						}
@@ -695,8 +766,8 @@ internal class FractalGenerator {
 				[MethodImpl(MethodImplOptions.AggressiveInlining)]
 				void NoiseNoSaturate(Vector3[] buffY, short[] voidY, ref byte* p, Random rand, float lightNormalizer, float voidDepthMax) {
 					if (selectAmbient <= 0)
-						for (var x = 0; x < width; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), ref p)) ;
-					else for (var x = 0; x < width; x++) {
+						for (var x = 0; x < selectWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), ref p)) ;
+					else for (var x = 0; x < selectWidth; x++) {
 							var voidAmb = voidY[x] / voidDepthMax;
 							ApplyRGBToBytePointer(ApplyAmbientNoise(Normalize(buffY[x], lightNormalizer), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb, rand), ref p);
 						}
@@ -704,19 +775,19 @@ internal class FractalGenerator {
 				[MethodImpl(MethodImplOptions.AggressiveInlining)]
 				void NoNoiseSaturate(Vector3[] buffY, short[] voidY, ref byte* p, float lightNormalizer, float voidDepthMax) {
 					if (selectAmbient <= 0)
-						for (var x = 0; x < width; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
-					else for (var x = 0; x < width; ++x)
+						for (var x = 0; x < selectWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
+					else for (var x = 0; x < selectWidth; ++x)
 							ApplyRGBToBytePointer(new Vector3(selectAmbient * voidY[x] / voidDepthMax) + ApplySaturate(Normalize(buffY[x], lightNormalizer)), ref p);
 				}
 				[MethodImpl(MethodImplOptions.AggressiveInlining)]
 				void NoNoiseNoSaturate(Vector3[] buffY, short[] voidY, ref byte* p, float lightNormalizer, float voidDepthMax) {
-					if (selectAmbient <= 0) for (var x = 0; x < width; x++)
+					if (selectAmbient <= 0) for (var x = 0; x < selectWidth; x++)
 							ApplyRGBToBytePointer(Normalize(buffY[x], lightNormalizer), ref p);
-					else for (var x = 0; x < width; x++)
+					else for (var x = 0; x < selectWidth; x++)
 							ApplyRGBToBytePointer(new Vector3(selectAmbient * voidY[x] / voidDepthMax) + Normalize(buffY[x], lightNormalizer), ref p);
 				}
 				// Make a locked bitmap, remember the locked state
-				var p = (byte*)(void*)(bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = new(width, height)).LockBits(rect,
+				var p = (byte*)(void*)(bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = new(selectWidth, selectHeight)).LockBits(rect,
 					ImageLockMode.WriteOnly,
 					System.Drawing.Imaging.PixelFormat.Format24bppRgb)).Scan0;
 				bitmapState[bitmapIndex] = 1;
@@ -724,7 +795,7 @@ internal class FractalGenerator {
 				// Switch between th selected settings such as saturation, noise, image parallelism...
 				if (applyParallelType > 0 && applyMaxGenerationTasks > 1) {
 					// Multi Threaded
-					var stride = 3 * width;
+					var stride = 3 * selectWidth;
 					var po = new ParallelOptions {
 						MaxDegreeOfParallelism = applyMaxGenerationTasks,
 						CancellationToken = cancel.Token
@@ -732,20 +803,20 @@ internal class FractalGenerator {
 					try {
 						if (ambnoise > 0) {
 							var threadRand = new ThreadLocal<Random>(() => new(Guid.NewGuid().GetHashCode()));
-							if (selectSaturate > 0.0) Parallel.For(0, height, po, y => {
+							if (selectSaturate > 0.0) Parallel.For(0, selectHeight, po, y => {
 								var rp = p + y * stride;
 								NoiseSaturate(buffT[y], voidT[y], ref rp, threadRand.Value, lightNormalizer, voidDepthMax);
 							});
-							else Parallel.For(0, height, po, y => {
+							else Parallel.For(0, selectHeight, po, y => {
 								var rp = p + y * stride;
 								NoiseNoSaturate(buffT[y], voidT[y], ref rp, threadRand.Value, lightNormalizer, voidDepthMax);
 							});
 						} else {
-							if (selectSaturate > 0.0) Parallel.For(0, height, po, y => {
+							if (selectSaturate > 0.0) Parallel.For(0, selectHeight, po, y => {
 								var rp = p + y * stride;
 								NoNoiseSaturate(buffT[y], voidT[y], ref rp, lightNormalizer, voidDepthMax);
 							});
-							else Parallel.For(0, height, po, y => {
+							else Parallel.For(0, selectHeight, po, y => {
 								var rp = p + y * stride;
 								NoNoiseNoSaturate(buffT[y], voidT[y], ref rp, lightNormalizer, voidDepthMax);
 							});
@@ -754,23 +825,23 @@ internal class FractalGenerator {
 				} else {
 					// Single Threaded
 					if (ambnoise > 0) {
-						if (selectSaturate > 0.0) for (short y = 0; y < height; ++y) {
+						if (selectSaturate > 0.0) for (short y = 0; y < selectHeight; ++y) {
 								if (cancel.Token.IsCancellationRequested)
 									continue;
 								NoiseSaturate(buffT[y], voidT[y], ref p, random, lightNormalizer, voidDepthMax);
 							}
-						else for (short y = 0; y < height; ++y) {
+						else for (short y = 0; y < selectHeight; ++y) {
 								if (cancel.Token.IsCancellationRequested)
 									continue;
 								NoiseNoSaturate(buffT[y], voidT[y], ref p, random, lightNormalizer, voidDepthMax);
 							}
 					} else {
-						if (selectSaturate > 0.0) for (short y = 0; y < height; ++y) {
+						if (selectSaturate > 0.0) for (short y = 0; y < selectHeight; ++y) {
 								if (cancel.Token.IsCancellationRequested)
 									continue;
 								NoNoiseSaturate(buffT[y], voidT[y], ref p, lightNormalizer, voidDepthMax);
 							}
-						else for (short y = 0; y < height; ++y) {
+						else for (short y = 0; y < selectHeight; ++y) {
 								if (cancel.Token.IsCancellationRequested)
 									continue;
 								NoNoiseNoSaturate(buffT[y], voidT[y], ref p, lightNormalizer, voidDepthMax);
@@ -793,16 +864,10 @@ internal class FractalGenerator {
 #endif
 			// Lets the generator know it's finished so it can encode gif it it's allowed to, if not it just lets the form know it can diplay it
 			bitmapState[bitmapIndex] = 2;
-			parallelTaskFinished[taskIndex] = 1;
+			state.state = 1;
 		}
-		bool FinishTask(int taskIndex) {
-			if (parallelTaskFinished[taskIndex] == 1) {
-				Join(taskIndex);
-				parallelTaskFinished[taskIndex] = 2;
-			}
-			return parallelTaskFinished[taskIndex] >= 2;
-		}
-		void TryGif(short taskIndex) {
+		
+		void TryGif(FractalTask task) {
 			if (bitmapState[bitmapsFinished] != 2)
 				return;
 			if (gifEncoder != null
@@ -811,13 +876,13 @@ internal class FractalGenerator {
 				&& selectMaxTasks == applyMaxTasks
 			) {
 				exportingGif = true;
-				parallelTaskFinished[taskIndex] = 0;
+				task.state = 0;
 				bitmapState[bitmapsFinished] = 3;
-				Start(taskIndex);
-				parallelTasks[taskIndex] = Task.Run(() => {
+				task.Start();
+				task.task = Task.Run(() => {
 					// Sequentially encode a finished GIF frame, then unlock the bitmap data
 					if (cancel.Token.IsCancellationRequested) {
-						parallelTaskFinished[taskIndex] = 2;
+						task.state = 2;
 						return;
 					}
 #if CUSTOMDEBUG
@@ -825,7 +890,7 @@ internal class FractalGenerator {
 #endif
 					unsafe {
 						// Save Frame to a temp GIF
-						if (encode >= 2
+						if (selectEncode >= 2
 						&& !cancel.Token.IsCancellationRequested
 						&& gifEncoder != null
 						&& !gifEncoder.AddFrame(cancel.Token, (byte*)(void*)bitmapData[bitmapsFinished].Scan0)) {
@@ -846,40 +911,21 @@ internal class FractalGenerator {
 					bitmapState[bitmapsFinished++] = 4;
 					//}
 					exportingGif = false;
-					parallelTaskFinished[taskIndex] = 1;
+					task.state = 1;
 				});
 			} else {
 				bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
 				bitmapState[bitmapsFinished++] = 4;
 			}
 		}
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		void Join(int i) {
-			if (taskStarted[i]) {
-				if (parallelTasks[i] != null) {
-					parallelTasks[i].Wait();
-					parallelTasks[i] = null;
-				}// else { }
-			}// else { }
-			taskStarted[i] = false;
-		}
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		void Start(int i) {
-			if (taskStarted[i]) {
-				if (parallelTasks[i] != null) {
-					parallelTasks[i].Wait();
-					parallelTasks[i] = null;
-				}// else { }
-			}// else { }
-			taskStarted[i] = true;
-		}
+		
 		#endregion
 		#region AnimationParams
 		void IncrFrameParameters(ref float size, ref float angle, float spin, ref float hueAngle, short blur) {
 			var blurPeriod = selectPeriod * blur;
 			// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
 			angle += spin * (periodAngle * (1 + selectExtraSpin)) / (finalPeriodMultiplier * blurPeriod);
-			hueAngle += (hueCycleMultiplier + 3 * selectExtraHue) * (float)selectHueCycle / (finalPeriodMultiplier * blurPeriod);
+			hueAngle += (hueCycleMultiplier + 3 * selectExtraHue) * (float)applyHueCycle / (finalPeriodMultiplier * blurPeriod);
 			IncFrameSize(ref size, blurPeriod);
 		}
 		void ModFrameParameters(ref float size, ref float angle, ref short spin, ref float hueAngle, ref byte color) {
@@ -889,10 +935,10 @@ internal class FractalGenerator {
 					angle = -angle;
 					spin = (short)-spin;
 				}
-				color = (byte)((3 + color + selectZoom * childColor[0]) % 3);
+				color = (byte)((3 + color + applyZoom * childColor[0]) % 3);
 			}
 			var fp = f.childSize;
-			var w = Math.Max(width, height) * f.maxSize;
+			var w = Math.Max(selectWidth, selectHeight) * f.maxSize;
 			// Zoom Rotation
 			while (angle > Math.PI * 2)
 				angle -= (float)Math.PI * 2;
@@ -917,7 +963,7 @@ internal class FractalGenerator {
 
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		void IncFrameSize(ref float size, int period) => size *= MathF.Pow(f.childSize, selectZoom * 1.0f / period);
+		void IncFrameSize(ref float size, int period) => size *= MathF.Pow(f.childSize, applyZoom * 1.0f / period);
 		#endregion
 #if CUSTOMDEBUG
 		// Start a new DebugLog
@@ -932,15 +978,15 @@ internal class FractalGenerator {
 		// Open a temp file to presave GIF to - Use AnimatedGifEncoder
 		exportingGif = gifSuccess = false;
 		gifEncoder = null;
-		if (encode >= 2) {
+		if (selectEncode >= 2) {
 			gifEncoder = new();
-			gifEncoder.SetDelay(delay); // Framerate
+			gifEncoder.SetDelay(selectDelay); // Framerate
 			gifEncoder.SetRepeat(0);    // Loop
 			gifEncoder.SetQuality(1);   // Highest quality
 			byte gifIndex = 0;
 			while (gifIndex < 255) {
 				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
-				if (!gifEncoder.Start(gifTempPath, width, height)) {
+				if (!gifEncoder.Start(gifTempPath, selectWidth, selectHeight)) {
 #if CUSTOMDEBUG
 					Log(ref logString, "Error opening gif file.");
 #endif
@@ -954,57 +1000,67 @@ internal class FractalGenerator {
 		// Initialize the starting default animation values
 		float size = 2400, angle = selectDefaultAngle * (float)Math.PI / 180.0f, hueAngle = selectDefaultHue / 120.0f;
 		byte color = 0;
-		widthBorder = (short)(width - 2);
-		heightBorder = (short)(height - 2);
+		widthBorder = (short)(selectWidth - 2);
+		heightBorder = (short)(selectHeight - 2);
 		bloom1 = selectBloom + 1;
 		upleftStart = -selectBloom;
 		rightEnd = widthBorder + bloom1;
 		downEnd = heightBorder + bloom1;
 		ambnoise = (short)(selectAmbient * selectNoise);
-		var spin = selectDefaultSpin;
+		var spin = selectSpin < -1 ? (short)random.Next(-1, 3) : selectSpin;
 		ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
-		for (var i = selectDefaultZoom; 0 <= --i; IncFrameSize(ref size, selectPeriod)) ;
+		for (var i = selectDefaultZoom < 0 ? random.Next(0, selectPeriod * finalPeriodMultiplier) : (selectDefaultZoom % (selectPeriod * finalPeriodMultiplier)); 0 <= --i; IncFrameSize(ref size, selectPeriod)) ;
 		// Generate the images
 		while (!cancel.Token.IsCancellationRequested && bitmapsFinished < bitmap.Length) {
 			// Initialize buffers (delete and reset if size changed)
-			applyMaxGenerationTasks = maxGenerationTasks;
+			applyMaxGenerationTasks = selectMaxGenerationTasks;
 			var batchTasks = Math.Max((short)1, applyMaxTasks = selectMaxTasks);
 			if (batchTasks != allocatedTasks) {
 				if (allocatedTasks >= 0)
-					for (var t = 0; t < allocatedTasks; ++t)
-						if (taskStarted[t])
-							Join(t);
-				rect = new(0, 0, allocatedWidth = width, allocatedHeight = height);
-				tuples = new ((float, float), (float, float), byte, int, byte)[Math.Max(1, applyMaxGenerationTasks * 8)];
-				voidDepth = new short[batchTasks][][];
-				voidQueue = new Queue<(short, short)>[batchTasks];
-				parallelTasks = new Task[batchTasks + 1];
-				taskStarted = new bool[batchTasks + 1];
-				parallelTaskFinished = new byte[batchTasks + 1];
-				buffer = new Vector3[allocatedTasks = batchTasks][][];
-				for (short t = 0; t < batchTasks; t = NewBuffer(t))
-					voidQueue[t] = new();
-				for (var t = 0; t <= batchTasks; parallelTaskFinished[t++] = 2) ;
-			}
-			if (height != allocatedHeight) {
-				for (short t = 0; t < batchTasks; t = NewBuffer(t)) ;
-				rect = new(0, 0, allocatedWidth = width, allocatedHeight = height);
-			}
-			if (width != allocatedWidth) {
-				for (var t = 0; t < batchTasks; ++t) {
-					var voidT = voidDepth[t];
-					var buffT = buffer[t];
-					for (short y = 0; y < height; voidT[y++] = new short[width])
-						buffT[y] = new Vector3[width];
+					for (var t = 0; t < allocatedTasks; ++t) {
+						var task = tasks[t];
+						if (task.taskStarted)
+							task.Join();
+					}
+				rect = new(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
+				tasks = new FractalTask[(allocatedTasks = batchTasks) + 2];
+				tuples = new (short, (float, float), (float, float), byte, int, byte)[applyMaxGenerationTasks * 8];
+				//voidDepth = new short[batchTasks][][];
+				//voidQueue = new Queue<(short, short)>[batchTasks];
+				//parallelTasks = new Task[batchTasks + 1];
+				//taskStarted = new bool[batchTasks + 1];
+				//parallelTaskFinished = new byte[batchTasks + 1];
+				//buffer = new Vector3[allocatedTasks = batchTasks][][];
+
+				for (short t = 0; t < allocatedTasks; ++t) {
+					var task = tasks[t] = new FractalTask();
+					task.voidDepth = new short[batchTasks][];
+					task.buffer = new Vector3[batchTasks][];
+					task.index = t;
+					NewBuffer(task);
 				}
-				rect = new(0, 0, allocatedWidth = width, height);
+				SetMaxIterations(true);
 			}
-			var generateLength = encode > 0 ? bitmap.Length : 1;
+			if (selectHeight != allocatedHeight) {
+				for (short t = 0; t < batchTasks; NewBuffer(tasks[t++])) ;
+				rect = new(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
+			}
+			if (selectWidth != allocatedWidth) {
+				for (short t = 0; t < batchTasks; ++t) {
+					var task = tasks[t];
+					var buffT = task.buffer;
+					var voidT = task.voidDepth;
+					for (short y = 0; y < selectHeight; voidT[y++] = new short[selectWidth]) 
+						buffT[y] = new Vector3[selectWidth];	
+				}
+				rect = new(0, 0, allocatedWidth = selectWidth, selectHeight);
+			}
+			var generateLength = selectEncode > 0 ? bitmap.Length : 1;
 			// Wait if no more frames to generate
 			if (bitmapsFinished >= generateLength)
 				continue;
 			// Image parallelism
-			imageTasks = (applyParallelType = parallelType) == 2 ? [] : null;
+			imageTasks = (applyParallelType = selectParallelType) == 2 ? [] : null;
 			// Animation Parallelism Task Count
 			var animationTaskCount = applyParallelType > 0 ? (short)0 : Math.Min(batchTasks, (short)generateLength);
 			if (animationTaskCount <= 1) {
@@ -1013,34 +1069,35 @@ internal class FractalGenerator {
 					ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 					GenerateImage(nextBitmap++, batchTasks, size, angle, spin, hueAngle, color);
 					IncrFrameParameters(ref size, ref angle, spin, ref hueAngle, 1);
-					parallelTaskFinished[batchTasks] = 2;
+					tasks[batchTasks].state = 2;
 				}
-				var gifTaskIndex = Math.Max((short)0, applyMaxGenerationTasks);
-				if (FinishTask(gifTaskIndex))
-					TryGif(gifTaskIndex);
+				var gif = tasks[applyMaxGenerationTasks];
+				if (gif.FinishTask())
+					TryGif(gif);
 			} else {
 				// Animation parallelism: Continue/Finish Animation and Gif tasks
 				var tasksRemaining = true;
 				while (tasksRemaining) {
 					tasksRemaining = false;
 					// Check every task
-					for (var task = 0; task < batchTasks; ++task) {
-						if (FinishTask(task)) {
-							TryGif((short)task);
-							if (parallelTaskFinished[task] >= 2 && nextBitmap < generateLength && !cancel.Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks) {
+					for (var t = 0; t < batchTasks; ++t) {
+						var task = tasks[t];
+						if (task.FinishTask()) {
+							TryGif(task);
+							if (task.state >= 2 && nextBitmap < generateLength && !cancel.Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks) {
 								// Start another task when previous was finished
-								parallelTaskFinished[task] = 0;
+								task.state = 0;
 								ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 								var _bitmap = nextBitmap++;
-								var _task = (short)task;
+								var _task = (short)t;
 								var _size = size;
 								var _angle = angle;
 								var _spin = spin;
 								var _hueAngle = hueAngle;
 								var _color = color;
 								//GenerateThread(_bitmap, _task, _size, _angle, _hueAngle, _color);
-								Start(_task);
-								parallelTasks[_task] = Task.Run(() => GenerateImage(_bitmap, _task, _size, _angle, _spin, _hueAngle, _color));
+								task.Start();
+								task.task = Task.Run(() => GenerateImage(_bitmap, _task, _size, _angle, _spin, _hueAngle, _color));
 								tasksRemaining = true; // A task finished, but started another one - keep checking before new master loop
 								IncrFrameParameters(ref size, ref angle, spin, ref hueAngle, 1);
 							}
@@ -1050,17 +1107,17 @@ internal class FractalGenerator {
 			}
 		}
 		// Wait for threads to finish
-		for (var i = allocatedTasks; 0 <= --i; Join(i)) ;
+		for (var t = allocatedTasks; 0 <= --t; tasks[t].Join()) ;
 		// Unlock unfinished bitmaps:
-		for (var i = 0; i < bitmap.Length; ++i)
-			if (bitmapState[i] is > 0 and < 4) {
+		for (var b = 0; b < bitmap.Length; ++b)
+			if (bitmapState[b] is > 0 and < 4) {
 				try {
 					//bitmapState[bitmapsFinished] = 4;
-					bitmap[i]?.UnlockBits(bitmapData[i]);
+					bitmap[b]?.UnlockBits(bitmapData[b]);
 				} catch (Exception) { }
 			}
 		// Save the temp GIF file
-		if (encode >= 2 && gifEncoder != null && gifEncoder.Finish())
+		if (selectEncode >= 2 && gifEncoder != null && gifEncoder.Finish())
 			gifSuccess = true;
 #if CUSTOMDEBUG
 		else Log(ref logString, "Error closing gif file.");
@@ -1085,10 +1142,15 @@ internal class FractalGenerator {
 	// start the generator in a separate main thread so that the form can continue being responsive
 	internal void StartGenerate() => mainTask = Task.Run(GenerateAnimation, (cancel = new()).Token);
 	internal void ResetGenerator() {
-		finalPeriodMultiplier = GetFinalPeriod();
+		applyZoom = (short)(selectZoom != 0 ? selectZoom : random.NextDouble() < .5f ? -1 : 1);
+		applyCutparam = selectCutparam < 0 ? (short)random.Next(0, cutparamMaximum) : selectCutparam;
+		SetupColor();
+		// Get the multiplier of the basic period required to get to a seamless loop
+		var m = applyHueCycle == 0 && childColor[0] > 0 ? selectPeriodMultiplier * 3 : selectPeriodMultiplier;
+		finalPeriodMultiplier = (short)(Math.Abs(selectSpin) > 1 || selectSpin == 0 && childAngle[0] < 2 * Math.PI ? 2 * m : m);
 		// A complex expression to calculate the minimum needed hue shift speed to match the loop:
-		hueCycleMultiplier = (byte)(selectHueCycle == 0 ? 0 : childColor[0] % 3 == 0 ? 2 : 1 +
-				(childColor[0] % 3 == 1 == (1 == selectHueCycle) == (1 == selectZoom) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3
+		hueCycleMultiplier = (byte)(applyHueCycle == 0 ? 0 : childColor[0] % 3 == 0 ? 2 : 1 +
+				(childColor[0] % 3 == 1 == (1 == applyHueCycle) == (1 == applyZoom) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3
 		);
 		// setup bitmap data
 		bitmapsFinished = nextBitmap = 0;
@@ -1145,80 +1207,67 @@ internal class FractalGenerator {
 		SelectFractal(1);
 		SelectThreadingDepth();
 		selectPeriod = debug = 7;
-		width = 8;//1920;
-		height = 8;//1080;
-		parallelType = 1;
+		selectWidth = 8;//1920;
+		selectHeight = 8;//1080;
+		selectParallelType = 1;
 		maxDepth = -1;//= 2;
-		maxGenerationTasks = selectMaxTasks = -1;// 10;
+		selectMaxGenerationTasks = selectMaxTasks = -1;// 10;
 		selectSaturate = 1.0f;
-		detail = .25f;
+		selectDetail = .25f;
 		SelectThreadingDepth();
-		selectCut = selectAngle = selectColor = -1;
-		if (!SelectColor(0))
-			SetupColor();
-		SelectAngle(0);
+		selectCut = selectChildAngle = selectChildColor = 0;
+		SetupColor();
 		SetupAngle();
-		SelectCutFunction(0);
 		SetupCutFunction();
 	}
 	#endregion
 
 	#region Interface_Settings
-	internal bool SelectFractal(short select) {
-		if (this.select == select)
+	internal bool SelectFractal(short selectFractal) {
+		if (this.selectFractal == selectFractal)
 			return true;
 		// new fractal definition selected - let the form know to reset and restart me
-		this.select = select;
-		selectCut = selectAngle = selectColor = -1;
-		SelectColor(0);
-		SelectAngle(0);
-		SelectCutFunction(0);
+		this.selectFractal = selectFractal;
+		selectCut = selectChildColor = selectChildAngle = 0;
 		return false;
 	}
 	internal void SetupFractal() {
-		f = fractals[select];
+		f = fractals[selectFractal];
 		logBase = (float)Math.Log(f.childSize);
 		SetMaxIterations();
 	}
 	internal void SetMaxIterations(bool forcedReset = false) {
-		short newMaxIterations = (short)(2 + Math.Ceiling(Math.Log(Math.Max(width, height) * f.maxSize / detail) / logBase));
+		short newMaxIterations = (short)(2 + Math.Ceiling(Math.Log(Math.Max(selectWidth, selectHeight) * f.maxSize / selectDetail) / logBase));
 		if (newMaxIterations <= maxIterations && !forcedReset) {
 			maxIterations = newMaxIterations;
 			return;
 		}
-		for(int t = 0; t < selectMaxTasks; ++t)
-			preIterate[t] = new (float, float, (float, float)[])[maxIterations = newMaxIterations];
-	}
-	internal bool SelectAngle(short selectAngle) {
-		if (this.selectAngle == selectAngle)
-			return true;
-		this.selectAngle = selectAngle;
-		return false;
+		maxIterations = newMaxIterations;
+		for (int t = 0; t < allocatedTasks; ++t) {
+			var preIterateTask = tasks[t].preIterate = new (float, float, (float, float)[])[maxIterations];
+			for (int i = 0; i < maxIterations; preIterateTask[i++] = (0.0f, 0.0f, null));
+		}
 	}
 	internal void SetupAngle() {
-		childAngle = f.childAngle[selectAngle].Item2;
+		childAngle = f.childAngle[selectChildAngle].Item2;
 		periodAngle = f.childCount <= 0 ? 0 : childAngle[0] % (2.0f * (float)Math.PI);
 	}
-	internal bool SelectColor(short selectColor) {
-		if (this.selectColor == selectColor)
-			return true;
-		this.selectColor = selectColor;
-		return false;
-	}
-	internal bool SelectColorPalette(short selectColorPalette) {
-		if (this.selectColorPalette == selectColorPalette)
-			return true;
-		this.selectColorPalette = selectColorPalette;
-		return false;
-	}
 	internal void SetupColor() {
+		// Unpack the color palette and hue cycling
+		if (selectHue < 0) {
+			applyHueCycle = (short)random.Next(-1, 2);
+			applyColorPalette = (short)random.Next(0, 2);
+		} else {
+			applyHueCycle = (short)((selectHue / 2 + 1) % 3 - 1);
+			applyColorPalette = (short)(selectHue % 2);
+		}
 		// Setup colors
 		if (f.childCount > 0) {
-			var ca = f.childColor[selectColor].Item2;
+			var ca = f.childColor[selectChildColor].Item2;
 			for (var i = f.childCount; 0 <= --i; childColor[i] = ca[i]) ;
 			// Setup palette
 			for (var i = 0; i < f.childCount; ++i)
-				childColor[i] = (selectColorPalette == 0) ? childColor[i] : (byte)((3 - childColor[i]) % 3);
+				childColor[i] = (applyColorPalette == 0) ? childColor[i] : (byte)((3 - childColor[i]) % 3);
 		}
 		// Prepare subiteration color blend
 		//SetupColorBlend();
@@ -1227,29 +1276,15 @@ internal class FractalGenerator {
 			colorBlendF[childColor[i]] += 1.0f / f.childCount;
 		colorBlend = new(colorBlendF[0], colorBlendF[1], colorBlendF[2]);
 	}
-	internal bool SelectCutFunction(short selectCut) {
-		if (this.selectCut == selectCut)
-			return true;
-		this.selectCut = selectCut;
-		return false;
-	}
 	internal void SetupCutFunction() => cutFunction = f.cutFunction == null || f.cutFunction.Length <= 0 ? null : f.cutFunction[selectCut].Item2;
-	/*[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal bool SelectDetail(float detail) {
-		if (this.detail == detail * f.minSize)
-			return true;
-		// detail is different, let the form know to restart me
-		this.detail = detail * f.minSize;
-		return false;
-	}*/
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal void SelectThreadingDepth() {
-		preIterate = new (float, float, (float, float)[])[Math.Max((short)1,selectMaxTasks)][];
+		//preIterate = new (float, float, (float, float)[])[Math.Max((short)1,selectMaxTasks)][];
 		SetMaxIterations(true);
 		maxDepth = 0;
 		if (f.childCount <= 0)
 			return;
-		for (int n = 1, threadCount = 0; (threadCount += n) < maxGenerationTasks; n *= f.childCount)
+		for (int n = 1, threadCount = 0; (threadCount += n) < selectMaxGenerationTasks; n *= f.childCount)
 			++maxDepth;
 	}
 	#endregion
@@ -1258,15 +1293,9 @@ internal class FractalGenerator {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Fractal[] GetFractals() => fractals;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal Fractal GetFractal() => fractals[select];
+	internal Fractal GetFractal() => fractals[selectFractal];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Bitmap GetBitmap(int index) => bitmap == null || bitmap.Length <= index ? null : bitmap[index];
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal short GetFinalPeriod() {
-		// get the multiplier of the basic period required to get to a seamless loop
-		var m = selectHueCycle == 0 && childColor[0] > 0 ? selectPeriodMultiplier * 3 : selectPeriodMultiplier;
-		return (short)(Math.Abs(selectDefaultSpin) > 1 || selectDefaultSpin == 0 && childAngle[0] < 2 * Math.PI ? 2 * m : m);
-	}
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal int GetFrames() => bitmap == null ? 0 : bitmap.Length;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1275,6 +1304,6 @@ internal class FractalGenerator {
 	internal bool IsGifReady() => gifSuccess;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	//GetTempGif();
-	internal Fractal.CutFunction GetCutFunction() => fractals[select].cutFunction?[selectCut].Item2;
+	internal Fractal.CutFunction GetCutFunction() => fractals[selectFractal].cutFunction?[selectCut].Item2;
 	#endregion
 }

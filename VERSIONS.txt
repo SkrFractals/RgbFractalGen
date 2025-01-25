@@ -1,3 +1,9 @@
+1.83
+- restart button
+- random options
+- bugfixes and optimizations
+- resolution presets
+
 1.82
 - brightness setting
 - performance improvements
