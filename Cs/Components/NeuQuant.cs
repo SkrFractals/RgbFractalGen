@@ -49,7 +49,7 @@ namespace Gif.Components {
 		protected static readonly int prime2 = 491;
 		protected static readonly int prime3 = 487;
 		protected static readonly int prime4 = 503;
-		protected static readonly int minpicturebytes = (3 * prime4);
+		protected static readonly int minpicturebytes = 3 * prime4;
 		/* minimum size for input image */
 		/* Program Skeleton
 		   ----------------
@@ -65,42 +65,44 @@ namespace Gif.Components {
 
 		/* Network Definitions
 		   ------------------- */
-		protected static readonly int maxnetpos = (netsize - 1);
+		protected static readonly int maxnetpos = netsize - 1;
 		protected static readonly int netbiasshift = 4; /* bias for colour values */
 		protected static readonly int ncycles = 100; /* no. of learning cycles */
 
 		/* defs for freq and bias */
 		protected static readonly int intbiasshift = 16; /* bias for fractions */
-		protected static readonly int intbias = (((int)1) << intbiasshift);
+		protected static readonly int intbias = 1 << intbiasshift;
 		protected static readonly int gammashift = 10; /* gamma = 1024 */
-		protected static readonly int gamma = (((int)1) << gammashift);
+		protected static readonly int gamma = 1 << gammashift;
 		protected static readonly int betashift = 10;
-		protected static readonly int beta = (intbias >> betashift); /* beta = 1/1024 */
-		protected static readonly int betagamma = (intbias << (gammashift - betashift));
+		protected static readonly int beta = intbias >> betashift; /* beta = 1/1024 */
+		protected static readonly int betagamma = intbias << (gammashift - betashift);
 
 		/* defs for decreasing radius factor */
-		protected static readonly int initrad = (netsize >> 3); /* for 256 cols, radius starts */
+		protected static readonly int initrad = netsize >> 3; /* for 256 cols, radius starts */
 		protected static readonly int radiusbiasshift = 6; /* at 32.0 biased by 6 bits */
-		protected static readonly int radiusbias = (((int)1) << radiusbiasshift);
-		protected static readonly int initradius = (initrad * radiusbias); /* and decreases by a */
+		protected static readonly int radiusbias = 1 << radiusbiasshift;
+		protected static readonly int initradius = initrad * radiusbias; /* and decreases by a */
 		protected static readonly int radiusdec = 30; /* factor of 1/30 each cycle */
 
 		/* defs for decreasing alpha factor */
 		protected static readonly int alphabiasshift = 10; /* alpha starts at 1.0 */
-		protected static readonly int initalpha = (((int)1) << alphabiasshift);
+		protected static readonly int initalpha = 1 << alphabiasshift;
 
 		protected int alphadec; /* biased by 10 bits */
 
 		/* radbias and alpharadbias used for radpower calculation */
 		protected static readonly int radbiasshift = 8;
-		protected static readonly int radbias = (((int)1) << radbiasshift);
-		protected static readonly int alpharadbshift = (alphabiasshift + radbiasshift);
-		protected static readonly int alpharadbias = (((int)1) << alpharadbshift);
+		protected static readonly int radbias = 1 << radbiasshift;
+		protected static readonly int alpharadbshift = alphabiasshift + radbiasshift;
+		protected static readonly int alpharadbias = 1 << alpharadbshift;
 
 		/* Types and Global Variables
 		-------------------------- */
 
-		unsafe protected byte* thepicture; /* the input image itself */
+		unsafe protected byte* pixelsPtr = null; /* the input image itself as a byte pointer array */
+		protected byte[] pixelsArr; /* the input image itself as a byte classic array */
+
 		protected int lengthcount; /* lengthcount = H*W*3 */
 
 		protected int samplefac; /* sampling factor 1..30 */
@@ -121,22 +123,69 @@ namespace Gif.Components {
 
 		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 		   ----------------------------------------------------------------------- */
-		unsafe public NeuQuant(byte* thepic, int len, int sample) {
-			int[] p;
-			thepicture = thepic;
+		unsafe public NeuQuant(byte[] thepic, int len, int sample) {
+			pixelsArr = thepic;
+			lengthcount = len;
+			samplefac = sample;
+			network = new int[netsize][];
+			for (int i = 0; i < netsize; ++i)
+				InitNetwork(i);
+		}
+
+		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters - cancellable
+		   ----------------------------------------------------------------------- */
+		unsafe public NeuQuant(byte[] thepic, int len, int sample, CancellationToken token) {
+			pixelsArr = thepic;
 			lengthcount = len;
 			samplefac = sample;
 			network = new int[netsize][];
 			for (int i = 0; i < netsize; ++i) {
-				p = network[i] = new int[4];
-				p[0] = p[1] = p[2] = (i << (netbiasshift + 8)) / netsize;
-				freq[i] = intbias / netsize; /* 1/netsize */
-				bias[i] = 0;
+				if (token.IsCancellationRequested)
+					return;
+				InitNetwork(i);
 			}
+			FactorizeLength(token);
+		}
 
+		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
+		   ----------------------------------------------------------------------- */
+		unsafe public NeuQuant(byte* thepic, int len, int sample) {
+			pixelsPtr = thepic;
+			lengthcount = len;
+			samplefac = sample;
+			network = new int[netsize][];
+			for (int i = 0; i < netsize; ++i) 
+				InitNetwork(i);
+		}
+
+		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters - cancellable
+		   ----------------------------------------------------------------------- */
+		unsafe public NeuQuant(byte* thepic, int len, int sample, CancellationToken token) {
+			pixelsPtr = thepic;
+			lengthcount = len;
+			samplefac = sample;
+			network = new int[netsize][];
+			for (int i = 0; i < netsize; ++i) {
+				if (token.IsCancellationRequested)
+					return;
+				InitNetwork(i);
+			}
+			FactorizeLength(token);
+		}
+
+		protected void InitNetwork(int i) {
+			int[] p = network[i] = new int[4];
+			p[0] = p[1] = p[2] = (i << (netbiasshift + 8)) / netsize;
+			freq[i] = intbias / netsize; /* 1/netsize */
+			bias[i] = 0;
+		}
+
+		protected void FactorizeLength(CancellationToken token) {
 			int samplepixels = lengthcount / (3 * samplefac);
 			factor = 1;
 			for (int t = 2, xt = factor * t, st = samplepixels / t; xt - st < samplepixels - factor; xt = factor * t, st = samplepixels / t) {
+				if (token.IsCancellationRequested)
+					return;
 				if ((samplepixels % t) == 0) {
 					factor = xt;
 					samplepixels = st;
@@ -149,26 +198,65 @@ namespace Gif.Components {
 		public byte[] ColorMap() {
 			byte[] map = new byte[3 * netsize];
 			int[] index = new int[netsize];
-			for (int i = 0; i < netsize; ++i)
-				index[network[i][3]] = i;
-			int k = 0;
-			for (int i = 0; i < netsize; ++i) {
-				int j = index[i];
-				map[k++] = (byte)(network[j][0]);
-				map[k++] = (byte)(network[j][1]);
-				map[k++] = (byte)(network[j][2]);
+			int k;
+			for (k = 0; k < netsize; ++k)
+				index[network[k][3]] = k;
+			int i = k = 0;
+			while (i < netsize) {
+				int j = index[i++];
+				map[k++] = (byte)network[j][0];
+				map[k++] = (byte)network[j][1];
+				map[k++] = (byte)network[j][2];
 			}
 			return map;
+		}
+		protected void SwitchPQ(ref int[] p, ref int[] q) {
+			(p[0], q[0]) = (q[0], p[0]);
+			(p[1], q[1]) = (q[1], p[1]);
+			(p[2], q[2]) = (q[2], p[2]);
+			(p[3], q[3]) = (q[3], p[3]);
+		}
+
+		/* Insertion sort of network and building of netindex[0..255] (to do after unbias)
+		   ------------------------------------------------------------------------------- */
+		public bool Inxbuild() {
+
+			int i, j, smallpos, smallval, previouscol = 0, startpos = 0;
+			int[] p, q;
+			for (i = 0; i < netsize; ++i) {
+				smallval = (p = network[smallpos = i])[1]; /* index on g */
+				/* find smallest in i..netsize-1 */
+				for (j = i + 1; j < netsize; ++j) {
+					if ((q = network[j])[1] < smallval) { /* index on g */
+						smallpos = j;
+						smallval = q[1]; /* index on g */
+					}
+				}
+				q = network[smallpos];
+				/* swap p (i) and q (smallpos) entries */
+				if (i != smallpos) 
+					SwitchPQ(ref p, ref q);
+				/* smallval entry is now in position i */
+				if (smallval != previouscol) {
+					netindex[previouscol] = (startpos + i) >> 1;
+					for (j = previouscol + 1; j < smallval; ++j)
+						netindex[j] = i;
+					previouscol = smallval;
+					startpos = i;
+				}
+			}
+			netindex[previouscol] = (startpos + maxnetpos) >> 1;
+			for (j = previouscol + 1; j < 256; ++j)
+				netindex[j] = maxnetpos; /* really 256 */
+			return false;
 		}
 
 		/* Insertion sort of network and building of netindex[0..255] (to do after unbias)
 		   ------------------------------------------------------------------------------- */
 		public bool Inxbuild(CancellationToken token) {
 
-			int i, j, smallpos, smallval;
-			int[] p;
-			int[] q;
-			int previouscol = 0, startpos = 0;
+			int i, j, smallpos, smallval, previouscol = 0, startpos = 0;
+			int[] p, q;
 			for (i = 0; i < netsize; ++i) {
 				if (token.IsCancellationRequested)
 					return true;
@@ -183,20 +271,8 @@ namespace Gif.Components {
 				}
 				q = network[smallpos];
 				/* swap p (i) and q (smallpos) entries */
-				if (i != smallpos) {
-					j = q[0];
-					q[0] = p[0];
-					p[0] = j;
-					j = q[1];
-					q[1] = p[1];
-					p[1] = j;
-					j = q[2];
-					q[2] = p[2];
-					p[2] = j;
-					j = q[3];
-					q[3] = p[3];
-					p[3] = j;
-				}
+				if (i != smallpos)
+					SwitchPQ(ref p, ref q);
 				/* smallval entry is now in position i */
 				if (smallval != previouscol) {
 					netindex[previouscol] = (startpos + i) >> 1;
@@ -214,7 +290,83 @@ namespace Gif.Components {
 
 		/* Main Learning Loop
 		   ------------------ */
-		unsafe public bool Learn(CancellationToken token) {
+		public bool Learn() {
+
+			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim;
+
+			if (lengthcount < minpicturebytes)
+				samplefac = 1;
+			alphadec = 30 + ((samplefac - 1) / 3);
+			lim = lengthcount;
+			delta = (samplepixels = lengthcount / (3 * samplefac)) / ncycles;
+			alpha = initalpha;
+			if ((rad = (radius = initradius) >> radiusbiasshift) <= 1)
+				rad = 0;
+			rad2 = rad * rad;
+			for (i = 0; i < rad; ++i)
+				radpower[i] = alpha * (((rad2 - i * i) * radbias) / rad2);
+
+			//fprintf(stderr,"beginning 1D learning: initial radius=%d\n", rad);
+
+			step = lengthcount < minpicturebytes ? 3 : ((lengthcount % prime1) != 0 ? 3 * prime1 : ((lengthcount % prime2) != 0 ? 3 * prime2 : ((lengthcount % prime3) != 0 ? 3 * prime3 : 3 * prime4)));
+			i = pix = 0;
+			unsafe {
+				if (pixelsPtr != null) {
+					for (int x = 0; x < samplepixels; ++x) {
+						// we don't need & 0xff for bytes
+						r = (pixelsPtr[pix + 0] /*& 0xff*/) << netbiasshift;
+						g = (pixelsPtr[pix + 1] /*& 0xff*/) << netbiasshift;
+						b = (pixelsPtr[pix + 2] /*& 0xff*/) << netbiasshift;
+						Altersingle(alpha, j = Contest(b, g, r), b, g, r);
+						if (rad != 0)
+							Alterneigh(rad, j, b, g, r); /* alter neighbours */
+						if ((pix += step) >= lim)
+							pix -= lengthcount;
+						++i;
+						if (delta == 0)
+							delta = 1;
+						if (i % delta != 0)
+							continue;
+						alpha -= alpha / alphadec;
+						rad = (radius -= radius / radiusdec) >> radiusbiasshift;
+						if (rad <= 1)
+							rad = 0;
+						rad2 = rad * rad;
+						for (j = 0; j < rad; ++j)
+							radpower[j] = alpha * (((rad2 - j * j) * radbias) / rad2);
+					}
+					return false;
+				}
+			}
+			for (int x = 0; x < samplepixels; ++x) {
+				// we don't need & 0xff for bytes
+				r = (pixelsArr[pix + 0] /*& 0xff*/) << netbiasshift;
+				g = (pixelsArr[pix + 1] /*& 0xff*/) << netbiasshift;
+				b = (pixelsArr[pix + 2] /*& 0xff*/) << netbiasshift;
+				Altersingle(alpha, j = Contest(b, g, r), b, g, r);
+				if (rad != 0)
+					Alterneigh(rad, j, b, g, r); /* alter neighbours */
+				if ((pix += step) >= lim)
+					pix -= lengthcount;
+				++i;
+				if (delta == 0)
+					delta = 1;
+				if (i % delta != 0)
+					continue;
+				alpha -= alpha / alphadec;
+				rad = (radius -= radius / radiusdec) >> radiusbiasshift;
+				if (rad <= 1)
+					rad = 0;
+				rad2 = rad * rad;
+				for (j = 0; j < rad; ++j)
+					radpower[j] = alpha * (((rad2 - j * j) * radbias) / rad2);
+			}
+			return false;
+			//fprintf(stderr,"finished 1D learning: readonly alpha=%f !\n",((float)alpha)/initalpha);
+		}
+		/* Main Learning Loop - cancellable
+		   ------------------ */
+		public bool Learn(CancellationToken token) {
 
 			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim;
 
@@ -235,13 +387,46 @@ namespace Gif.Components {
 			step = lengthcount < minpicturebytes ? 3 : ((lengthcount % prime1) != 0 ? 3 * prime1 : ((lengthcount % prime2) != 0 ? 3 * prime2 : ((lengthcount % prime3) != 0 ? 3 * prime3 : 3 * prime4)));
 			i = pix = 0;
 			samplepixels /= factor;
+			unsafe {
+				if (pixelsPtr != null) {
+					for (int x = 0; x < factor; ++x) {
+						if (token.IsCancellationRequested)
+							return true;
+						for (int y = 0; y < samplepixels; ++y) {
+							// we don't need & 0xff for bytes
+							r = (pixelsPtr[pix + 0] /*& 0xff*/) << netbiasshift;
+							g = (pixelsPtr[pix + 1] /*& 0xff*/) << netbiasshift;
+							b = (pixelsPtr[pix + 2] /*& 0xff*/) << netbiasshift;
+							Altersingle(alpha, j = Contest(b, g, r), b, g, r);
+							if (rad != 0)
+								Alterneigh(rad, j, b, g, r); /* alter neighbours */
+							if ((pix += step) >= lim)
+								pix -= lengthcount;
+							++i;
+							if (delta == 0)
+								delta = 1;
+							if (i % delta != 0)
+								continue;
+							alpha -= alpha / alphadec;
+							rad = (radius -= radius / radiusdec) >> radiusbiasshift;
+							if (rad <= 1)
+								rad = 0;
+							rad2 = rad * rad;
+							for (j = 0; j < rad; ++j)
+								radpower[j] = alpha * (((rad2 - j * j) * radbias) / rad2);
+						}
+					}
+					return false;
+				}
+			}
 			for (int x = 0; x < factor; ++x) {
 				if (token.IsCancellationRequested)
 					return true;
 				for (int y = 0; y < samplepixels; ++y) {
-					r = (thepicture[pix + 0] /*& 0xff*/) << netbiasshift;
-					g = (thepicture[pix + 1] /*& 0xff*/) << netbiasshift;
-					b = (thepicture[pix + 2] /*& 0xff*/) << netbiasshift;
+					// we don't need & 0xff for bytes
+					r = (pixelsArr[pix + 0] /*& 0xff*/) << netbiasshift;
+					g = (pixelsArr[pix + 1] /*& 0xff*/) << netbiasshift;
+					b = (pixelsArr[pix + 2] /*& 0xff*/) << netbiasshift;
 					Altersingle(alpha, j = Contest(b, g, r), b, g, r);
 					if (rad != 0)
 						Alterneigh(rad, j, b, g, r); /* alter neighbours */
@@ -312,13 +497,18 @@ namespace Gif.Components {
 			}
 			return best;
 		}
+		public byte[] Process() {
+			if (Learn())
+				return null;
+			Unbiasnet();
+			return Inxbuild() ? null : ColorMap();
+		}
+
 		public byte[] Process(CancellationToken token) {
 			if (Learn(token))
 				return null;
 			Unbiasnet();
-			if (Inxbuild(token))
-				return null;
-			return ColorMap();
+			return Inxbuild(token) ? null : ColorMap();
 		}
 
 		/* Unbias network to give byte values 0..255 and record position i to prepare for sort
@@ -399,12 +589,12 @@ namespace Gif.Components {
 					bestbiasd = biasdist;
 					bestbiaspos = i;
 				}
-				freq[i] -= betafreq = (freq[i] >> betashift);
+				freq[i] -= betafreq = freq[i] >> betashift;
 				bias[i] += betafreq << gammashift;
 			}
 			freq[bestpos] += beta;
 			bias[bestpos] -= betagamma;
-			return (bestbiaspos);
+			return bestbiaspos;
 		}
 	}
 }

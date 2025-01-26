@@ -96,7 +96,7 @@ public partial class GeneratorForm : Form {
 			SetupControl(hueSelect, "Choose the color scheme of the fractal.\nAlso you can make the color hues slowly cycle as the fractal zoom.");
 			SetupControl(hueSpeedBox, "Type the extra speed on the hue shifting from the values possible for looping.\nOnly possible if you have chosen color cycling on the left.");
 			SetupControl(defaultHue, "Type the initial hue angle of the first image (in degrees).");
-			SetupControl(ambBox, "The strength of the ambient grey color in the empty spaces far away between the generated fractal dots.");
+			SetupControl(ambBox, "The strength of the ambient grey color in the empty spaces far away between the generated fractal dots.\n-1 for transparent");
 			SetupControl(noiseBox, "The strength of the random noise in the empty spaces far away between the generated fractal dots.");
 			SetupControl(saturateBox, "Enhance the color saturation of the fractal dots.\nUseful when the fractal is too gray, like the Sierpinski Triangle (Triflake).");
 			SetupControl(detailBox, "Level of Detail (The lower the finer).");
@@ -110,7 +110,7 @@ public partial class GeneratorForm : Form {
 			SetupControl(prevButton, "Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 			SetupControl(nextButton, "Stop the animation and move to the next frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 			SetupControl(animateButton, "Toggle preview animation.\nWill seamlessly loop when the fractal is finished generating.\nClicking on the image does the same thing.");
-			SetupControl(encodeButton, "Only Image - only generates one image\nAnimation RAM - generated an animation without GIF encoding, faster but can't save GIF afterwards\nEncode GIF - encodes GIF while generating an animation - can save a GIF afterwards");
+			SetupControl(encodeSelect, "Only Image - only generates one image\nAnimation RAM - generated an animation without GIF encoding, faster but can't save GIF afterwards\nEncode GIF - encodes GIF while generating an animation - can save a GIF afterwards");
 			SetupControl(helpButton, "Show README.txt.");
 			SetupControl(pngButton, "Save the currently displayed frame into a PNG file.\nStop the animation and select the frame you wish to export with the buttons above.");
 			SetupControl(gifButton, "Save the full animation into a GIF file.");
@@ -145,6 +145,7 @@ public partial class GeneratorForm : Form {
 			BrightnessBox_TextChanged(null, null);
 			parallelTypeBox.SelectedIndex = 0;
 			spinSelect.SelectedIndex = zoomSelect.SelectedIndex = hueSelect.SelectedIndex = 1;
+			encodeSelect.SelectedIndex = 2;
 			SetupFractal();
 			threadsBox.Text = (maxTasks = Math.Max(0, Environment.ProcessorCount - 2)).ToString();
 			bInit = modifySettings = helpPanel.Visible = false;
@@ -327,7 +328,7 @@ public partial class GeneratorForm : Form {
 		//if (previewMode)
 		//	width = height = 80;
 		string[] rxy = resSelect.SelectedIndex is 1 or < 0 ? resSelect.Items[1].ToString().Split(':')[1].Split('x') : resSelect.Items[resSelect.SelectedIndex].ToString().Split('x');
-		if(!short.TryParse(rxy[0], out width))
+		if (!short.TryParse(rxy[0], out width))
 			width = 80;
 		if (!short.TryParse(rxy[1], out height))
 			height = 80;
@@ -338,7 +339,7 @@ public partial class GeneratorForm : Form {
 	#region Input
 	private static short Parse(TextBox BOX) => short.TryParse(BOX.Text, out var v) ? v : (short)0;
 	private static T Clamp<T>(T NEW, T MIN, T MAX) where T : struct, IComparable<T> => NEW.CompareTo(MIN) < 0 ? MIN : NEW.CompareTo(MAX) > 0 ? MAX : NEW;
-	private static short Retext(TextBox BOX, short NEW) { BOX.Text = NEW == 0 ? "" : NEW.ToString(); return NEW; }
+	private static short Retext(TextBox BOX, short NEW) { BOX.Text = NEW == 0 ? (short.TryParse(BOX.Text, out short t) ? "" : BOX.Text) : NEW.ToString(); return NEW; }
 	private static T Mod<T>(T NEW, T MIN, T MAX) where T : struct, IComparable<T> {
 		var D = (dynamic)MAX - MIN; while (NEW.CompareTo(MIN) < 0) NEW = (T)(NEW + D); while (NEW.CompareTo(MAX) > 0) NEW = (T)(NEW - D); return NEW;
 	}
@@ -436,19 +437,18 @@ public partial class GeneratorForm : Form {
 		else generator.selectExtraHue = newSpeed;
 	}
 	private void DefaultHue_TextChanged(object sender, EventArgs e) => ParseModDiffApply(defaultHue, ref generator.selectDefaultHue, 0, 360);
-	private void AmbBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(ambBox, ref generator.selectAmbient, 0, 30, 4);
+	private void AmbBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(ambBox, ref generator.selectAmbient, -1, 30, 4);
 	private void NoiseBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(noiseBox, ref generator.selectNoise, 0, 30, .1f);
 	private void SaturateBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(saturateBox, ref generator.selectSaturate, 0, 10, .1f);
 	private void DetailBox_TextChanged(object sender, EventArgs e) {
 		if (!ParseClampRetextMulDiffApply(detailBox, ref generator.selectDetail, 0, 10, .1f * generator.GetFractal().minSize)) generator.SetMaxIterations();
 	}
 	private void BloomBox_TextChanged(object sender, EventArgs e) => ParseClampRetextMulDiffApply(bloomBox, ref generator.selectBloom, 0, 40, .25f);
-	private void BlurBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(blurBox, ref generator.selectBlur, 1, 40);
+	private void BlurBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(blurBox, ref generator.selectBlur, 0, 40);
 	private void BrightnessBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(brightnessBox, ref generator.selectBrightness, 0, 300);
 	private void Parallel_Changed(object sender, EventArgs e) {
 		short newThreads = ParseClampRetext(threadsBox, 0, (short)maxTasks);
 		generator.selectMaxTasks = (short)(newThreads > 0 ? newThreads : -1);
-		generator.selectMaxGenerationTasks = Math.Max((short)1, (short)(generator.selectMaxTasks - 1));
 		generator.SelectThreadingDepth();
 	}
 	private void ParallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) => generator.selectParallelType = (byte)parallelTypeBox.SelectedIndex;
@@ -480,23 +480,10 @@ public partial class GeneratorForm : Form {
 		restartButton.Enabled = false;
 		QueueReset(true);
 	}
-	private void EncodeButton_Click(object sender, EventArgs e) {
-		switch (generator.selectEncode = (byte)((generator.selectEncode + 1) % 3)) {
-			case 0:
-				// Only generates one image
-				encodeButton.Text = "Only Image";
-				break;
-			case 1:
-				// Generates an animation for you to see faster, but without encoding a Gif to export
-				encodeButton.Text = "RAM Animation";
-				break;
-			case 2:
-				// Full generation including GIF encoding
-				encodeButton.Text = "Encode GIF";
-				if (!generator.IsGifReady())
-					QueueReset();//AbortGenerate();
-				break;
-		}
+
+	private void EncodeSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		if ((generator.selectEncode = (byte)Math.Max(0, encodeSelect.SelectedIndex)) == 2 && !generator.IsGifReady())
+			QueueReset();
 	}
 	private void HelpButton_Click(object sender, EventArgs e) {
 		helpPanel.Visible = screenPanel.Visible;

@@ -52,7 +52,6 @@
 			blurLabel = new System.Windows.Forms.Label();
 			defaultZoom = new System.Windows.Forms.TextBox();
 			defaultAngle = new System.Windows.Forms.TextBox();
-			encodeButton = new System.Windows.Forms.Button();
 			defaultHue = new System.Windows.Forms.TextBox();
 			periodMultiplierBox = new System.Windows.Forms.TextBox();
 			periodLabel = new System.Windows.Forms.Label();
@@ -84,6 +83,7 @@
 			zoomSelect = new System.Windows.Forms.ComboBox();
 			restartButton = new System.Windows.Forms.Button();
 			resSelect = new System.Windows.Forms.ComboBox();
+			encodeSelect = new System.Windows.Forms.ComboBox();
 			helpPanel.SuspendLayout();
 			SuspendLayout();
 			// 
@@ -216,7 +216,7 @@
 			// 
 			// pngButton
 			// 
-			pngButton.Location = new System.Drawing.Point(91, 555);
+			pngButton.Location = new System.Drawing.Point(91, 551);
 			pngButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			pngButton.Name = "pngButton";
 			pngButton.Size = new System.Drawing.Size(66, 27);
@@ -227,7 +227,7 @@
 			// 
 			// gifButton
 			// 
-			gifButton.Location = new System.Drawing.Point(165, 555);
+			gifButton.Location = new System.Drawing.Point(165, 551);
 			gifButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			gifButton.Name = "gifButton";
 			gifButton.Size = new System.Drawing.Size(135, 27);
@@ -302,7 +302,7 @@
 			// 
 			statusLabel.AutoSize = true;
 			statusLabel.ForeColor = System.Drawing.Color.White;
-			statusLabel.Location = new System.Drawing.Point(17, 528);
+			statusLabel.Location = new System.Drawing.Point(17, 525);
 			statusLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			statusLabel.Name = "statusLabel";
 			statusLabel.Size = new System.Drawing.Size(64, 15);
@@ -313,7 +313,7 @@
 			// 
 			infoLabel.AutoSize = true;
 			infoLabel.ForeColor = System.Drawing.Color.White;
-			infoLabel.Location = new System.Drawing.Point(91, 528);
+			infoLabel.Location = new System.Drawing.Point(91, 525);
 			infoLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			infoLabel.Name = "infoLabel";
 			infoLabel.Size = new System.Drawing.Size(28, 15);
@@ -350,16 +350,6 @@
 			defaultAngle.Text = "0";
 			defaultAngle.TextChanged += DefaultAngle_TextChanged;
 			// 
-			// encodeButton
-			// 
-			encodeButton.Location = new System.Drawing.Point(165, 522);
-			encodeButton.Name = "encodeButton";
-			encodeButton.Size = new System.Drawing.Size(135, 27);
-			encodeButton.TabIndex = 32;
-			encodeButton.Text = "Encode GIF";
-			encodeButton.UseVisualStyleBackColor = true;
-			encodeButton.Click += EncodeButton_Click;
-			// 
 			// defaultHue
 			// 
 			defaultHue.Location = new System.Drawing.Point(177, 287);
@@ -391,7 +381,7 @@
 			// 
 			// helpButton
 			// 
-			helpButton.Location = new System.Drawing.Point(17, 555);
+			helpButton.Location = new System.Drawing.Point(17, 551);
 			helpButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			helpButton.Name = "helpButton";
 			helpButton.Size = new System.Drawing.Size(66, 27);
@@ -440,7 +430,7 @@
 			helpPanel.Controls.Add(helpLabel);
 			helpPanel.Location = new System.Drawing.Point(309, 14);
 			helpPanel.Name = "helpPanel";
-			helpPanel.Size = new System.Drawing.Size(763, 568);
+			helpPanel.Size = new System.Drawing.Size(763, 564);
 			helpPanel.TabIndex = 0;
 			// 
 			// helpLabel
@@ -525,7 +515,7 @@
 			// parallelTypeBox
 			// 
 			parallelTypeBox.FormattingEnabled = true;
-			parallelTypeBox.Items.AddRange(new object[] { "Of Animation", "Of Depth", "Of Recursion" });
+			parallelTypeBox.Items.AddRange(new object[] { "Of Animation", "Of Depth" });
 			parallelTypeBox.Location = new System.Drawing.Point(114, 432);
 			parallelTypeBox.Name = "parallelTypeBox";
 			parallelTypeBox.Size = new System.Drawing.Size(120, 23);
@@ -670,12 +660,24 @@
 			resSelect.Text = "Select Resolution";
 			resSelect.SelectedIndexChanged += Resolution_Changed;
 			// 
+			// encodeSelect
+			// 
+			encodeSelect.FormattingEnabled = true;
+			encodeSelect.Items.AddRange(new object[] { "Only Image", "Animation RAM", "Encode GIF" });
+			encodeSelect.Location = new System.Drawing.Point(165, 522);
+			encodeSelect.Name = "encodeSelect";
+			encodeSelect.Size = new System.Drawing.Size(135, 23);
+			encodeSelect.TabIndex = 51;
+			encodeSelect.Text = "Generation Type";
+			encodeSelect.SelectedIndexChanged += EncodeSelect_SelectedIndexChanged;
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
-			ClientSize = new System.Drawing.Size(1086, 610);
+			ClientSize = new System.Drawing.Size(1086, 592);
+			Controls.Add(encodeSelect);
 			Controls.Add(resSelect);
 			Controls.Add(restartButton);
 			Controls.Add(zoomSelect);
@@ -709,7 +711,6 @@
 			Controls.Add(periodMultiplierBox);
 			Controls.Add(defaultHue);
 			Controls.Add(cutparamBox);
-			Controls.Add(encodeButton);
 			Controls.Add(defaultAngle);
 			Controls.Add(defaultZoom);
 			Controls.Add(blurLabel);
@@ -764,7 +765,6 @@
 		private System.Windows.Forms.Label blurLabel;
 		private System.Windows.Forms.TextBox defaultZoom;
 		private System.Windows.Forms.TextBox defaultAngle;
-		private System.Windows.Forms.Button encodeButton;
 		private System.Windows.Forms.TextBox cutparamBox;
 		private System.Windows.Forms.TextBox defaultHue;
 		private System.Windows.Forms.TextBox periodMultiplierBox;
@@ -800,6 +800,7 @@
 		private System.Windows.Forms.ComboBox zoomSelect;
 		private System.Windows.Forms.Button restartButton;
 		private System.Windows.Forms.ComboBox resSelect;
+		private System.Windows.Forms.ComboBox encodeSelect;
 	}
 }
 
