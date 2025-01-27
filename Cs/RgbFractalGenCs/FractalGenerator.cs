@@ -654,6 +654,7 @@ internal class FractalGenerator {
 			Stopwatch initTime = new();
 			initTime.Start();
 #endif
+			bitmapState[bitmapIndex] = BitmapState.Dots;
 			// Init buffer with zeroes
 			var taskIndex = Math.Max((short)0, stateIndex);
 			var state = stateIndex < 0 ? null : tasks[stateIndex];
