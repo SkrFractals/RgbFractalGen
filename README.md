@@ -114,6 +114,7 @@ Default Hue Angle:
 Void Ambient:
 - The intensity of the grey light in the void areas (outside between the fractal dots)
 - If 0 it will completely skip computing the void depth and rendering, good to render a bit faster thee fractals without void (for example sierpinski triangle and carpet).
+- If -1 the exported GIF will have a transparent background
 
 
 Void Noise:

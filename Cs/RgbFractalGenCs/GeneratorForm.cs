@@ -168,7 +168,7 @@ public partial class GeneratorForm : Form {
 			int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
 			MinimumSize = new(
 				Math.Max(640, bw + width + 284),
-				Math.Max(640, bh + Math.Max(460, height + 8))
+				Math.Max(Math.Max(640, debugLabel.Bounds.Bottom + bh), bh + Math.Max(460, height + 8))
 			);
 			//debugLabel.Text = debugLabel.Text + " " + MinimumSize.Height.ToString();
 		}
@@ -222,8 +222,10 @@ public partial class GeneratorForm : Form {
 
 		if (bInit)
 			Init();
-		if (generator.debugmode) 
+		if (generator.debugmode) {
 			debugLabel.Text = generator.debugString;
+			SetMinimumSize();
+		}
 		// Window Size Update
 		WindowSizeRefresh();
 		if (queueReset > 0) {
@@ -450,7 +452,7 @@ public partial class GeneratorForm : Form {
 		generator.selectMaxTasks = (short)(newThreads > 0 ? newThreads : -1);
 		generator.SelectThreadingDepth();
 	}
-	private void ParallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) => generator.selectParallelType = (byte)parallelTypeBox.SelectedIndex;
+	private void ParallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) => generator.selectParallelType = (FractalGenerator.ParallelType)parallelTypeBox.SelectedIndex;
 	private void AbortBox_TextChanged(object sender, EventArgs e) => abortDelay = ParseClampRetext(abortBox, 0, 10000);
 	private void DelayBox_TextChanged(object sender, EventArgs e) {
 		var newDelay = ParseClampRetext(delayBox, 1, 500);
@@ -461,7 +463,7 @@ public partial class GeneratorForm : Form {
 		var fpsrate = 100 / generator.selectDelay;
 		timer.Interval = generator.selectDelay * 10;
 		delayLabel.Text = "Abort / FPS: " + fpsrate.ToString();
-		if (generator.selectEncode == 2)
+		if (generator.selectGenerationType == FractalGenerator.GenerationType.EncodeGIF)
 			QueueReset();
 	}
 	private void MoveFrame(int move) { animated = false; var b = generator.GetBitmapsFinished(); currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b; }
@@ -481,8 +483,10 @@ public partial class GeneratorForm : Form {
 	}
 
 	private void EncodeSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if ((generator.selectEncode = (byte)Math.Max(0, encodeSelect.SelectedIndex)) == 2 && !generator.IsGifReady())
-			QueueReset();
+		if (
+			(generator.selectGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex)) == FractalGenerator.GenerationType.EncodeGIF 
+			&& !generator.IsGifReady()
+		) QueueReset();
 	}
 	private void HelpButton_Click(object sender, EventArgs e) {
 		helpPanel.Visible = screenPanel.Visible;
@@ -492,7 +496,7 @@ public partial class GeneratorForm : Form {
 	private void Gif_Click(object sender, EventArgs e) => saveGif.ShowDialog();
 
 	private void DebugBox_CheckedChanged(object sender, EventArgs e) {
-		generator.debugmode = debugBox.Checked;
+		if (!(generator.debugmode = debugBox.Checked)) debugLabel.Text = "";
 	}
 
 	#endregion

@@ -3,6 +3,8 @@
 - random options
 - bugfixes and optimizations
 - resolution presets
+- parallel gif encode!
+- transparent background if void ambient == -1
 
 1.82
 - brightness setting
