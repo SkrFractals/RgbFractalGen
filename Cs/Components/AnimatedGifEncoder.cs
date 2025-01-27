@@ -436,6 +436,7 @@ namespace Gif.Components {
 			// writeTaskData = the one that I haven't written into file yet
 			encodeTaskData = writeTaskData = new EncoderTaskData();
 			finishedFrame = 0;
+			finishedAnimation = false;
 			return started = ok;
 		}
 
