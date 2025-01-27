@@ -1220,7 +1220,7 @@ internal class FractalGenerator {
 			}
 		// Save the temp GIF file
 		gifSuccess = false;
-		if (selectEncode >= 2 && gifEncoder.Finish())
+		if (selectEncode >= 2 && gifEncoder != null && gifEncoder.Finish())
 			while (!cancel.Token.IsCancellationRequested && gifEncoder != null) {
 
 				switch (gifEncoder.TryWriteFrameIntoFile()) {
@@ -1295,6 +1295,8 @@ internal class FractalGenerator {
 			bitmapData = new BitmapData[frames];
 			bitmapState = new byte[frames + 1];
 		}
+		for (int b = 0; b <= frames; ++b) 
+			bitmapState[b] = 0;
 	}
 	internal void RequestCancel() {
 		cancel?.Cancel();
