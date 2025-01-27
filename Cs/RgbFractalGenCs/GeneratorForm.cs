@@ -8,9 +8,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Collections.Generic;
-using static System.Net.Mime.MediaTypeNames;
-using System.Windows.Media;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -225,6 +222,8 @@ public partial class GeneratorForm : Form {
 
 		if (bInit)
 			Init();
+		if (generator.debugmode) 
+			debugLabel.Text = generator.debugString;
 		// Window Size Update
 		WindowSizeRefresh();
 		if (queueReset > 0) {
@@ -491,6 +490,11 @@ public partial class GeneratorForm : Form {
 	}
 	private void Png_Click(object sender, EventArgs e) => savePng.ShowDialog();
 	private void Gif_Click(object sender, EventArgs e) => saveGif.ShowDialog();
+
+	private void DebugBox_CheckedChanged(object sender, EventArgs e) {
+		generator.debugmode = debugBox.Checked;
+	}
+
 	#endregion
 
 	#region Output

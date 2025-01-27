@@ -203,10 +203,11 @@ namespace Gif.Components {
 		 * @return true if successful.
 		 */
 		public bool AddFrame(byte[] pixels) {
-			if (!started || encodeTaskData.failed)
+			var encodeData = NextEncodeData();
+			if (encodeData == null)
 				return false;
-			encodeTaskData.pixelsArr = pixels; // was this.pixels, moved that into the taskData
-			return UntaskedFrame(encodeTaskData); ;
+			encodeData.pixelsArr = pixels; // was this.pixels, moved that into the taskData
+			return UntaskedFrame(encodeData);
 		}
 
 		/**
@@ -217,10 +218,11 @@ namespace Gif.Components {
 		 * @return true if successful.
 		 */
 		public bool AddFrame(byte[] pixels, CancellationToken token) {
-			if (!started || encodeTaskData.failed)
+			var encodeData = NextEncodeData();
+			if (encodeData == null)
 				return false;
-			encodeTaskData.pixelsArr = pixels; // was this.pixels, moved that into the taskData
-			return UntaskedFrame(encodeTaskData, token); ;
+			encodeData.pixelsArr = pixels; // was this.pixels, moved that into the taskData
+			return UntaskedFrame(encodeData, token);
 		}
 
 		/**
@@ -230,10 +232,11 @@ namespace Gif.Components {
 		 * @return true if successful.
 		 */
 		public unsafe bool AddFrame(byte* pixels) {
-			if (!started || encodeTaskData.failed)
+			var encodeData = NextEncodeData();
+			if (encodeData == null)
 				return false;
-			encodeTaskData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
-			return UntaskedFrame(encodeTaskData); ;
+			encodeData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
+			return UntaskedFrame(encodeData);
 		}
 
 		/**
@@ -244,10 +247,11 @@ namespace Gif.Components {
 		 * @return true if successful.
 		 */
 		public unsafe bool AddFrame(byte* pixels, CancellationToken token) {
-			if (!started || encodeTaskData.failed)
+			var encodeData = NextEncodeData();
+			if (encodeData == null)
 				return false;
-			encodeTaskData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
-			return UntaskedFrame(encodeTaskData, token); ;
+			encodeData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
+			return UntaskedFrame(encodeData, token);
 		}
 
 		/**
@@ -260,10 +264,11 @@ namespace Gif.Components {
 		 * @return true if successful.
 		 */
 		public bool AddFrameParallel(byte[] pixels, CancellationToken token) {
-			if (!started || encodeTaskData.failed)
+			var encodeData = NextEncodeData();
+			if (encodeData == null)
 				return false;
-			encodeTaskData.pixelsArr = pixels; // was this.pixels, moved that into the taskData
-			return AddFrameTask(encodeTaskData, token); // here it normally continued with the code for writing to file, but i have moved that to TryWriteFrameIntoFile where it will wait for the first next task to complete
+			encodeData.pixelsArr = pixels; // was this.pixels, moved that into the taskData
+			return AddFrameTask(encodeData, token); // here it normally continued with the code for writing to file, but i have moved that to TryWriteFrameIntoFile where it will wait for the first next task to complete
 		}
 
 		/**
@@ -277,10 +282,11 @@ namespace Gif.Components {
 		 * @return true if successful.
 		 */
 		public bool AddFrameParallel(byte[] pixels, ref Task task, CancellationToken token) {
-			if (!started || encodeTaskData.failed)
+			var encodeData = NextEncodeData();
+			if (encodeData == null)
 				return false;
-			encodeTaskData.pixelsArr = pixels; // was this.pixels, moved that into the taskData
-			return MakeFrameTask(encodeTaskData, ref task, token); // here it normally continued with the code for writing to file, but i have moved that to TryWriteFrameIntoFile where it will wait for the first next task to complete
+			encodeData.pixelsArr = pixels; // was this.pixels, moved that into the taskData
+			return MakeFrameTask(encodeData, ref task, token); // here it normally continued with the code for writing to file, but i have moved that to TryWriteFrameIntoFile where it will wait for the first next task to complete
 		}
 
 		/**
@@ -293,10 +299,11 @@ namespace Gif.Components {
 		 * @return true if successful.
 		 */
 		unsafe public bool AddFrameParallel(byte* pixels, CancellationToken token) {
-			if (!started || encodeTaskData.failed)
+			var encodeData = NextEncodeData();
+			if (encodeData == null)
 				return false;
-			encodeTaskData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
-			return AddFrameTask(encodeTaskData, token); // here it normally continued with the code for writing to file, but i have moved that to TryWriteFrameIntoFile where it will wait for the first next task to complete
+			encodeData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
+			return AddFrameTask(encodeData, token); // here it normally continued with the code for writing to file, but i have moved that to TryWriteFrameIntoFile where it will wait for the first next task to complete
 		}
 
 		/**
@@ -310,41 +317,44 @@ namespace Gif.Components {
 		 * @return true if successful.
 		 */
 		unsafe public bool AddFrameParallel(byte* pixels, ref Task task, CancellationToken token) {
-			if (!started || encodeTaskData.failed)
+			var encodeData = NextEncodeData();
+			if (encodeData == null)
 				return false;
-			encodeTaskData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
-			return MakeFrameTask(encodeTaskData, ref task, token);
+			encodeData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
+			return MakeFrameTask(encodeData, ref task, token);
 		}
 
+
+		protected EncoderTaskData NextEncodeData() {
+			EncoderTaskData encodeTask = null;
+			Monitor.Enter(this);
+			try {
+				if (!started || (encodeTask = encodeTaskData).failed)
+					return null;
+				encodeTaskData = encodeTask.nextTask = new EncoderTaskData(); // make a next one for the next call of Addframe to work on
+			} finally { Monitor.Exit(this); }
+			return encodeTask;
+		}
 		private bool UntaskedFrame(EncoderTaskData encodeTask) {
-			encodeTaskData = encodeTask.nextTask = new EncoderTaskData(); // make a next one for the next call of Addframe to work on
 			encodeTask.failed = AnalyzePixels(encodeTask);   // build color table & map pixels, returns Failed/Cancelled
 			return (encodeTask.finished = true) && !encodeTask.failed && TryWriteFrameIntoFile() == FinishTaskReturn.FinishedFrame;
 		}
-
 		private bool UntaskedFrame(EncoderTaskData encodeTask, CancellationToken token) {
-			encodeTaskData = encodeTask.nextTask = new EncoderTaskData(); // make a next one for the next call of Addframe to work on
 			encodeTask.failed = AnalyzePixels(encodeTask, token);   // build color table & map pixels, returns Failed/Cancelled
 			return (encodeTask.finished = true) && !encodeTask.failed && TryWriteFrameIntoFile() == FinishTaskReturn.FinishedFrame;
 		}
-
 		protected bool MakeFrameTask(EncoderTaskData encodeTask, ref Task task, CancellationToken token) {
-			encodeTaskData = encodeTaskData.nextTask = new EncoderTaskData(); // make a next one for the next call of Addframe to work on
 			task = encodeTask.thisTask = Task.Run(() => {
 				encodeTask.failed = AnalyzePixels(encodeTask, token);    // build color table & map pixels, returns Failed/Cancelled
 				encodeTask.finished = true; // lets the TryWriteFrameIntoFile know this task was finished so it can write the data into the file
 			}, token);
 			return true;
 		}
-
 		protected bool AddFrameTask(EncoderTaskData encodeTask, CancellationToken token) {
-			encodeTaskData = encodeTask.nextTask = new EncoderTaskData(); // make a next one for the next call of Addframe to work on
 			encodeTask.failed = AnalyzePixels(encodeTask, token);   // build color table & map pixels, returns Failed/Cancelled
 			return (encodeTask.finished = true) && !encodeTask.failed;
 		}
-
 		protected bool MakeFrameTask(EncoderTaskData encodeTask, ref Task task) {
-			encodeTaskData = encodeTaskData.nextTask = new EncoderTaskData(); // make a next one for the next call of Addframe to work on
 			task = encodeTask.thisTask = Task.Run(() => {
 				encodeTask.failed = AnalyzePixels(encodeTask);    // build color table & map pixels, returns Failed/Cancelled
 				encodeTask.finished = true; // lets the TryWriteFrameIntoFile know this task was finished so it can write the data into the file
@@ -353,7 +363,6 @@ namespace Gif.Components {
 		}
 
 		protected bool AddFrameTask(EncoderTaskData encodeTask) {
-			encodeTaskData = encodeTask.nextTask = new EncoderTaskData(); // make a next one for the next call of Addframe to work on
 			encodeTask.failed = AnalyzePixels(encodeTask);   // build color table & map pixels, returns Failed/Cancelled
 			return (encodeTask.finished = true) && !encodeTask.failed;
 		}

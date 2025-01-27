@@ -84,6 +84,8 @@
 			restartButton = new System.Windows.Forms.Button();
 			resSelect = new System.Windows.Forms.ComboBox();
 			encodeSelect = new System.Windows.Forms.ComboBox();
+			debugBox = new System.Windows.Forms.CheckBox();
+			debugLabel = new System.Windows.Forms.Label();
 			helpPanel.SuspendLayout();
 			SuspendLayout();
 			// 
@@ -671,12 +673,34 @@
 			encodeSelect.Text = "Generation Type";
 			encodeSelect.SelectedIndexChanged += EncodeSelect_SelectedIndexChanged;
 			// 
+			// debugBox
+			// 
+			debugBox.AutoSize = true;
+			debugBox.Location = new System.Drawing.Point(17, 584);
+			debugBox.Name = "debugBox";
+			debugBox.Size = new System.Drawing.Size(84, 19);
+			debugBox.TabIndex = 52;
+			debugBox.Text = "Debug Log";
+			debugBox.UseVisualStyleBackColor = true;
+			debugBox.CheckedChanged += DebugBox_CheckedChanged;
+			// 
+			// debugLabel
+			// 
+			debugLabel.AutoSize = true;
+			debugLabel.Location = new System.Drawing.Point(17, 606);
+			debugLabel.Name = "debugLabel";
+			debugLabel.Size = new System.Drawing.Size(73, 15);
+			debugLabel.TabIndex = 53;
+			debugLabel.Text = "DebugString";
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
-			ClientSize = new System.Drawing.Size(1086, 592);
+			ClientSize = new System.Drawing.Size(1086, 658);
+			Controls.Add(debugLabel);
+			Controls.Add(debugBox);
 			Controls.Add(encodeSelect);
 			Controls.Add(resSelect);
 			Controls.Add(restartButton);
@@ -801,6 +825,8 @@
 		private System.Windows.Forms.Button restartButton;
 		private System.Windows.Forms.ComboBox resSelect;
 		private System.Windows.Forms.ComboBox encodeSelect;
+		private System.Windows.Forms.CheckBox debugBox;
+		private System.Windows.Forms.Label debugLabel;
 	}
 }
 
