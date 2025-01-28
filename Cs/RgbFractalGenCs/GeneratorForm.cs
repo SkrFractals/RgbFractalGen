@@ -143,8 +143,9 @@ public partial class GeneratorForm : Form {
 			parallelTypeBox.SelectedIndex = 0;
 			spinSelect.SelectedIndex = zoomSelect.SelectedIndex = hueSelect.SelectedIndex = 1;
 			encodeSelect.SelectedIndex = 2;
+			maxTasks = Math.Max(2, Environment.ProcessorCount - 2);
 			SetupFractal();
-			threadsBox.Text = (maxTasks = Math.Max(2, Environment.ProcessorCount - 2)).ToString();
+			threadsBox.Text = maxTasks.ToString();
 			bInit = modifySettings = helpPanel.Visible = false;
 
 			// Start the generator
@@ -449,7 +450,7 @@ public partial class GeneratorForm : Form {
 	private void BrightnessBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(brightnessBox, ref generator.selectBrightness, 0, 300);
 	private void Parallel_Changed(object sender, EventArgs e) {
 		short newThreads = ParseClampRetext(threadsBox, 2, (short)maxTasks);
-		generator.selectMaxTasks = (short)(newThreads > 0 ? newThreads : -1);
+		generator.selectMaxTasks = (short)(newThreads > 1 ? newThreads : 2);
 		generator.SelectThreadingDepth();
 	}
 	private void ParallelTypeBox_SelectedIndexChanged(object sender, EventArgs e) => generator.selectParallelType = (FractalGenerator.ParallelType)parallelTypeBox.SelectedIndex;

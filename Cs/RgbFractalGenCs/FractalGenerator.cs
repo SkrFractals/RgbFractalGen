@@ -105,8 +105,8 @@ internal class FractalGenerator {
 	private readonly Fractal[] fractals;// Fractal definitions
 	private Fractal f;                  // Selected fractal definition
 	private float[] childAngle;         // A copy of selected childAngle
-	private float selectPeriodAngle;          // Angle symmetry of current fractal
-	private float applyPeriodAngle;
+	private float selectPeriodAngle;    // Angle symmetry of current fractal
+	private float applyPeriodAngle;     // Angle symmetry corrected for periodMultiplier
 	private readonly byte[] childColor; // A copy of childColor for allowing BGR
 	private Vector3 colorBlend;         // Color blend of a selected fractal for more seamless loop (between single color to the sum of children)
 	private Fractal.CutFunction 
@@ -445,7 +445,7 @@ internal class FractalGenerator {
 					for (int x, y = Math.Max(1, (int)MathF.Floor(inY - selectBloom)); y <= endY; ++y) {
 						var yd = bloom1 - MathF.Abs(y - inY);
 						var buffY = buffT[y];
-						for (x = startX; x <= endX; ++x) 
+						for (x = startX; x <= endX; ++x)
 							buffY[x] += (yd * (bloom1 - MathF.Abs(x - inX))) * dotColor;
 					}
 					return true;
@@ -477,7 +477,7 @@ internal class FractalGenerator {
 				var newPreIterated = task.preIterate[++inDepth];
 				//var i = f.childCount;
 				//while (0 <= --i) {
-				for(int i = 0; i < f.childCount; ++i) { 
+				for (int i = 0; i < f.childCount; ++i) {
 					if (cancel.Token.IsCancellationRequested)
 						return;
 					// Special Cutoff
@@ -488,9 +488,9 @@ internal class FractalGenerator {
 					var XY = preIterated.Item3[i];
 					var newXY = NewXY(inXY, XY, inAngle.Item1);
 					if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1))
-						GenerateDots_SingleTask(taskIndex, newXY, 
-							i == 0 
-							? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) 
+						GenerateDots_SingleTask(taskIndex, newXY,
+							i == 0
+							? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2)
 							: (inAngle.Item1 + childAngle[i], inAngle.Item2),
 							(byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
 				}
@@ -526,7 +526,7 @@ internal class FractalGenerator {
 					count = (max + insertTo - index) % max;
 				}
 				FinishTasks(false, (short taskIndex) => {
-					if (count <= 0) 
+					if (count <= 0)
 						return false;
 					var task = tasks[taskIndex];
 					var tupleIndex = index++;
@@ -631,7 +631,7 @@ internal class FractalGenerator {
 #endif
 			// Generate the fractal frame recursively
 			if (cancel.Token.IsCancellationRequested) {
-				if(state != null)
+				if (state != null)
 					state.state = 2;
 				return;
 			}
@@ -650,7 +650,7 @@ internal class FractalGenerator {
 						preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					inSize /= f.childSize;
 				}
-				
+
 				// Prepare Color blending per one dot (hueshifting + iteration correction)
 				// So that the color of the dot will slowly approach the combined colors of its childer before it splits
 				var lerp = hueAngle % 1.0f;
@@ -706,10 +706,10 @@ internal class FractalGenerator {
 								//Thread.Sleep(10);
 							}
 							break;*/
+				IncFrameParameters(ref size, ref angle, spin, ref hueAngle, applyBlur);
+				if (IsCancelRequested(task))
+					return;
 			}
-			IncFrameParameters(ref size, ref angle, spin, ref hueAngle, applyBlur);
-			if (IsCancelRequested(task)) 
-				return;
 #if CUSTOMDEBUG
 			iterTime.Stop();
 			Log(ref threadString, "Iter:" + bitmapIndex + " time = " + iterTime.Elapsed.TotalMilliseconds + " ms.");
@@ -829,7 +829,7 @@ internal class FractalGenerator {
 				bitmapState[bitmapIndex] = BitmapState.Drawing;
 				// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
 				// Switch between th selected settings such as saturation, noise, image parallelism...
-				var maxGenerationTasks = Math.Max((short)1, applyMaxTasks); 
+				var maxGenerationTasks = (short)Math.Max(1, applyMaxTasks-1); 
 				if (applyParallelType > 0 && maxGenerationTasks > 1) {
 					// Multi Threaded
 					var stride = 3 * selectWidth;
@@ -1280,8 +1280,7 @@ internal class FractalGenerator {
 			bitmapData = new BitmapData[frames];
 			bitmapState = new BitmapState[frames + 1];
 		}
-		for (int b = 0; b <= frames; ++b) 
-			bitmapState[b] = BitmapState.Queued;
+		for (int b = frames; b >= 0; bitmapState[b--] = BitmapState.Queued);
 	}
 	internal void RequestCancel() {
 		cancel?.Cancel();

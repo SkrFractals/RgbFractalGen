@@ -263,7 +263,6 @@ namespace Gif.Components {
 			}
 			bool ok = true;
 			// here I am following the code after AnalyPixels, anytime when the task of the sequential next frame is finished:
-
 			var writeTask = writeTaskData;
 			EncoderTaskData prevWrite = null;
 			while (writeTask.frameIndex > finishedFrame) {
@@ -272,17 +271,13 @@ namespace Gif.Components {
 						? Components.TryWrite.Failed	// You must have called finish while having gaps in supplied out of order frames!
 						: Components.TryWrite.Waiting;	// You have not supplied the next out of order frame yet, so the Task has not even started running yet.
 				}
-				prevWrite = writeTask;
-				writeTask = writeTask.nextTask;
+				writeTask = (prevWrite = writeTask).nextTask;
 			}
-
 			if (!writeTask.finished)
 				return Components.TryWrite.Waiting; // the task for the next sequential frame is not finished yet, try again later
-
-
 			if (writeTask.nextTask == null) {
 				// i always assign to next right before i start its task, so if i set the finished flag without starting a task, that means i have called Finish and there's no next frame
-				// The finish normally cflosed the filestream, but not I will do it here
+				// The finish normally closed the filestream, but not I will do it here
 				// and the next Finish just sets the encodeTaskData.finished = true to trigger this code when all frames wating to be written have been written
 
 				started = false;
