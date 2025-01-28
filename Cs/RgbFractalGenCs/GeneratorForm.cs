@@ -144,7 +144,7 @@ public partial class GeneratorForm : Form {
 			spinSelect.SelectedIndex = zoomSelect.SelectedIndex = hueSelect.SelectedIndex = 1;
 			encodeSelect.SelectedIndex = 2;
 			SetupFractal();
-			threadsBox.Text = (maxTasks = Math.Max(0, Environment.ProcessorCount - 2)).ToString();
+			threadsBox.Text = (maxTasks = Math.Max(2, Environment.ProcessorCount - 2)).ToString();
 			bInit = modifySettings = helpPanel.Visible = false;
 
 			// Start the generator
@@ -448,7 +448,7 @@ public partial class GeneratorForm : Form {
 	private void BlurBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(blurBox, ref generator.selectBlur, 0, 40);
 	private void BrightnessBox_TextChanged(object sender, EventArgs e) => ParseClampRetextDiffApply(brightnessBox, ref generator.selectBrightness, 0, 300);
 	private void Parallel_Changed(object sender, EventArgs e) {
-		short newThreads = ParseClampRetext(threadsBox, 0, (short)maxTasks);
+		short newThreads = ParseClampRetext(threadsBox, 2, (short)maxTasks);
 		generator.selectMaxTasks = (short)(newThreads > 0 ? newThreads : -1);
 		generator.SelectThreadingDepth();
 	}
