@@ -63,10 +63,10 @@
 /* Initialise network in range (0,0,0) to (255,255,255) and set parameters
    ----------------------------------------------------------------------- */
 
-void NeuQuant::initnet(const unsigned char *thepic, int len, int sample, const int samplepix) {
+void NeuQuant::initnet(/*const unsigned char* thepic,*/ int len, int sample, const int samplepix) {
     int i, * p;
 
-    thepicture = thepic;
+    //thepicture = thepic;
     lengthcount = len;
     samplefac = sample;
     samplepixels = samplepix;
@@ -279,12 +279,12 @@ void NeuQuant::alterneigh(int rad, int i, int b, int g, int r) {
 /* Main Learning Loop
    ------------------ */
 
-bool NeuQuant::learn(System::Threading::CancellationToken* canceltoken) {
+bool NeuQuant::learn(unsigned char* p, System::Threading::CancellationToken* canceltoken) {
     int x, i, j, b, g, r;
     int radius = initradius, rad = radius >> radiusbiasshift, alpha, step, //samplepixels = lengthcount / (3 * samplefac), 
         delta = samplepixels / ncycles;
-    const unsigned char *p = thepicture;
-    const unsigned char *lim = thepicture + lengthcount;
+    //const unsigned char *p = thepicture;
+    const unsigned char *lim = p + lengthcount;
 
     alphadec = 30 + ((samplefac - 1) / 3);
     if (delta <= 0)
@@ -322,11 +322,13 @@ bool NeuQuant::learn(System::Threading::CancellationToken* canceltoken) {
     }
     auto& token = *canceltoken;
     int y = factor;
-    x /= y;
+    samplepixels /= y;
+    int cnt = 0;
     while (0 <= --y) {
         if (token.IsCancellationRequested)
             return true;
-        while (0 <= --x) {
+        for (x = samplepixels; 0 <= --x;) {
+            ++cnt;
             b = p[0] << netbiasshift;
             g = p[1] << netbiasshift;
             r = p[2] << netbiasshift;
@@ -345,5 +347,6 @@ bool NeuQuant::learn(System::Threading::CancellationToken* canceltoken) {
             }
         }
     }
+    cnt = cnt;
     return false;
 }

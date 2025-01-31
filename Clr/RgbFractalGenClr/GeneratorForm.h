@@ -20,38 +20,21 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::ComboBox^ fractalSelect;
 	private: System::Windows::Forms::TextBox^ resX;
 	private: System::Windows::Forms::TextBox^ resY;
-
 	private: System::Windows::Forms::TextBox^ periodBox;
 	private: System::Windows::Forms::Label^ delayLabel;
 	private: System::Windows::Forms::TextBox^ delayBox;
-
 	private: System::Windows::Forms::Button^ prevButton;
 	private: System::Windows::Forms::Button^ nextButton;
 	private: System::Windows::Forms::Button^ animateButton;
 	private: System::Windows::Forms::Label^ voidLabel;
-
-
-
-
-
 	private: System::Windows::Forms::Label^ dotLabel;
-
-
-
 	private: System::Windows::Forms::Label^ threadsLabel;
-
-
-
 	private: System::Windows::Forms::Label^ statusLabel;
 	private: System::Windows::Forms::Label^ infoLabel;
 	private: System::Windows::Forms::Button^ pngButton;
 	private: System::Windows::Forms::Button^ gifButton;
-
-
 	private: System::Windows::Forms::TextBox^ defaultZoom;
 	private: System::Windows::Forms::TextBox^ defaultAngle;
-
-
 	private: System::Windows::Forms::TextBox^ cutparamBox;
 	private: System::Windows::Forms::TextBox^ defaultHue;
 	private: System::Windows::Forms::TextBox^ periodMultiplierBox;
@@ -88,9 +71,6 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::Button^ restartButton;
 	private: System::Windows::Forms::ComboBox^ resSelect;
 	private: System::Windows::Forms::ComboBox^ encodeSelect;
-
-
-
 
 	private: System::ComponentModel::IContainer^ components;
 

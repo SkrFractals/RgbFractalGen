@@ -178,26 +178,24 @@ bool GifEncoder::push_parallel(GifEncoderPixelFormat format, uint8_t* frame, con
     auto& encode = *encodePtr;
     encode.m_delay = delay;
     encode.setSize(width, height); // set the frame size
-    /*if (format == GifEncoderPixelFormat::PIXEL_FORMAT_BGR)
+    if (format == GifEncoderPixelFormat::PIXEL_FORMAT_BGR)
         encode.thepicture = frame; // use the pixels directly without copying if they are alraedy BGR
-    else */
+    else 
         if (encode.alloc(1) || !encode.convertToBGR(format, encode.thepicture, frame, encode.lengthcount)) // otherwise, do the copy allocation coversion
         return abort(true); // failed to allocate memory or convert to BGR
-    return abort(pushTask(encode, token == nullptr ? encode.token : token)); // start the task of encoding the frame
-}
-bool GifEncoder::pushTask(NeuQuantTask& encode, System::Threading::CancellationToken* token) const {
-    const auto nPix = encode.m_frameWidth * encode.m_frameHeight;
-    encode.getColorMap(m_quality, token); // run the neuquant learning
-    if (token->IsCancellationRequested)
-        return encode.failed = true; // fail if cancelled
-    encode.getRasterBits(encode.thepicture, token); // make raster bits
-    encode.finished = !(encode.failed = token->IsCancellationRequested);// fail if cancelled or else succeed and mark the task as finished and ready to write into the file
-    return encode.failed;
+    if(encode.getColorMap(m_quality, token)) // run the neuquant learning
+        return abort(encode.failed = true); // fail if cancelled
+    if(encode.getRasterBits(encode.thepicture, token)) // make raster bits
+        return abort(encode.failed = true);
+    return encode.finished = true;
 }
 GifEncoderTryWriteResult GifEncoder::tryWrite(System::Threading::CancellationToken* token) {
-    GifEncoderTryWriteResult r = tryWriteInternal(token);
+    GifEncoderTryWriteResult r;
+    mtx.lock();
+    r = tryWriteInternal(token);
     if (r == GifEncoderTryWriteResult::Failed)
         abort(true);
+    mtx.unlock();
     return r;
 }
 GifEncoderTryWriteResult GifEncoder::tryWriteInternal(System::Threading::CancellationToken* token) {

@@ -28,8 +28,6 @@ public enum GifEncoderTryWriteResult : uint8_t {
 
 public struct NeuQuantTask {
 
-   
-
     // Paralellism variables:
     ColorMapObject* colorMap;
     GifByteType* rasterBits;
@@ -104,11 +102,11 @@ public struct NeuQuantTask {
         }
         return true;
     }
-    void getColorMap(const int quality, System::Threading::CancellationToken* canceltoken) {
+    bool getColorMap(const int quality, System::Threading::CancellationToken* canceltoken) {
         colorMap = GifMakeMapObject(256, nullptr);
-        learn(canceltoken == nullptr ? token : canceltoken, quality);
+        return learn(canceltoken == nullptr ? token : canceltoken, quality);
     }
-    void getRasterBits(uint8_t* pixels, System::Threading::CancellationToken* canceltoken) {
+    bool getRasterBits(uint8_t* pixels, System::Threading::CancellationToken* canceltoken) {
         const int pix = m_frameWidth * m_frameHeight;
         rasterBits = (GifByteType*)malloc(pix);
 
@@ -119,17 +117,18 @@ public struct NeuQuantTask {
             for (int i = 0, x = pix; x > 0; --x) {
                 GRB_BODY(i)
             }
-            return;
+            return false;
         }
         // with cancellation token
         auto& tokenR = *canceltoken;
         for (int i = 0, y = m_frameHeight; y > 0; --y) {
             if (tokenR.IsCancellationRequested)
-                return;
+                return true;
             for (int x = m_frameWidth; x > 0; --x) {
                 GRB_BODY(i)
             }
         }
+        return false;
     }
 private:
     bool learn(System::Threading::CancellationToken* canceltoken, const int quality) {
@@ -147,8 +146,8 @@ private:
                 }
                 ++t;
             }
-        neuquant.initnet(thepicture, lengthcount, quality, samplepixels);
-        if (neuquant.learn(canceltoken))
+        neuquant.initnet(/*thepicture,*/ lengthcount, quality, samplepixels);
+        if (neuquant.learn(thepicture, canceltoken))
             return true;
         neuquant.unbiasnet();
         neuquant.inxbuild();
@@ -344,12 +343,14 @@ public:
     inline bool isFinishedAnimation() const { return finishedAnimation; }
     inline int getFinishedFrame() const { return finishedFrame; }
 
+    bool m_parallel = false;
+
 private:
     GifEncoderTryWriteResult tryWriteInternal(System::Threading::CancellationToken* token);
     /** Attempts to open a file, returns true if failed (unlike most other function returns here) */
     bool initOpen(const std::string& file, int width, int height);
     bool endOpen(NeuQuantTask& encode, int16_t loop);
-    bool pushTask(NeuQuantTask& task, System::Threading::CancellationToken* token) const;
+    bool pushTask(NeuQuantTask& task, System::Threading::CancellationToken* token);
     void cleartask(NeuQuantTask& task);
 
     /*inline bool isFirstFrame() const {
@@ -375,6 +376,8 @@ private:
 
     void freeEverything();
 
+   
+
 private:
 
     // Original variables
@@ -393,7 +396,7 @@ private:
     // SkrFractals additions:
     NeuQuantTask* data_encode = nullptr, * data_write = nullptr;
     bool finishedAnimation = false;
-    bool m_parallel = false;
+   
     int finishedFrame = 0;
     int addedFrames = 0;
     std::mutex mtx;

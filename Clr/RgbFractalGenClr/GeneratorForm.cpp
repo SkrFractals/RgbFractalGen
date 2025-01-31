@@ -149,7 +149,7 @@ namespace RgbFractalGenClr {
 		this->periodBox->Name = L"periodBox";
 		this->periodBox->Size = System::Drawing::Size(86, 23);
 		this->periodBox->TabIndex = 7;
-		this->periodBox->Text = L"120";
+		this->periodBox->Text = L"10";
 		this->periodBox->TextChanged += gcnew System::EventHandler(this, &GeneratorForm::PeriodBox_TextChanged);
 		// 
 		// delayBox
@@ -906,7 +906,7 @@ namespace RgbFractalGenClr {
 		spinSelect->SelectedIndex = 1;
 		zoomSelect->SelectedIndex = 1;
 		hueSelect->SelectedIndex = 1;
-		encodeSelect->SelectedIndex = 1; // TODO set it to 2 when gif is debugged
+		encodeSelect->SelectedIndex = 2;
 		SetupFractal();
 		threadsBox->Text = (maxTasks = Math::Max(1, Environment::ProcessorCount - 2)).ToString();
 		modifySettings = false;
@@ -921,8 +921,9 @@ namespace RgbFractalGenClr {
 	System::Void GeneratorForm::timer_Tick(System::Object^ sender, System::EventArgs^ e) {
 		// Window Size Update
 		WindowSizeRefresh();
+		const auto gTaskNotRunning = IsTaskNotRunning(gTask);
 		if (queueReset > 0) {
-			if (!(IsTaskNotRunning(gTask) && IsTaskNotRunning(aTask)))
+			if (!(gTaskNotRunning && IsTaskNotRunning(aTask)))
 				return;
 			if (queueAbort)
 				aTask = Task::Run(gcnew Action(this, &GeneratorForm::Abort), (cancel = gcnew CancellationTokenSource())->Token);
@@ -936,16 +937,15 @@ namespace RgbFractalGenClr {
 		}
 		if (restartTimer > 0 && (restartTimer -= timer->Interval) <= 0)
 			ResetRestart();
-		const auto gTaskNotRunning = IsTaskNotRunning(gTask);
 		// Fetch the state of generated bitmaps
-		const auto b = generator->GetBitmapsFinished(), bt = generator->GetFrames();
-		if (bt <= 0)
+		const auto bitmapsFinished = generator->GetBitmapsFinished(), bitmapsTotal = generator->GetFrames();
+		if (bitmapsTotal <= 0)
 			return;
 		// Only Allow GIF Export when generation is finished
 		gifButton->Enabled = generator->IsGifReady() && gTaskNotRunning;
-		if (b > 0) {
+		if (bitmapsFinished > 0) {
 			// Fetch bitmap, make sure the index is is range
-			Bitmap^ bitmap = generator->GetBitmap(currentBitmapIndex = currentBitmapIndex % b);
+			Bitmap^ bitmap = generator->GetBitmap(currentBitmapIndex = currentBitmapIndex % bitmapsFinished);
 			if (bitmap != nullptr) {
 				// Update the display with it if necessary
 				if (currentBitmap != bitmap) {
@@ -954,22 +954,23 @@ namespace RgbFractalGenClr {
 				}
 				// Animate the frame index
 				if (animated)
-					currentBitmapIndex = (currentBitmapIndex + 1) % b;
+					currentBitmapIndex = (currentBitmapIndex + 1) % bitmapsFinished;
 			}
 		}
 		// Info text refresh
-		if (b < bt) {
+		if (bitmapsFinished < bitmapsTotal) {
 			statusLabel->Text = "Generating: ";
-			infoLabel->Text = b.ToString();
+			infoLabel->Text = bitmapsFinished.ToString();
 		} else {
 			statusLabel->Text = "Finished: ";
 			infoLabel->Text = currentBitmapIndex.ToString();
 		}
-		infoLabel->Text += " / " + bt.ToString();
+		infoLabel->Text += " / " + bitmapsTotal.ToString();
 		gifButton->Text = gTaskNotRunning ? "Save GIF" : "Saving GIF...";
 	}
 	System::Void GeneratorForm::GeneratorForm_FormClosing(System::Object^ sender, System::Windows::Forms::FormClosingEventArgs^ e) {
-		if (!IsTaskNotRunning(gTask)) {
+		const auto gTaskRunning = !IsTaskNotRunning(gTask);
+		if (gTaskRunning) {
 			auto result = MessageBox::Show(
 				"Your GIF is still saving!\nAre you sure you want to close the application and potentially lose it?",
 				"Confirm Exit",
@@ -982,7 +983,7 @@ namespace RgbFractalGenClr {
 		}
 		if (cancel != nullptr)
 			cancel->Cancel();
-		if (!IsTaskNotRunning(gTask))
+		if (gTaskRunning)
 			gTask->Wait();
 		if (!IsTaskNotRunning(aTask))
 			aTask->Wait();
@@ -1027,8 +1028,7 @@ namespace RgbFractalGenClr {
 		if (modifySettings)
 			return;
 		// Resets the generator
-		// (Abort should be called before this or else it will crash)
-		// generator->StartGenerate(); should be called after
+		// (Abort should be called before this or else it will crash, generator->StartGenerate should be called after)
 		gifButton->Enabled = false;
 		currentBitmapIndex = 0;
 		generator->ResetGenerator();
@@ -1305,7 +1305,7 @@ namespace RgbFractalGenClr {
 		QueueReset(true);
 	}
 	System::Void GeneratorForm::EncodeSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		if (encodeSelect->SelectedIndex == 2) {
+		/*if (encodeSelect->SelectedIndex == 2) {
 			auto result = MessageBox::Show(
 				"GIF encoding is not available in Clr version yet.\n You can use GIF encoding in the Cs version.",
 				"Not available",
@@ -1313,7 +1313,7 @@ namespace RgbFractalGenClr {
 				MessageBoxIcon::Error);
 			encodeSelect->SelectedIndex = 1;
 			return;
-		}
+		}*/
 
 		if ((generator->selectGenerationType = (GenerationType)Math::Max(0, encodeSelect->SelectedIndex)) && !generator->IsGifReady())
 			QueueReset(false);

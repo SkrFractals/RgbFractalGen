@@ -46,7 +46,7 @@ public struct NeuQuant {
 /* Types and Global Variables
    -------------------------- */
 
-	const unsigned char* thepicture;        /* the input image itself */
+	//const unsigned char* thepicture;        /* the input image itself */
 	int lengthcount;                /* lengthcount = H*W*3 */
 	int samplefac;                /* sampling factor 1..30 */
 	typedef int pixel[4];                /* BGRc */
@@ -64,7 +64,7 @@ public struct NeuQuant {
 
 	/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 	   ----------------------------------------------------------------------- */
-	void initnet(const unsigned char* thepic, const int len, const int sample, const int samplepix);
+	void initnet(/*const unsigned char* thepic, */const int len, const int sample, const int samplepix);
 
 	/* Unbias network to give byte values 0..255 and record position i to prepare for sort
 	   ----------------------------------------------------------------------------------- */
@@ -86,7 +86,7 @@ public struct NeuQuant {
 
 	/* Main Learning Loop
 	   ------------------ */
-	bool learn(System::Threading::CancellationToken* canceltoken);
+	bool learn(unsigned char* thepicture, System::Threading::CancellationToken* canceltoken);
 
 private:
     /* Search for biased BGR values

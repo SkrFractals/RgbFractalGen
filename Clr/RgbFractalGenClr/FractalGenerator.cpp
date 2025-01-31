@@ -351,7 +351,7 @@ namespace RgbFractalGenClr {
 		while (!cancel->Token.IsCancellationRequested && bitmapsFinished < bitmap->Length) {
 			// Initialize buffers (delete and reset if size changed)
 			//const int16_t batchTasks = Math::Max(static_cast<int16_t>(1), applyMaxTasks = selectMaxTasks);
-			if ((applyMaxTasks = Math::Max(static_cast<int16_t>(1), selectMaxTasks)) != allocatedTasks) {
+			if ((applyMaxTasks = Math::Max(static_cast<int16_t>(1), selectMaxTasks)) != allocatedTasks) { 
 				if (allocatedTasks >= 0) {
 					for (uint16_t t = 0; t < allocatedTasks; ++t) {
 						auto& task = tasks[t];
@@ -807,7 +807,10 @@ namespace RgbFractalGenClr {
 		if (applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr) {
 			if (parallelGif) 
 				((GifEncoder*)gifEncoder)->push_parallel((uint8_t*)(void*)(bitmapData[task.bitmapIndex]->Scan0), selectWidth, selectHeight, selectDelay, task.bitmapIndex, &cancel->Token);
-			else ((GifEncoder*)gifEncoder)->push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, (uint8_t*)(void*)(bitmapData[task.bitmapIndex]->Scan0), selectWidth, selectHeight, selectDelay);
+			else {
+				((GifEncoder*)gifEncoder)->push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, (uint8_t*)(void*)(bitmapData[task.bitmapIndex]->Scan0), selectWidth, selectHeight, selectDelay);
+				bitmapState[task.bitmapIndex] = BitmapState::Finished;
+			}
 		} else bitmapState[task.bitmapIndex] = BitmapState::Finished;
 #ifdef CUSTOMDEBUG
 		const auto gifsElapsed = (std::chrono::steady_clock::now() - gifTime).count();
@@ -888,23 +891,24 @@ namespace RgbFractalGenClr {
 		return task.state == TaskState::Done ? Join(task) : task.state != TaskState::Free;
 	}
 	void FractalGenerator::TryFinishBitmaps() {
-		while (applyGenerationType >= GenerationType::EncodeGIF) {
-			int unlock = ((GifEncoder*)gifEncoder)->getFinishedFrame();
-			// Try to finalize the previous encoder tasks
-			switch (((GifEncoder*)gifEncoder)->tryWrite(&cancel->Token)) {
-			case GifEncoderTryWriteResult::Failed:
-				// fallback to only display animation without encoding
-				applyGenerationType = GenerationType::AnimationRAM;
-				return;
-			case GifEncoderTryWriteResult::FinishedFrame:
-				// mark the bitmap state as fully finished
-				bitmapState[unlock] = BitmapState::Finished;
-				break;
-			default:
-				// waiting or finished animation
-				return;
+		if (parallelGif)
+			while (applyGenerationType >= GenerationType::EncodeGIF) {
+				int unlock = ((GifEncoder*)gifEncoder)->getFinishedFrame();
+				// Try to finalize the previous encoder tasks
+				switch (((GifEncoder*)gifEncoder)->tryWrite(&cancel->Token)) {
+				case GifEncoderTryWriteResult::Failed:
+					// fallback to only display animation without encoding
+					applyGenerationType = GenerationType::AnimationRAM;
+					return;
+				case GifEncoderTryWriteResult::FinishedFrame:
+					// mark the bitmap state as fully finished
+					bitmapState[unlock] = BitmapState::Finished;
+					break;
+				default:
+					// waiting or finished animation
+					return;
+				}
 			}
-		}
 	}
 	/*bool FractalGenerator::TryGif(FractalTask& task) {
 		
@@ -1206,6 +1210,10 @@ namespace RgbFractalGenClr {
 			// Try to save (move the temp) the gif file
 			//if (gifEncoder != nullptr)
 			//	((GifEncoder*)gifEncoder)->close();
+			try { 
+				File::Delete(gifPath); 
+			} 
+			catch (Exception^) {}
 			File::Move(gifTempPath, gifPath);
 		} catch (IOException^ ex) {
 			System::String^ exs = "SaveGif: An error occurred: " + ex->Message;

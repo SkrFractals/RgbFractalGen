@@ -245,8 +245,8 @@ public partial class GeneratorForm : Form {
 		if (restartTimer > 0 && (restartTimer -= (short)timer.Interval) <= 0)
 			ResetRestart();
 		// Fetch the state of generated bitmaps
-		int b = generator.GetBitmapsFinished(), bt = generator.GetFrames();
-		if (bt <= 0)
+		int bitmapsFinished = generator.GetBitmapsFinished(), bitmapsTotal = generator.GetFrames();
+		if (bitmapsTotal <= 0)
 			return;
 		// Only Allow GIF Export when generation is finished
 		if (gTask == null) {
@@ -257,9 +257,9 @@ public partial class GeneratorForm : Form {
 			gifButton.Text = "Cancel Saving GIF";
 		}
 		// Handle currentBitmap
-		if (b > 0) {
+		if (bitmapsFinished > 0) {
 			// Fetch bitmap, make sure the index is is range
-			currentBitmapIndex %= b;
+			currentBitmapIndex %= bitmapsFinished;
 			var bitmap = generator.GetBitmap(currentBitmapIndex);
 			// Update the display with it if necessary
 			if (currentBitmap != bitmap) {
@@ -268,11 +268,11 @@ public partial class GeneratorForm : Form {
 			}
 			// Animate the frame index
 			if (animated)
-				currentBitmapIndex = (currentBitmapIndex + 1) % b;
+				currentBitmapIndex = (currentBitmapIndex + 1) % bitmapsFinished;
 		}
 		// Info text refresh
-		statusLabel.Text = b < bt ? "Generating: " : "Finished: ";
-		infoLabel.Text = (b < bt ? b.ToString() : currentBitmapIndex.ToString()) + " / " + bt.ToString();
+		statusLabel.Text = bitmapsFinished < bitmapsTotal ? "Generating: " : "Finished: ";
+		infoLabel.Text = (bitmapsFinished < bitmapsTotal ? bitmapsFinished.ToString() : currentBitmapIndex.ToString()) + " / " + bitmapsTotal.ToString();
 
 
 	}
