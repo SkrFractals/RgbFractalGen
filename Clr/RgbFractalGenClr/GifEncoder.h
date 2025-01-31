@@ -1,5 +1,6 @@
 //
 // Created by xiaozhuai on 2020/12/20.
+// Expanded by SkrFractals on 2025/01/31
 //
 
 #ifndef GIF_GIFENCODER_H
@@ -7,169 +8,99 @@
 
 #include <string>
 #include <vector>
-#include "algorithm/NeuQuant.h"
+#include <thread>
 #include <mutex>
 #include "giflib/gif_lib.h"
+#include "algorithm/NeuQuant.h"
 
+#pragma region ENUMS
+/** Allowed pixel formats, BGR_NATIVE is fastest and will not allocate new mmemory, you should not unlock/free that frame data until the encoding task is finished*/
 public enum GifEncoderPixelFormat : uint8_t {
     PIXEL_FORMAT_UNKNOWN = 0,
-    PIXEL_FORMAT_BGR = 1,
-    PIXEL_FORMAT_RGB = 2,
-    PIXEL_FORMAT_BGRA = 3,
-    PIXEL_FORMAT_RGBA = 4,
+    PIXEL_FORMAT_BGR_NATIVE = 1,
+    PIXEL_FORMAT_BGR = 2,
+    PIXEL_FORMAT_RGB = 3,
+    PIXEL_FORMAT_BGRA = 4,
+    PIXEL_FORMAT_RGBA = 5,
 };
 
+/** Return of tryWrite call, informing you how it went */
 public enum GifEncoderTryWriteResult : uint8_t {
     Failed = 0,				// Error has occured, and the file was aborted.
     Waiting = 1,			// Next frame was not written because it was either not supplied yet, or it's task is still running.
     FinishedFrame = 2,		// Next frame was successfully written into the stream
     FinishedAnimation = 3	// The stream was sucessfully finished
 };
+#pragma endregion
 
+#pragma region TASK_STRUCT
+/** SkrFractals expansion: A structture holding the data for and performing the parallel neuquant */
 public struct NeuQuantTask {
 
     // Paralellism variables:
-    ColorMapObject* colorMap;
-    GifByteType* rasterBits;
-    int frameIndex;
-    int m_delay;
-    bool finished;
-    bool failed;
-    int m_allocSize;
-    int m_frameWidth;
-    int m_frameHeight;
+    ColorMapObject* colorMap;   // learned color map from NeuQuant
+    GifByteType* rasterBits;    // rasterBits to write into the file
+    int frameIndex;             // index of the frame in order to write into the file (needed if you push them out of order)
+    int m_delay;                // delay of this frame
+    bool finished;              // is NeuQuant's learn finished?
+    bool failed;                // has something failed?
+    int m_allocSize;            // how many bytes of thepicture are allocated
+    int m_frameWidth;           // width of the image
+    int m_frameHeight;          // height of the image
+    int transIndex;             // index of the transparent color
+    int transR, transG, transB; // transparent color
     //int factor;
-    NeuQuant neuquant = NeuQuant();
-    NeuQuantTask* nextTask;
-    std::thread* thisTask;
-    uint8_t* thepicture;
-    int lengthcount;        /* lengthcount = H*W*3 */
-    //int m_quality;          /* sampling factor 1..30 */
-    int samplepixels;
-    System::Threading::CancellationToken* token;
+    NeuQuant 
+        neuquant = NeuQuant();  // unstaticed instance of neuquant to allow it to run in parallel
+    NeuQuantTask* nextTask;     // next pushed task (can be out of order frame)
+    std::thread* thisTask;      // if the task makes it's own thread, it writes it here, and also to the reference supplied in the push
+    uint8_t* thepicture;        // BGR bytes of the picture
+    int lengthcount;            // = Height * Width * 3
+    int samplepixels;           // = lengthcount / (3 * quality)
+    int factor;                 // balanced factor of samplepixels to evenly split the learn loop
+    System::Threading::CancellationToken* 
+        token;                  // cancellation token
 
-    NeuQuantTask() {
-        token = nullptr;
-        nextTask = nullptr;
-        finished = failed = false;
-        thisTask = nullptr;
-        thepicture = nullptr;
-        m_allocSize = -1;
-        colorMap = nullptr;
-        rasterBits = nullptr;
-        frameIndex = m_frameWidth = m_frameHeight = -1;
-    }
-    void setSize(int w, int h) {
-        lengthcount = 3 * (m_frameWidth = w) * (m_frameHeight = h);
-    }
-    bool alloc(int needSize) {
-        if (m_allocSize >= (needSize *= lengthcount)) // already allocated enough
-            return false;
-        void* tryalloc = m_allocSize <= 0 ? malloc(m_allocSize = needSize) : realloc(thepicture, m_allocSize = needSize); // try allocate or reallocate
-        if (tryalloc == nullptr)
-            return true; // failed to allocate memory
-        thepicture = (uint8_t*)tryalloc;
-        return false;
-    }
-    bool convertToBGR(GifEncoderPixelFormat format, uint8_t* dst, const uint8_t* src, const int len) {
-        switch (format) {
-        case PIXEL_FORMAT_BGR:
-            memcpy(dst, src, len);
-            break;
-        case PIXEL_FORMAT_RGB:
-            for (const uint8_t* dstEnd = dst + len; dst < dstEnd; src += 3) {
-                *(dst++) = *(src + 2);
-                *(dst++) = *(src + 1);
-                *(dst++) = *(src);
-            }
-            break;
-        case PIXEL_FORMAT_BGRA:
-            for (const uint8_t* dstEnd = dst + len; dst < dstEnd; src += 4) {
-                *(dst++) = *(src);
-                *(dst++) = *(src + 1);
-                *(dst++) = *(src + 2);
-            }
-            break;
-        case PIXEL_FORMAT_RGBA:
-            for (const uint8_t* dstEnd = dst + len; dst < dstEnd; src += 4) {
-                *(dst++) = *(src + 2);
-                *(dst++) = *(src + 1);
-                *(dst++) = *(src);
-            }
-            break;
-        default:
-            return false;
-        }
-        return true;
-    }
-    bool getColorMap(const int quality, System::Threading::CancellationToken* canceltoken) {
-        colorMap = GifMakeMapObject(256, nullptr);
-        return learn(canceltoken == nullptr ? token : canceltoken, quality);
-    }
-    bool getRasterBits(uint8_t* pixels, System::Threading::CancellationToken* canceltoken) {
-        const int pix = m_frameWidth * m_frameHeight;
-        rasterBits = (GifByteType*)malloc(pix);
+    NeuQuantTask(const int width, const int height);
 
-#define GRB_BODY(i) const auto i3 = i * 3; rasterBits[i++] = neuquant.inxsearch( pixels[i3], pixels[i3 + 1], pixels[i3 + 2]);
+    void setTransparent(const int r, const int g, const int b);
 
-        if ((canceltoken = canceltoken == nullptr ? token : canceltoken) == nullptr) {
-            // without cancellation token
-            for (int i = 0, x = pix; x > 0; --x) {
-                GRB_BODY(i)
-            }
-            return false;
-        }
-        // with cancellation token
-        auto& tokenR = *canceltoken;
-        for (int i = 0, y = m_frameHeight; y > 0; --y) {
-            if (tokenR.IsCancellationRequested)
-                return true;
-            for (int x = m_frameWidth; x > 0; --x) {
-                GRB_BODY(i)
-            }
-        }
-        return false;
-    }
+    /** changes the size, return true if changed */
+    bool setSize(const int width, const int height);
+
+    /** attmepts to allocate memory for thepicture */
+    bool alloc(const int needSize);
+
+    /** copies pixels into thepicture in BGR format */
+    bool convertToBGR(GifEncoderPixelFormat format, uint8_t* dst, const uint8_t* src) const;
+
+    /** runs the NeuQuant's learn to get the color palette */
+    bool getColorMap(const int quality);
+
+    /** gets raster bits according to the colormap */
+    bool getRasterBits(uint8_t* pixels);
+
 private:
-    bool learn(System::Threading::CancellationToken* canceltoken, const int quality) {
-        int s = samplepixels = lengthcount / (3 * quality);
-        neuquant.factor = 1;
-
-        canceltoken = canceltoken == nullptr ? token : canceltoken;
-
-        if (canceltoken != nullptr) // find a balanced factor of samplepixels
-            for (int t = 2, ft = neuquant.factor * t, st = s / t; ft - st < s - neuquant.factor; ft = neuquant.factor * t, st = s / t) {
-                if ((s % t) == 0) {
-                    neuquant.factor = ft;
-                    s = st;
-                    continue;
-                }
-                ++t;
-            }
-        neuquant.initnet(/*thepicture,*/ lengthcount, quality, samplepixels);
-        if (neuquant.learn(thepicture, canceltoken))
-            return true;
-        neuquant.unbiasnet();
-        neuquant.inxbuild();
-        neuquant.getcolourmap((uint8_t*)colorMap->Colors);
-        return false;
+    inline void getRasterPix(const uint8_t* pic, const int pix) {
+        const auto i3 = pix * 3;
+        rasterBits[pix] = neuquant.inxsearch(pic[i3], pic[i3 + 1], pic[i3 + 2]);
     }
-
 };
+#pragma endregion
 
 class GifEncoder {
 
-    // ORIGINALS:
-    //bool open(const std::string &file, int width, int height, int quality, bool useGlobalColorMap, int16_t loop, int preAllocSize = 0);
-    //bool push(PixelFormat format, const uint8_t *frame, int width, int height, int delay);
-    //bool close();
+    // ---------------------
+    // Xiaozhuai's Original:
 
 public:
+
+#pragma region ORIGINAL_PUBLIC
+
     GifEncoder() = default;
 
-#pragma region ORIGINAL
     /**
-     * create gif file - original synchronous version for compatibily
+     * create gif file - original synchronous version for compatibily, allowing cancellation
      *
      * @param file file path
      * @param width gif width
@@ -180,33 +111,86 @@ public:
      * @param preAllocSize For better performance, it's suggested to set preAllocSize. If you can't determine it, set to 0.
      *        If use global color map (you won't, it's disabled in this threading version), all frames size must be same, and preAllocSize = width * height * 3 * nFrame
      *        If use local color map, preAllocSize = MAX(width * height) * 3
+     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable
      * @return success
      */
-    bool open(const std::string& file, int width, int height, int quality, bool useGlobalColorMap, int16_t loop, int preAllocSize = 0);
+    bool open(const std::string& file, const int width, const int height, 
+              const int quality = 1, const bool useGlobalColorMap = false, const int16_t loop = 0, 
+              const int preAllocSize = 0, System::Threading::CancellationToken* token = nullptr);
 
     /**
-     * add frame - original compatibility, doesn't support cancellation or out of order frame pushing
+    * add frame - original compatibility - allowing out of order pushing, allowing cancellation
+    *
+    * @param format pixel format
+    * @param frame frame data
+    * @param width frame width
+    * @param height frame height
+    * @param delay delay time 0.01s
+    * @param task - starts its own push task and puts it into the reference
+    * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
+    * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
+    * @return
+    */
+    bool push(const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, 
+              const int delay = 5, const int frameIndex = -1, System::Threading::CancellationToken* token = nullptr);
+
+    /**
+     * add frame - original compatibility - only uncopied BGR, allowing out of order pushing, allowing cancellation
      *
-     * @param format pixel format
      * @param frame frame data
      * @param width frame width
      * @param height frame height
      * @param delay delay time 0.01s
      * @param task - starts its own push task and puts it into the reference
+     * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
+     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
-    bool push(GifEncoderPixelFormat format, const uint8_t* frame, int width, int height, int delay);
+    inline bool push(uint8_t* frame, const int width, const int height,
+              const int delay = 5, const int frameIndex = -1, System::Threading::CancellationToken* token = nullptr) {
+        return push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, token);
+    }
 
     /**
-     * close gif file
+     * close gif file, but if in parallel it just marks the pushes as final, and you need to complete the file by calling tryWrite until a finished or failed result
      *
+     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
-    bool close();
+    bool close(System::Threading::CancellationToken* token = nullptr);
 
 #pragma endregion
 
-#pragma region PARALLEL
+private:
+
+#pragma region ORIGINAL_PRIVATES_AND_VARIABLES
+    bool setupTask(NeuQuantTask* pushPtr, const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, System::Threading::CancellationToken* token);
+
+    /** Encodes the frame */
+    void encodeFrame(NeuQuantTask& task, const int delay);
+
+    //inline bool isFirstFrame() const {return m_frameCount == 0;} // unused
+
+    inline void reset();
+
+    // Original variables:
+    void* m_gifFileHandler = nullptr;
+    int m_quality = 10;
+    bool m_useGlobalColorMap = false;
+    std::vector<int> m_allFrameDelays{};
+    int m_frameCount = 0;
+#pragma endregion
+
+    // Xiaozhuai's Original end
+    // ------------------------
+
+    // ----------------------
+    // SkrFractals expansion:
+
+public:
+
+#pragma region EXPANSION_PUBLIC
+
     /**
     * create gif file
     *
@@ -219,112 +203,24 @@ public:
     * @return success
     */
     bool open_parallel(const std::string& file, const int width, const int height,
-                       const int quality, int16_t loop, System::Threading::CancellationToken* token);
+                       const int quality = 1, int16_t loop = 0, System::Threading::CancellationToken* token = nullptr);
 
-    /**
-    * add frame - not cancellable (or cancellable from open's token)
-    *
-    * @param format pixel format
-    * @param frame frame data
-    * @param width frame width
-    * @param height frame height
-    * @param delay delay time 0.01s
-    * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
-    * @return
-    */
-    inline bool push_parallel(GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, const int frameIndex) {
-        return push_parallel(format, frame, width, height, delay, frameIndex, nullptr);
+    /** set transparent color */
+    inline void setTransparent(const int b, const int g, const int r) {
+        transB = b;
+        transG = g;
+        transR = r;
+        transparent = true;
+    }
+
+    /** resets transparency (makes opaque again) */
+    inline void resetTransparent() {
+        transB = transG = transR = -1;
+        transparent = false;
     }
 
     /**
-     * add frame - only sequential
-     *
-     * @param format pixel format
-     * @param frame frame data
-     * @param width frame width
-     * @param height frame height
-     * @param delay delay time 0.01s
-     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
-     * @return
-     */
-    inline bool push_parallel(GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, System::Threading::CancellationToken* token) {
-        return push_parallel(format, frame, width, height, delay, -1, token);
-    }
-
-    /**
-    * add frame - only sequential, not cancellable (or cancellable from open's token)
-    *
-    * @param format pixel format
-    * @param frame frame data
-    * @param width frame width
-    * @param height frame height
-    * @param delay delay time 0.01s
-    * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
-    * @return
-    */
-    inline bool push_parallel(GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay) {
-        push_parallel(format, frame, width, height, delay, -1, nullptr);
-    }
-
-    /**
-    * add frame - BGR, not cancellable (or cancellable from open's token)
-    *
-    * @param frame frame data
-    * @param width frame width
-    * @param height frame height
-    * @param delay delay time 0.01s
-    * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
-    * @return
-    */
-    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay, const int frameIndex) {
-        return  push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame, width, height, delay, frameIndex, nullptr);
-    }
-
-    /**
-     * add frame - BGR, only sequential
-     *
-     * @param frame frame data
-     * @param width frame width
-     * @param height frame height
-     * @param delay delay time 0.01s
-     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
-     * @return
-     */
-    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay, System::Threading::CancellationToken* token) {
-        return  push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame, width, height, delay, -1, token);
-    }
-
-    /**
-    * add frame - BGR, only sequential, not cancellable (or cancellable from open's token)
-    *
-    * @param frame frame data
-    * @param width frame width
-    * @param height frame height
-    * @param delay delay time 0.01s
-    * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
-    * @return
-    */
-    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay) {
-        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame, width, height, delay, -1, nullptr);
-    }
-
-    /**
-     * add frame - BGR
-     *
-     * @param frame frame data
-     * @param width frame width
-     * @param height frame height
-     * @param delay delay time 0.01s
-     * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
-     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
-     * @return
-     */
-    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay, const int frameIndex, System::Threading::CancellationToken* token) {
-        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame, width, height, delay, frameIndex, token);
-    }
-
-    /**
-     * add frame
+     * add frame - allowing out of order, cancellable (or cancellable from open's token)
      *
      * @param format pixel format
      * @param frame frame data
@@ -332,76 +228,86 @@ public:
      * @param height frame height
      * @param delay delay time 0.01s
      * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
-     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
+     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open_parallel()
      * @return
      */
-    bool push_parallel(GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, const int frameIndex, System::Threading::CancellationToken* token);
+    bool push_parallel(const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height,
+                       const int delay = 5, const int frameIndex = -1, System::Threading::CancellationToken* token = nullptr);
 
-    GifEncoderTryWriteResult tryWrite(System::Threading::CancellationToken* token);
+    /**
+    * add frame - only uncopied BGR, allowing out of order, cancellable (or cancellable from open's token)
+    *
+    * @param frame frame data
+    * @param width frame width
+    * @param height frame height
+    * @param delay delay time 0.01s
+    * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
+    * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open_parallel()
+    * @return
+    */
+    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay = 5, const int frameIndex = -1, System::Threading::CancellationToken* token = nullptr) {
+        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, token);
+    }
+
+    /**
+    * try to write next frame into the file - this is only for parallel mode
+    *
+    * @param parallel - if you are calling this in parallel, set this to true so it locks inself to preserve data integrity!
+    * @return Failed = somethign went wrong, stop trying the file has been closed. Waiting - try again later, or some frames are missing. FinishedFrame - one frame was written. FinishedAnimation - file is completed.
+    */
+    GifEncoderTryWriteResult tryWrite(bool parallel = false);
+
+    /** has the file been fully written ? */
+    inline bool isFinishedAnimation() const { return finishedAnimation; }
+
+    /** how many frames have been written into the file already? */
+    inline int getFinishedFrame() const { return finishedFrame; }
 #pragma endregion
 
-    inline bool isFinishedAnimation() const { return finishedAnimation; }
-    inline int getFinishedFrame() const { return finishedFrame; }
-
-    bool m_parallel = false;
-
 private:
-    GifEncoderTryWriteResult tryWriteInternal(System::Threading::CancellationToken* token);
+
+#pragma region EXPANSION_PRIVATES_AND_VARIABLES
+    GifEncoderTryWriteResult tryWriteInternal();
+
     /** Attempts to open a file, returns true if failed (unlike most other function returns here) */
-    bool initOpen(const std::string& file, int width, int height);
-    bool endOpen(NeuQuantTask& encode, int16_t loop);
-    bool pushTask(NeuQuantTask& task, System::Threading::CancellationToken* token);
-    void cleartask(NeuQuantTask& task);
+    bool initOpen(const std::string& file, const int width, const int height);
 
-    /*inline bool isFirstFrame() const {
-        return m_frameCount == 0;
-    }*/
+    /** Attempts to start writing the file */
+    bool endOpen(NeuQuantTask& task, int16_t loop);
 
-    inline void reset() {
-        // Free the task memory
-        while (data_write != nullptr) {
-            cleartask(*data_write);
-            data_write = data_write->nextTask;
-        }
-        data_encode = nullptr;
-        m_allFrameDelays.clear();
-        m_frameCount = 0;
-    }
+    /** Clears the allocated pixels of the task, if they were allocated */
+    void clearTask(NeuQuantTask& task);
 
-    void encodeFrame(NeuQuantTask& encode, int delay);
+    /** Fetch the next data_encode, and make a new empty one after that, uses a mutex lock for data integrity */
+    NeuQuantTask* GifEncoder::nextEncode(const int index, const int width, const int height);
 
-    NeuQuantTask* GifEncoder::nextEncode(int index);
+    /** Attempts to abort a cancelled/failed file */
+    bool abort(const bool fail);
 
-    bool abort(bool fail);
-
+    /** Attempts to free the allocated memory of a failed/cancelled file, MIGHT CRASH SOMETIMES */
     void freeEverything();
 
-   
+    inline void factorize(NeuQuantTask& task);
 
-private:
+    inline int getSamplePixels(NeuQuantTask& task) {
+        return task.lengthcount / (3 * m_quality);
+    }
 
-    // Original variables
-    void* m_gifFileHandler = nullptr;
+    // SkrFractal's vareiables:
+    NeuQuantTask* data_push = nullptr,  // tasks data to push frame
+        * data_write = nullptr;         // task data to write next
+    bool transparent,                   // is it transparent?
+        finishedAnimation = false,      // was the file completed?
+        m_parallel = false;             // is it running in parallel mode?
+    int transR, transG, transB,         // transparent color
+        samplepixels,       // presaved width * height * 3 / (3 * quality) for the neuquant's learn
+        factor,             // balanced factor for splitting the neuquant's learn loop over samplepixels
+        finishedFrame = 0;  // how many frames have been written?
+    std::mutex mtx;         // mutex for parallel integrity
+#pragma endregion
 
-    int m_quality = 10;
-    bool m_useGlobalColorMap = false;
-
-    //uint8_t* m_framePixels = nullptr;
-
-    std::vector<int> m_allFrameDelays{};
-    int m_frameCount = 0;
-    //int m_frameWidth = -1;
-    //int m_frameHeight = -1;
-
-    // SkrFractals additions:
-    NeuQuantTask* data_encode = nullptr, * data_write = nullptr;
-    bool finishedAnimation = false;
-   
-    int finishedFrame = 0;
-    int addedFrames = 0;
-    std::mutex mtx;
-    System::Threading::CancellationToken* cancelToken;
+    // SkrFractals expansion end
+    // -------------------------
 };
-
 
 #endif //GIF_GIFENCODER_H

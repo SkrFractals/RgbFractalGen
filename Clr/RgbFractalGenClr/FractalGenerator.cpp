@@ -315,14 +315,12 @@ namespace RgbFractalGenClr {
 		gifSuccess = false;
 		DeleteEncoder();
 		if ((applyGenerationType = selectGenerationType) >= GenerationType::EncodeGIF) {
-			gifEncoder = new GifEncoder();
+			GifEncoder* e;
+			gifEncoder = e = new GifEncoder();
 			uint8_t gifIndex = 0;
 			while (gifIndex < 255) {
 				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
-				if (parallelGif 
-					? !((GifEncoder*)gifEncoder)->open_parallel(ConvertToStdString(gifTempPath), selectWidth, selectHeight, 1, 0, &cancel->Token) 
-					: !((GifEncoder*)gifEncoder)->open(ConvertToStdString(gifTempPath), selectWidth, selectHeight, 1, false, 0)
-				) {
+				if(!e->open_parallel(ConvertToStdString(gifTempPath), selectWidth, selectHeight, 1, 0, &cancel->Token)) {
 #ifdef CUSTOMDEBUG
 					Log(logString, "Error opening gif file: " + gifTempPath);
 #endif
@@ -332,6 +330,8 @@ namespace RgbFractalGenClr {
 			}
 			if (gifIndex == 255)
 				DeleteEncoder();
+			else if(selectAmbient < 0)
+				e->setTransparent(0, 0, 0);
 		}
 		// Initialize the starting default animation values
 		auto size = 2400.0f, angle = selectDefaultAngle * (float)M_PI / 180.0f, hueAngle = selectDefaultHue / 120.0f;
@@ -424,7 +424,7 @@ namespace RgbFractalGenClr {
 			for (auto tasksRemaining = true; tasksRemaining; MakeDebugString()) {
 				TryFinishBitmaps();
 				while (bitmapsFinished < bitmap->Length && bitmapState[bitmapsFinished] >= (applyGenerationType >= GenerationType::EncodeGIF ? BitmapState::Finished : BitmapState::Encoding)) {
-					bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]);
+					bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]); // TODO return this!
 					++bitmapsFinished;
 				}
 				tasksRemaining = false;
@@ -462,29 +462,29 @@ namespace RgbFractalGenClr {
 				} catch (Exception^) {}
 			}
 
+		//TestEncoder();
+
 		// Save the temp GIF file
 		gifSuccess = false;
-		if (applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr && ((GifEncoder*)gifEncoder)->close())
-			if(parallelGif){
-				while (/*!cancel->Token.IsCancellationRequested &&*/ gifEncoder != nullptr) {
-					auto& encoder = *((GifEncoder*)gifEncoder);
-					switch (encoder.tryWrite(&cancel->Token)) {
-					case GifEncoderTryWriteResult::Failed:
-						DeleteEncoder();
-						break;
-					case GifEncoderTryWriteResult::Waiting:
-						// This should never be hit, because the coe reches this loop only after getting cancelled or every frame finished
-						Thread::Sleep(100);
-						break;
-					case GifEncoderTryWriteResult::FinishedAnimation:
-						gifSuccess = true;
-						// This will follow with gifEncoder.IsFinished()
-						break;
-					}
-					if (encoder.isFinishedAnimation())
-						break;
-				} 
-			} else gifSuccess = true;
+		if (applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr && ((GifEncoder*)gifEncoder)->close(&cancel->Token))
+			while (/*!cancel->Token.IsCancellationRequested &&*/ gifEncoder != nullptr) {
+				auto& encoder = *((GifEncoder*)gifEncoder);
+				switch (encoder.tryWrite()) {
+				case GifEncoderTryWriteResult::Failed:
+					DeleteEncoder();
+					break;
+				case GifEncoderTryWriteResult::Waiting:
+					// This should never be hit, because the coe reches this loop only after getting cancelled or every frame finished
+					Thread::Sleep(100);
+					break;
+				case GifEncoderTryWriteResult::FinishedAnimation:
+					gifSuccess = true;
+					// This will follow with gifEncoder.IsFinished()
+					break;
+				}
+				if (encoder.isFinishedAnimation())
+					break;
+			}
 #if CUSTOMDEBUG
 		else Log(logString, "Error closing gif file.");
 		const auto generateElapsed = (std::chrono::steady_clock::now() - *startTime).count();
@@ -722,7 +722,7 @@ namespace RgbFractalGenClr {
 		// Draw the generated pixel to bitmap data
 		// Make a locked bitmap, remember the locked state
 		uint8_t* p = (uint8_t*)(void*)((bitmapData[task.bitmapIndex] = (bitmap[task.bitmapIndex] = gcnew Bitmap(selectWidth, selectHeight))
-										->LockBits(rect, ImageLockMode::WriteOnly, System::Drawing::Imaging::PixelFormat::Format24bppRgb))->Scan0);
+										->LockBits(rect, ImageLockMode::ReadWrite, System::Drawing::Imaging::PixelFormat::Format24bppRgb))->Scan0);
 		bitmapState[task.bitmapIndex] = BitmapState::Drawing;
 		// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
 		// Switch between th selected settings such as saturation, noise, image parallelism...
@@ -804,14 +804,9 @@ namespace RgbFractalGenClr {
 		const auto gifsTime{ std::chrono::steady_clock::now() };
 #endif
 		bitmapState[task.bitmapIndex] = BitmapState::Encoding; // Start encoding Frame to a temp GIF		
-		if (applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr) {
-			if (parallelGif) 
-				((GifEncoder*)gifEncoder)->push_parallel((uint8_t*)(void*)(bitmapData[task.bitmapIndex]->Scan0), selectWidth, selectHeight, selectDelay, task.bitmapIndex, &cancel->Token);
-			else {
-				((GifEncoder*)gifEncoder)->push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, (uint8_t*)(void*)(bitmapData[task.bitmapIndex]->Scan0), selectWidth, selectHeight, selectDelay);
-				bitmapState[task.bitmapIndex] = BitmapState::Finished;
-			}
-		} else bitmapState[task.bitmapIndex] = BitmapState::Finished;
+		if (applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr) 
+			((GifEncoder*)gifEncoder)->push_parallel((uint8_t*)(void*)(bitmapData[task.bitmapIndex]->Scan0), selectWidth, selectHeight, selectDelay, task.bitmapIndex, &cancel->Token);
+		else bitmapState[task.bitmapIndex] = BitmapState::Finished;
 #ifdef CUSTOMDEBUG
 		const auto gifsElapsed = (std::chrono::steady_clock::now() - gifTime).count();
 		Log(threadString, "Gifs:" + task.bitmapIndex + " time = " + gifsElapsed);
@@ -891,84 +886,24 @@ namespace RgbFractalGenClr {
 		return task.state == TaskState::Done ? Join(task) : task.state != TaskState::Free;
 	}
 	void FractalGenerator::TryFinishBitmaps() {
-		if (parallelGif)
-			while (applyGenerationType >= GenerationType::EncodeGIF) {
-				int unlock = ((GifEncoder*)gifEncoder)->getFinishedFrame();
-				// Try to finalize the previous encoder tasks
-				switch (((GifEncoder*)gifEncoder)->tryWrite(&cancel->Token)) {
-				case GifEncoderTryWriteResult::Failed:
-					// fallback to only display animation without encoding
-					applyGenerationType = GenerationType::AnimationRAM;
-					return;
-				case GifEncoderTryWriteResult::FinishedFrame:
-					// mark the bitmap state as fully finished
-					bitmapState[unlock] = BitmapState::Finished;
-					break;
-				default:
-					// waiting or finished animation
-					return;
-				}
+		while (applyGenerationType >= GenerationType::EncodeGIF) {
+			int unlock = ((GifEncoder*)gifEncoder)->getFinishedFrame();
+			// Try to finalize the previous encoder tasks
+			switch (((GifEncoder*)gifEncoder)->tryWrite()) {
+			case GifEncoderTryWriteResult::Failed:
+				// fallback to only display animation without encoding
+				applyGenerationType = GenerationType::AnimationRAM;
+				return;
+			case GifEncoderTryWriteResult::FinishedFrame:
+				// mark the bitmap state as fully finished
+				bitmapState[unlock] = BitmapState::Finished;
+				break;
+			default:
+				// waiting or finished animation
+				return;
 			}
-	}
-	/*bool FractalGenerator::TryGif(FractalTask& task) {
-		
-		uint16_t tryEncode;
-		if (parallelGif && false) {
-			// Find a next bitmap to encode:
-			while (bitmapToEncode < bitmap->Length && bitmapState[bitmapToEncode] >= BitmapState::Encoding)
-				++bitmapToEncode;
-			tryEncode = bitmapToEncode;
-			while (tryEncode <= bitmapToEncode + applyMaxTasks && tryEncode < bitmap->Length && bitmapState[tryEncode] != BitmapState::DrawingFinished)
-				++tryEncode;
-		} else {
-			while (bitmapToEncode < bitmap->Length && bitmapState[bitmapToEncode] > BitmapState::Encoding)
-				++bitmapToEncode;
-			tryEncode = bitmapToEncode;
 		}
-
-		//short bitmapIndex = bitmapToEncode;
-		if (applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr) {
-			auto& encoder = *((GifEncoder*)gifEncoder);
-			if (parallelGif) {
-				bool tryWrite = true;
-				while (tryWrite) {
-					int unlock = encoder.getFinishedFrame();
-					// Try to finalize the previous encoder tasks
-					switch (encoder.tryWrite(&cancel->Token)) {
-					default:
-						tryWrite = false;
-						break;
-					case GifEncoderTryWriteResult::Failed:
-						// Failed, or FinishedAnimation which should never happen
-						if (bitmapState[tryEncode] >= BitmapState::DrawingFinished)
-							bitmapState[tryEncode] = BitmapState::EncodingFinished;
-						tryWrite = false;
-						return true;
-					case GifEncoderTryWriteResult::Waiting:
-						tryWrite = false;
-						break;
-					case GifEncoderTryWriteResult::FinishedFrame:
-						bitmapState[unlock] = BitmapState::EncodingFinished;
-						break;
-					}
-				}
-			}
-			if (bitmapState[tryEncode] != BitmapState::DrawingFinished)
-				return true;
-			//exportingGif = true;
-			bitmapState[tryEncode] = BitmapState::Encoding; // Started encoding state
-			
-			Start(task, 1);
-			//Task_Gif(gcnew array<System::Object^>{ task.index, tryEncode });
-			parallelTasks[task.taskIndex] = Task::Factory->StartNew(
-				gcnew Action<Object^>(this, &FractalGenerator::Task_Gif),
-				gcnew array<System::Object^>{ task.taskIndex, tryEncode }
-			);
-			return false;
-		} else if (bitmapState[tryEncode] == BitmapState::DrawingFinished)
-			bitmapState[tryEncode] = BitmapState::EncodingFinished;
-		return true;
-	}*/
+	}
 #pragma endregion
 
 #pragma region Generate_Inline
@@ -1051,7 +986,8 @@ namespace RgbFractalGenClr {
 	}
 	inline System::Void FractalGenerator::NoNoiseSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
 		if (selectAmbient <= 0) for (uint16_t x = 0; x < selectWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), p));
-		else for (uint16_t x = 0; x < selectWidth; ApplyRGBToBytePointer(Vector(selectAmbient * voidY[x++] / voidDepthMax) + ApplySaturate(Normalize(buffY[x], lightNormalizer)), p));
+		else for (uint16_t x = 0; x < selectWidth; ++x)
+			ApplyRGBToBytePointer(Vector(selectAmbient * voidY[x] / voidDepthMax) + ApplySaturate(Normalize(buffY[x], lightNormalizer)), p);
 
 	}
 	inline System::Void FractalGenerator::NoiseNoSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
@@ -1070,7 +1006,7 @@ namespace RgbFractalGenClr {
 	inline System::Void FractalGenerator::NoNoiseNoSaturate(const Vector*& buffY, const int16_t* voidY, uint8_t*& p, const float lightNormalizer, const float voidDepthMax) {
 		if (selectAmbient <= 0) 
 			for (uint16_t x = 0; x < selectWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), p));
-		else for (uint16_t x = 0; x < selectWidth; x++)
+		else for (uint16_t x = 0; x < selectWidth; ++x)
 			ApplyRGBToBytePointer(Vector(selectAmbient * voidY[x] / voidDepthMax) + Normalize(buffY[x], lightNormalizer), p);
 	}
 #pragma endregion
@@ -1307,6 +1243,126 @@ namespace RgbFractalGenClr {
 			_debugString += "\n" + counter[c] + "x: " + GetBitmapState((BitmapState)c);
 		_debugString += "\n" + _memoryString;
 		debugString = b < bitmap->Length ? _debugString + "\n" + b + "+: " + "QUEUED" : _debugString;
+	}
+	System::Void FractalGenerator::TestEncoder(array<Bitmap^>^ bitmap) {
+
+		// init
+		GifEncoder* se = new GifEncoder();
+		GifEncoder* pe = new GifEncoder();
+		GifEncoder* se_out = new GifEncoder();
+		GifEncoder* pe_out = new GifEncoder();
+		List<int>^ l = gcnew List<int>();
+
+		// get byte pointers if we don't have already:
+		array<BitmapData^>^ bgr = gcnew array<BitmapData^>(bitmap->Length);
+		array<BitmapData^>^ bgra = gcnew array<BitmapData^>(bitmap->Length);
+		for (int i = 0; i < bitmap->Length; ++i) {
+			bgr[i] = bitmap[i]->LockBits(Rectangle(0, 0, bitmap[i]->Width, bitmap[i]->Height), ImageLockMode::ReadOnly, PixelFormat::Format24bppRgb); // get BRG (also used for RGB)
+			bgra[i] = bitmap[i]->LockBits(Rectangle(0, 0, bitmap[i]->Width, bitmap[i]->Height), ImageLockMode::ReadOnly, PixelFormat::Format32bppArgb); // get BRGA (also used for RGBA)
+		}
+
+		// BGR/BGRA:
+		se->open("s_bgr_inorder.gif", selectWidth, selectHeight, 1, true, 0);
+		pe->open_parallel("p_bgr_inorder.gif", selectWidth, selectHeight, 1, 0);
+		se_out->open("s_bgr_outoforder.gif", selectWidth, selectHeight, 1, true, 0);
+		pe_out->open_parallel("p_bgr_outoforder.gif", selectWidth, selectHeight, 1, 0);
+		for (int i = 0; i < bitmap->Length; l->Add(i++)) {
+			uint8_t* frame_bgr = (uint8_t*)(void*)bgr[i]->Scan0;
+			uint8_t* frame_bgra = (uint8_t*)(void*)bgra[i]->Scan0;
+			// BGR NATIVE:
+			se->push(frame_bgr, selectWidth, selectHeight, 20);
+			pe->push_parallel(frame_bgr, selectWidth, selectHeight, 20);
+			// BGR copy:
+			//se->push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame_bgr, selectWidth, selectHeight, 20);
+			//pe->push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame_bgr, selectWidth, selectHeight, 20);
+			// BGRA copy:
+			//se->push(GifEncoderPixelFormat::PIXEL_FORMAT_BGRA, frame_bgra, selectWidth, selectHeight, 20);
+			//pe->push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGRA, frame_bgra, selectWidth, selectHeight, 20);
+		}
+		while (l->Count > 0) {
+			int i = l[random.Next(0, l->Count)];
+			l->Remove(i);
+			uint8_t* frame_bgr = (uint8_t*)(void*)bgr[i]->Scan0;
+			uint8_t* frame_bgra = (uint8_t*)(void*)bgra[i]->Scan0;
+			// BGR NATIVE:
+			se_out->push(frame_bgr, selectWidth, selectHeight, 20, i);
+			pe_out->push_parallel(frame_bgr, selectWidth, selectHeight, 20, i);
+			// BGR copy:
+			//se_out->push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame_bgr, selectWidth, selectHeight, 20, i);
+			//pe_out->push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame_bgr, selectWidth, selectHeight, 20, i);
+			// BGRA copy:
+			//se_out->push(GifEncoderPixelFormat::PIXEL_FORMAT_BGRA, frame_bgra, selectWidth, selectHeight, 20, i);
+			//pe_out->push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGRA, frame_bgra, selectWidth, selectHeight, 20, i);
+		}
+		se->close();
+		pe->close();
+		se_out->close();
+		pe_out->close();
+		for (int i = 0; i <= bitmap->Length; ++i) {
+			pe->tryWrite();
+			pe_out->tryWrite();
+		}
+
+		// RGB/RGBA:
+		uint8_t** rgb = new uint8_t * [bitmap->Length];
+		uint8_t** rgba = new uint8_t * [bitmap->Length];
+		for (int i = 0; i < bitmap->Length; ++i) {
+			// RGB
+			uint8_t* p = rgb[i] = new uint8_t[selectWidth * selectHeight * 3],
+				* s = (uint8_t*)(void*)bgr[i]->Scan0;
+			for (int i = selectWidth * selectHeight; 0 <= --i; p += 3, s += 3) {
+				p[0] = s[2];
+				p[1] = s[1];
+				p[2] = s[0];
+			}
+			// RBGA
+			p = rgba[i] = new uint8_t[selectWidth * selectHeight * 4];
+			s = (uint8_t*)(void*)bgra[i]->Scan0;
+			for (int i = selectWidth * selectHeight; 0 <= --i; p += 4, s += 4) {
+				p[0] = s[2];
+				p[1] = s[1];
+				p[2] = s[0];
+				p[3] = s[3];
+			}
+		}
+		se->open("s_rgb_inorder.gif", selectWidth, selectHeight, 1, true, 0);
+		pe->open_parallel("p_rgb_inorder.gif", selectWidth, selectHeight, 1, 0);
+		se_out->open("s_rgb_outoforder.gif", selectWidth, selectHeight, 1, false, 0); // try both false and true global color map
+		pe_out->open_parallel("p_rgb_outoforder.gif", selectWidth, selectHeight, 1, 0);
+		for (int i = 0; i < bitmap->Length; l->Add(i++)) {
+			// RGB copy:
+			se->push(GifEncoderPixelFormat::PIXEL_FORMAT_RGB, rgb[i], selectWidth, selectHeight, 20);
+			pe->push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_RGB, rgb[i], selectWidth, selectHeight, 20);
+			// RGBA copy:
+			//se->push(GifEncoderPixelFormat::PIXEL_FORMAT_RGBA, rgba[i], selectWidth, selectHeight, 20);
+			//pe->push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_RGBA, rgba[i], selectWidth, selectHeight, 20);
+		}
+		while (l->Count > 0) {
+			int i = l[random.Next(0, l->Count)];
+			l->Remove(i);
+			// RGB copy:
+			se_out->push(GifEncoderPixelFormat::PIXEL_FORMAT_RGB, rgb[i], selectWidth, selectHeight, 20, i);
+			pe_out->push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_RGB, rgb[i], selectWidth, selectHeight, 20, i);
+			// RGBA copy: 
+			//se_out->push(GifEncoderPixelFormat::PIXEL_FORMAT_RGBA, rgba[i], selectWidth, selectHeight, 20, i);
+			//pe_out->push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_RGBA, rgba[i], selectWidth, selectHeight, 20, i);
+		}
+		se->close();
+		pe->close();
+		se_out->close();
+		pe_out->close();
+		for (int i = 0; i <= bitmap->Length; ++i) {
+			pe->tryWrite();
+			pe_out->tryWrite();
+		}
+
+		// release byte pointers and encoders:
+		for (int i = 0; i < bitmap->Length; ++i)
+			bitmap[i]->UnlockBits(bitmapData[i]);
+		delete se;
+		delete pe;
+		delete se_out;
+		delete pe_out;
 	}
 #pragma endregion
 

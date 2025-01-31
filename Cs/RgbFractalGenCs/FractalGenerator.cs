@@ -823,7 +823,7 @@ internal class FractalGenerator {
 				void NoiseNoSaturate(Vector3[] buffY, short[] voidY, ref byte* p, Random rand, float lightNormalizer, float voidDepthMax) {
 					if (selectAmbient <= 0)
 						for (var x = 0; x < selectWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), ref p)) ;
-					else for (var x = 0; x < selectWidth; x++) {
+					else for (var x = 0; x < selectWidth; ++x) {
 							var voidAmb = voidY[x] / voidDepthMax;
 							ApplyRGBToBytePointer(ApplyAmbientNoise(Normalize(buffY[x], lightNormalizer), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb, rand), ref p);
 						}
@@ -839,13 +839,13 @@ internal class FractalGenerator {
 				void NoNoiseNoSaturate(Vector3[] buffY, short[] voidY, ref byte* p, float lightNormalizer, float voidDepthMax) {
 					if (selectAmbient <= 0) for (var x = 0; x < selectWidth; x++)
 							ApplyRGBToBytePointer(Normalize(buffY[x], lightNormalizer), ref p);
-					else for (var x = 0; x < selectWidth; x++)
+					else for (var x = 0; x < selectWidth; ++x)
 							ApplyRGBToBytePointer(new Vector3(selectAmbient * voidY[x] / voidDepthMax) + Normalize(buffY[x], lightNormalizer), ref p);
 				}
 				#endregion
 				// Make a locked bitmap, remember the locked state
 				var p = (byte*)(void*)(bitmapData[task.bitmapIndex] = (bitmap[task.bitmapIndex] = new(selectWidth, selectHeight)).LockBits(rect,
-					ImageLockMode.WriteOnly,
+					ImageLockMode.ReadWrite,
 					System.Drawing.Imaging.PixelFormat.Format24bppRgb)).Scan0;
 				bitmapState[task.bitmapIndex] = BitmapState.Drawing;
 				// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void

@@ -47,8 +47,8 @@ public struct NeuQuant {
    -------------------------- */
 
 	//const unsigned char* thepicture;        /* the input image itself */
-	int lengthcount;                /* lengthcount = H*W*3 */
-	int samplefac;                /* sampling factor 1..30 */
+	//int lengthcount;                /* lengthcount = H*W*3 */
+	//int samplefac;                /* sampling factor 1..30 */
 	typedef int pixel[4];                /* BGRc */
 	pixel network[netsize];            /* the network itself */
 	int netindex[256];            /* for network lookup - really 256 */
@@ -57,14 +57,14 @@ public struct NeuQuant {
 	int radpower[initrad];            /* radpower for precomputation */
 	int alphadec;                    /* biased by 10 bits */
 
-	int factor;
-	int samplepixels;
+	//int factor;
+	//int samplepixels;
 
 	//int getNetwork(int i, int j);
 
 	/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 	   ----------------------------------------------------------------------- */
-	void initnet(/*const unsigned char* thepic, */const int len, const int sample, const int samplepix);
+	void initnet();
 
 	/* Unbias network to give byte values 0..255 and record position i to prepare for sort
 	   ----------------------------------------------------------------------------------- */
@@ -72,7 +72,7 @@ public struct NeuQuant {
 
 	/* Output colour map
 	   ----------------- */
-	   //void writecolourmap(FILE *f);
+	//void writecolourmap(FILE *f); // unused
 
 	void getcolourmap(uint8_t* colorMap);
 
@@ -85,8 +85,13 @@ public struct NeuQuant {
 	int inxsearch(const int b, const int g, const int r);
 
 	/* Main Learning Loop
+	* 
+	* @param thepicture - BGR byte pointer array of the picture
+	* @param lengthcount = Width*Height*3
+	* @param samplefac = sampling factor 1..30, 1 is highest quality
+	* @param canceltoken = pointer to a cancellation token, nullptr to not use one
 	   ------------------ */
-	bool learn(unsigned char* thepicture, System::Threading::CancellationToken* canceltoken);
+	bool learn(unsigned char* p, const int lengthcount, const int samplefac, int samplepixels, int factor, System::Threading::CancellationToken* canceltoken);
 
 private:
     /* Search for biased BGR values

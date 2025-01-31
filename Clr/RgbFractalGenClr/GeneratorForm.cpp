@@ -1239,7 +1239,7 @@ namespace RgbFractalGenClr {
 		ParseModDiffApply(defaultHue, &generator->selectDefaultHue, static_cast<int16_t>(0), static_cast<int16_t>(360));
 	}
 	System::Void GeneratorForm::AmbBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextMulDiffApply(ambBox, &generator->selectAmbient, static_cast<int16_t>(0), static_cast<int16_t>(30), static_cast<int16_t>(4));
+		ParseClampRetextMulDiffApply(ambBox, &generator->selectAmbient, static_cast<int16_t>(-1), static_cast<int16_t>(30), static_cast<int16_t>(4));
 	}
 	System::Void GeneratorForm::NoiseBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		ParseClampRetextMulDiffApply(noiseBox, &generator->selectNoise, static_cast<int16_t>(0), static_cast<int16_t>(30), .1f);

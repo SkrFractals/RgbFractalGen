@@ -158,8 +158,6 @@ namespace RgbFractalGenClr {
         System::String^ gifTempPath;    // Temporary GIF file name
         System::Drawing::Rectangle rect;// Bitmap rectangle TODO implement
 
-        bool parallelGif = true;
-
     public:
         // Selected Settings
         int16_t selectFractal,      // Fractal definition (0-fractals.Length)
@@ -343,6 +341,8 @@ namespace RgbFractalGenClr {
             }
         }
         System::Void MakeDebugString();
+private:
+    System::Void TestEncoder(array<Bitmap^>^ bitmap);
 #pragma endregion
 
 #pragma region Interface_Settings

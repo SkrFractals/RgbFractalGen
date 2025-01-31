@@ -532,7 +532,7 @@ namespace Gif.Components {
 			
 			// get closest match to transparent color if specified
 			if (transparent != Color.Empty)
-				encodeData.transIndex = nq.Map(transparent.B, transparent.G, transparent.R); // I am not making a transparent gif, but I guess I coudl have in the future, so i will save it to the TaskData
+				encodeData.transIndex = nq.Map(transparent.B, transparent.G, transparent.R);
 			return false;
 		}
 
@@ -581,7 +581,7 @@ namespace Gif.Components {
 			
 			// get closest match to transparent color if specified
 			if (transparent != Color.Empty)
-				encodeData.transIndex = nq.Map(transparent.B, transparent.G, transparent.R); // I am not making a transparent gif, but I guess I coudl have in the future, so i will save it to the TaskData
+				encodeData.transIndex = nq.Map(transparent.B, transparent.G, transparent.R);
 			return false;
 		}
 		#endregion
