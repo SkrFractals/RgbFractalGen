@@ -11,24 +11,17 @@
 #include <mutex>
 #include "giflib/gif_lib.h"
 
-public enum GifEncoderPixelFormat : uint8_t {
-    PIXEL_FORMAT_UNKNOWN = 0,
-    PIXEL_FORMAT_BGR = 1,
-    PIXEL_FORMAT_RGB = 2,
-    PIXEL_FORMAT_BGRA = 3,
-    PIXEL_FORMAT_RGBA = 4,
-};
 
-public enum GifEncoderTryWriteResult : uint8_t {
-    Failed = 0,				// Error has occured, and the file was aborted.
-    Waiting = 1,			// Next frame was not written because it was either not supplied yet, or it's task is still running.
-    FinishedFrame = 2,		// Next frame was successfully written into the stream
-    FinishedAnimation = 3	// The stream was sucessfully finished
-};
 
 public struct NeuQuantTask {
 
-   
+    enum PixelFormat {
+        PIXEL_FORMAT_UNKNOWN = 0,
+        PIXEL_FORMAT_BGR = 1,
+        PIXEL_FORMAT_RGB = 2,
+        PIXEL_FORMAT_BGRA = 3,
+        PIXEL_FORMAT_RGBA = 4,
+    };
 
     // Paralellism variables:
     ColorMapObject* colorMap;
@@ -53,27 +46,28 @@ public struct NeuQuantTask {
     NeuQuantTask() {
         token = nullptr;
         nextTask = nullptr;
-        finished = failed = false;
+        finished = failed = false; 
         thisTask = nullptr;
         thepicture = nullptr;
         m_allocSize = -1;
         colorMap = nullptr;
         rasterBits = nullptr;
-        frameIndex = m_frameWidth = m_frameHeight = -1;
+        m_frameWidth = -1;
+        m_frameHeight = -1;
     }
     void setSize(int w, int h) {
         lengthcount = 3 * (m_frameWidth = w) * (m_frameHeight = h);
     }
     bool alloc(int needSize) {
-        if (m_allocSize >= (needSize *= lengthcount)) // already allocated enough
+        if (m_allocSize >= (needSize *= lengthcount))
             return false;
-        void* tryalloc = m_allocSize <= 0 ? malloc(m_allocSize = needSize) : realloc(thepicture, m_allocSize = needSize); // try allocate or reallocate
-        if (tryalloc == nullptr)
+        void* alloc = realloc(thepicture, m_allocSize = needSize);
+        if (alloc == nullptr)
             return true; // failed to allocate memory
-        thepicture = (uint8_t*)tryalloc;
+        thepicture = (uint8_t*)alloc;
         return false;
     }
-    bool convertToBGR(GifEncoderPixelFormat format, uint8_t* dst, const uint8_t* src, const int len) {
+    bool convertToBGR(PixelFormat format, uint8_t* dst, const uint8_t* src, const int len) {
         switch (format) {
         case PIXEL_FORMAT_BGR:
             memcpy(dst, src, len);
@@ -132,7 +126,7 @@ public struct NeuQuantTask {
         }
     }
 private:
-    bool learn(System::Threading::CancellationToken* canceltoken, const int quality) {
+    void learn(System::Threading::CancellationToken* canceltoken, const int quality) {
         int s = samplepixels = lengthcount / (3 * quality);
         neuquant.factor = 1;
 
@@ -148,14 +142,19 @@ private:
                 ++t;
             }
         neuquant.initnet(thepicture, lengthcount, quality, samplepixels);
-        if (neuquant.learn(canceltoken))
-            return true;
+        neuquant.learn(canceltoken);
         neuquant.unbiasnet();
         neuquant.inxbuild();
-        neuquant.getcolourmap((uint8_t*)colorMap->Colors);
-        return false;
+        neuquant.getcolourmap((uint8_t*)(colorMap)->Colors);
     }
 
+};
+
+public enum TryWrite : uint8_t {
+    Failed = 0,				// Error has occured, and the file was aborted.
+    Waiting = 1,			// Next frame was not written because it was either not supplied yet, or it's task is still running.
+    FinishedFrame = 2,		// Next frame was successfully written into the stream
+    FinishedAnimation = 3	// The stream was sucessfully finished
 };
 
 class GifEncoder {
@@ -196,7 +195,7 @@ public:
      * @param task - starts its own push task and puts it into the reference
      * @return
      */
-    bool push(GifEncoderPixelFormat format, const uint8_t* frame, int width, int height, int delay);
+    bool push(NeuQuantTask::PixelFormat format, const uint8_t* frame, int width, int height, int delay);
 
     /**
      * close gif file
@@ -220,7 +219,7 @@ public:
     * @return success
     */
     bool open_parallel(const std::string& file, const int width, const int height,
-                       const int quality, int16_t loop, System::Threading::CancellationToken* token);
+              const int quality, int16_t loop, System::Threading::CancellationToken* token);
 
     /**
     * add frame - not cancellable (or cancellable from open's token)
@@ -233,7 +232,7 @@ public:
     * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
     * @return
     */
-    inline bool push_parallel(GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, const int frameIndex) {
+    inline bool push_parallel(NeuQuantTask::PixelFormat format, uint8_t* frame, const int width, const int height, const int delay, const int frameIndex) {
         return push_parallel(format, frame, width, height, delay, frameIndex, nullptr);
     }
 
@@ -248,7 +247,7 @@ public:
      * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
-    inline bool push_parallel(GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, System::Threading::CancellationToken* token) {
+    inline bool push_parallel(NeuQuantTask::PixelFormat format, uint8_t* frame, const int width, const int height, const int delay, System::Threading::CancellationToken* token) {
         return push_parallel(format, frame, width, height, delay, -1, token);
     }
 
@@ -263,7 +262,7 @@ public:
     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
     * @return
     */
-    inline bool push_parallel(GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay) {
+    inline bool push_parallel(NeuQuantTask::PixelFormat format, uint8_t* frame, const int width, const int height, const int delay) {
         push_parallel(format, frame, width, height, delay, -1, nullptr);
     }
 
@@ -278,7 +277,7 @@ public:
     * @return
     */
     inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay, const int frameIndex) {
-        return  push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame, width, height, delay, frameIndex, nullptr);
+        return  push_parallel(NeuQuantTask::PIXEL_FORMAT_BGR, frame, width, height, delay, frameIndex, nullptr);
     }
 
     /**
@@ -292,7 +291,7 @@ public:
      * @return
      */
     inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay, System::Threading::CancellationToken* token) {
-        return  push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame, width, height, delay, -1, token);
+        return  push_parallel(NeuQuantTask::PIXEL_FORMAT_BGR, frame, width, height, delay, -1, token);
     }
 
     /**
@@ -306,7 +305,7 @@ public:
     * @return
     */
     inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay) {
-        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame, width, height, delay, -1, nullptr);
+        return push_parallel(NeuQuantTask::PIXEL_FORMAT_BGR, frame, width, height, delay, -1, nullptr);
     }
 
     /**
@@ -321,7 +320,7 @@ public:
      * @return
      */
     inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay, const int frameIndex, System::Threading::CancellationToken* token) {
-        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR, frame, width, height, delay, frameIndex, token);
+        return push_parallel(NeuQuantTask::PIXEL_FORMAT_BGR, frame, width, height, delay, frameIndex, token);
     }
 
     /**
@@ -336,16 +335,15 @@ public:
      * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
-    bool push_parallel(GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, const int frameIndex, System::Threading::CancellationToken* token);
+    bool push_parallel(NeuQuantTask::PixelFormat format, uint8_t* frame, const int width, const int height, const int delay, const int frameIndex, System::Threading::CancellationToken* token);
 
-    GifEncoderTryWriteResult tryWrite(System::Threading::CancellationToken* token);
+    TryWrite tryWrite(System::Threading::CancellationToken* token);
 #pragma endregion
 
     inline bool isFinishedAnimation() const { return finishedAnimation; }
     inline int getFinishedFrame() const { return finishedFrame; }
 
 private:
-    GifEncoderTryWriteResult tryWriteInternal(System::Threading::CancellationToken* token);
     /** Attempts to open a file, returns true if failed (unlike most other function returns here) */
     bool initOpen(const std::string& file, int width, int height);
     bool endOpen(NeuQuantTask& encode, int16_t loop);
@@ -357,12 +355,10 @@ private:
     }*/
 
     inline void reset() {
-        // Free the task memory
         while (data_write != nullptr) {
             cleartask(*data_write);
             data_write = data_write->nextTask;
         }
-        data_encode = nullptr;
         m_allFrameDelays.clear();
         m_frameCount = 0;
     }
@@ -371,12 +367,9 @@ private:
 
     NeuQuantTask* GifEncoder::nextEncode(int index);
 
-    bool abort(bool fail);
-
-    void freeEverything();
 
 private:
-
+    
     // Original variables
     void* m_gifFileHandler = nullptr;
 
@@ -384,14 +377,14 @@ private:
     bool m_useGlobalColorMap = false;
 
     //uint8_t* m_framePixels = nullptr;
-
+    
     std::vector<int> m_allFrameDelays{};
     int m_frameCount = 0;
     //int m_frameWidth = -1;
     //int m_frameHeight = -1;
 
     // SkrFractals additions:
-    NeuQuantTask* data_encode = nullptr, * data_write = nullptr;
+    NeuQuantTask *data_encode = nullptr, *data_write = nullptr;
     bool finishedAnimation = false;
     bool m_parallel = false;
     int finishedFrame = 0;

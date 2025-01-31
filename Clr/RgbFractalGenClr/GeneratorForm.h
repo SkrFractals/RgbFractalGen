@@ -50,7 +50,7 @@ namespace RgbFractalGenClr {
 
 	private: System::Windows::Forms::TextBox^ defaultZoom;
 	private: System::Windows::Forms::TextBox^ defaultAngle;
-	private: System::Windows::Forms::Button^ encodeButton;
+
 
 	private: System::Windows::Forms::TextBox^ cutparamBox;
 	private: System::Windows::Forms::TextBox^ defaultHue;
@@ -87,6 +87,8 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::ComboBox^ zoomSelect;
 	private: System::Windows::Forms::Button^ restartButton;
 	private: System::Windows::Forms::ComboBox^ resSelect;
+	private: System::Windows::Forms::ComboBox^ encodeSelect;
+
 
 
 
@@ -279,7 +281,8 @@ namespace RgbFractalGenClr {
 		System::Void AnimateButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void NextButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void RestartButton_Click(System::Object^ sender, System::EventArgs^ e);
-		System::Void EncodeButton_Click(System::Object^ sender, System::EventArgs^ e);
+		//System::Void EncodeButton_Click(System::Object^ sender, System::EventArgs^ e);
+		System::Void EncodeSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void HelpButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void PngButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void GifButton_Click(System::Object^ sender, System::EventArgs^ e);
@@ -322,8 +325,6 @@ namespace RgbFractalGenClr {
 		//std::string ConvertToStdString(System::String^ managedString);
 #pragma endregion
 
-		
-
 		inline bool IsTaskNotRunning(Task^ t) { return t == nullptr || t->IsCanceled || t->IsCompleted || t->IsFaulted; }
 		//inline bool IsTaskNotCancelled(Task^ t) { gTask != nullptr && !(gTask->IsCanceled || gTask->IsCompleted || gTask->IsFaulted) }
 
@@ -331,5 +332,6 @@ namespace RgbFractalGenClr {
 			cutparamBox->Enabled = 0 < (cutparamMaximum = cf == nullptr || (*cf)(0, -1) <= 0 ? 0 : ((*cf)(0, 1 - (1 << 16)) + 1) / (*cf)(0, -1));
 			return cutparamBox->Enabled;
 		}
+
 };
 }

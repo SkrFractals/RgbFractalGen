@@ -66,13 +66,13 @@ void _InsertHashTable(GifHashTableType *HashTable, uint32_t Key, int Code)
     int HKey = KeyItem(Key);
     uint32_t *HTable = HashTable -> HTable;
 
-#ifdef DEBUG_HIT_RATE
+#ifdef CUSTOMDEBUG_HIT_RATE
 	NumberOfTests++;
 	NumberOfMisses++;
 #endif /* DEBUG_HIT_RATE */
 
     while (HT_GET_KEY(HTable[HKey]) != 0xFFFFFL) {
-#ifdef DEBUG_HIT_RATE
+#ifdef CUSTOMDEBUG_HIT_RATE
 	    NumberOfMisses++;
 #endif /* DEBUG_HIT_RATE */
 	HKey = (HKey + 1) & HT_KEY_MASK;
@@ -89,13 +89,13 @@ int _ExistsHashTable(GifHashTableType *HashTable, uint32_t Key)
     int HKey = KeyItem(Key);
     uint32_t *HTable = HashTable -> HTable, HTKey;
 
-#ifdef DEBUG_HIT_RATE
+#ifdef CUSTOMDEBUG_HIT_RATE
 	NumberOfTests++;
 	NumberOfMisses++;
 #endif /* DEBUG_HIT_RATE */
 
     while ((HTKey = HT_GET_KEY(HTable[HKey])) != 0xFFFFFL) {
-#ifdef DEBUG_HIT_RATE
+#ifdef CUSTOMDEBUG_HIT_RATE
 	    NumberOfMisses++;
 #endif /* DEBUG_HIT_RATE */
 	if (Key == HTKey) return HT_GET_CODE(HTable[HKey]);

@@ -299,6 +299,8 @@ namespace Gif.Components {
 			alphadec = 30 + ((samplefac - 1) / 3);
 			lim = lengthcount;
 			delta = (samplepixels = lengthcount / (3 * samplefac)) / ncycles;
+			if (delta <= 0)
+				delta = 1;
 			alpha = initalpha;
 			if ((rad = (radius = initradius) >> radiusbiasshift) <= 1)
 				rad = 0;
@@ -322,10 +324,7 @@ namespace Gif.Components {
 							Alterneigh(rad, j, b, g, r); /* alter neighbours */
 						if ((pix += step) >= lim)
 							pix -= lengthcount;
-						++i;
-						if (delta == 0)
-							delta = 1;
-						if (i % delta != 0)
+						if ((++i) % delta != 0)
 							continue;
 						alpha -= alpha / alphadec;
 						rad = (radius -= radius / radiusdec) >> radiusbiasshift;
@@ -348,10 +347,7 @@ namespace Gif.Components {
 					Alterneigh(rad, j, b, g, r); /* alter neighbours */
 				if ((pix += step) >= lim)
 					pix -= lengthcount;
-				++i;
-				if (delta == 0)
-					delta = 1;
-				if (i % delta != 0)
+				if ((++i) % delta != 0)
 					continue;
 				alpha -= alpha / alphadec;
 				rad = (radius -= radius / radiusdec) >> radiusbiasshift;
@@ -375,6 +371,8 @@ namespace Gif.Components {
 			alphadec = 30 + ((samplefac - 1) / 3);
 			lim = lengthcount;
 			delta = (samplepixels = lengthcount / (3 * samplefac)) / ncycles;
+			if (delta <= 0)
+				delta = 1;
 			alpha = initalpha;
 			if ((rad = (radius = initradius) >> radiusbiasshift) <= 1)
 				rad = 0;
@@ -402,10 +400,7 @@ namespace Gif.Components {
 								Alterneigh(rad, j, b, g, r); /* alter neighbours */
 							if ((pix += step) >= lim)
 								pix -= lengthcount;
-							++i;
-							if (delta == 0)
-								delta = 1;
-							if (i % delta != 0)
+							if ((++i) % delta != 0)
 								continue;
 							alpha -= alpha / alphadec;
 							rad = (radius -= radius / radiusdec) >> radiusbiasshift;
@@ -432,10 +427,7 @@ namespace Gif.Components {
 						Alterneigh(rad, j, b, g, r); /* alter neighbours */
 					if ((pix += step) >= lim)
 						pix -= lengthcount;
-					++i;
-					if (delta == 0)
-						delta = 1;
-					if (i % delta != 0)
+					if ((++i) % delta != 0)
 						continue;
 					alpha -= alpha / alphadec;
 					rad = (radius -= radius / radiusdec) >> radiusbiasshift;
@@ -464,33 +456,20 @@ namespace Gif.Components {
 						++i;
 						if (dist < 0)
 							dist = -dist;
-						if ((a = p[0] - b) < 0)
-							a = -a;
-						if ((dist += a) < bestd) {
-							if ((a = p[2] - r) < 0)
-								a = -a;
-							if ((dist += a) < bestd) {
-								bestd = dist;
-								best = p[3];
-							}
+						if (((a = p[0] - b) < 0 ? dist -= a : dist += a) < bestd && ((a = p[2] - r) < 0 ? dist -= a : dist += a) < bestd) {
+							bestd = dist;
+							best = p[3];
 						}
 					} else i = netsize; /* stop iter */
 				}
 				if (j >= 0) {
-					;
 					if ((dist = g - (p = network[j])[1]) < bestd) { /* inx key - reverse dif */
 						--j;
 						if (dist < 0)
 							dist = -dist;
-						if ((a = p[0] - b) < 0)
-							a = -a;
-						if ((dist += a) < bestd) {
-							if ((a = p[2] - r) < 0)
-								a = -a;
-							if ((dist += a) < bestd) {
-								bestd = dist;
-								best = p[3];
-							}
+						if (((a = p[0] - b) < 0 ? dist -= a : dist += a) < bestd && ((a = p[2] - r) < 0 ? dist -= a : dist += a) < bestd) {
+							bestd = dist;
+							best = p[3];
 						}
 					} else j = -1; /* stop iter */
 				}
@@ -573,15 +552,10 @@ namespace Gif.Components {
 			int i, dist, a, biasdist, betafreq, bestpos = -1, bestbiaspos = bestpos, bestd = ~(1 << 31), bestbiasd = bestd;
 			int[] n;
 			for (i = 0; i < netsize; ++i) {
-				dist = (n = network[i])[0] - b;
-				if (dist < 0)
+				if ((dist = (n = network[i])[0] - b) < 0)
 					dist = -dist;
-				if ((a = n[1] - g) < 0)
-					a = -a;
-				dist += a;
-				if ((a = n[2] - r) < 0)
-					a = -a;
-				if ((dist += a) < bestd) {
+				dist += (a = n[1] - g) < 0 ? -a : a;
+				if ((dist += (a = n[2] - r) < 0 ? -a : a) < bestd) {
 					bestd = dist;
 					bestpos = i;
 				}

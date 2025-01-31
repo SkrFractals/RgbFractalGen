@@ -246,7 +246,7 @@ namespace Gif.Components {
 			} catch (IOException) {
 				ok = Abort();
 			}
-			return started = ok;
+			return ok;
 		}
 
 		/* Call at various times after adding frames, it will attempt to write the next ready frame to a file.
@@ -255,12 +255,22 @@ namespace Gif.Components {
 		 * @return Failed if error, Waiting if next frame task still running or next frame not added yet, FinishedFrame if successfully written next frame to a file, FinishedAnimation if file is finished
 		 */
 		public TryWrite TryWrite() {
+			TryWrite r;
+			//Monitor.Enter(this);
+			//try {
+				r = TryWriteInternal();
+				if (r == Components.TryWrite.Failed)
+					Abort();
+			//}finally { Monitor.Exit(this); }
+			return r;
+		}
+
+		private TryWrite TryWriteInternal() {
 			if (finishedAnimation)
 				return Components.TryWrite.FinishedAnimation;
-			if (!started || writeTaskData.failed) {
-				Abort();
+			if (!started || writeTaskData.failed) 
 				return Components.TryWrite.Failed;  // it has failed or cancelled or not started yet, so i will need to cancel the wlo file writing as well
-			}
+			
 			bool ok = true;
 			// here I am following the code after AnalyPixels, anytime when the task of the sequential next frame is finished:
 			var writeTask = writeTaskData;
@@ -268,8 +278,8 @@ namespace Gif.Components {
 			while (writeTask.frameIndex > finishedFrame) {
 				if (writeTask.nextTask == null) {
 					return writeTask.finished
-						? Components.TryWrite.Failed	// You must have called finish while having gaps in supplied out of order frames!
-						: Components.TryWrite.Waiting;	// You have not supplied the next out of order frame yet, so the Task has not even started running yet.
+						? Components.TryWrite.Failed    // You must have called finish while having gaps in supplied out of order frames!
+						: Components.TryWrite.Waiting;  // You have not supplied the next out of order frame yet, so the Task has not even started running yet.
 				}
 				writeTask = (prevWrite = writeTask).nextTask;
 			}
@@ -291,7 +301,7 @@ namespace Gif.Components {
 					if (closeStream)
 						ms?.Close();
 				} catch (IOException) {
-					ok = Abort();
+					ok = false;
 				}
 				finishedAnimation = firstFrame = true;
 				return ok ? Components.TryWrite.FinishedAnimation : Components.TryWrite.Failed; // Has writing the full file finished or failed?
@@ -319,16 +329,16 @@ namespace Gif.Components {
 				WritePixels(writeTask); // encode and write pixel data
 				++finishedFrame;
 			} catch (IOException) {
-				ok = Abort();
+				ok = false;
 			}
 			firstFrame = false;
 			if (prevWrite == null) {
 				// Now that I wrote the frame, I can forget the task data, and move on to the next one.
-				writeTaskData = writeTaskData.nextTask; 
+				writeTaskData = writeTaskData.nextTask;
 			} else {
 				// The first queued writeTaskData was not the next sequential frame to be written and we were not writing that one...
 				// ...so we have to skip and forget the one later in the list that we actually wrote
-				prevWrite.nextTask = writeTask.nextTask; 
+				prevWrite.nextTask = writeTask.nextTask;
 			}
 			return ok ? Components.TryWrite.FinishedFrame : Components.TryWrite.Failed; // Has writing this next frame finished or failed?
 		}

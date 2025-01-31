@@ -68,7 +68,6 @@ namespace RgbFractalGenClr {
 		this->infoLabel = (gcnew System::Windows::Forms::Label());
 		this->defaultZoom = (gcnew System::Windows::Forms::TextBox());
 		this->defaultAngle = (gcnew System::Windows::Forms::TextBox());
-		this->encodeButton = (gcnew System::Windows::Forms::Button());
 		this->cutparamBox = (gcnew System::Windows::Forms::TextBox());
 		this->defaultHue = (gcnew System::Windows::Forms::TextBox());
 		this->periodMultiplierBox = (gcnew System::Windows::Forms::TextBox());
@@ -104,6 +103,7 @@ namespace RgbFractalGenClr {
 		this->zoomSelect = (gcnew System::Windows::Forms::ComboBox());
 		this->restartButton = (gcnew System::Windows::Forms::Button());
 		this->resSelect = (gcnew System::Windows::Forms::ComboBox());
+		this->encodeSelect = (gcnew System::Windows::Forms::ComboBox());
 		this->helpPanel->SuspendLayout();
 		this->SuspendLayout();
 		// 
@@ -198,7 +198,7 @@ namespace RgbFractalGenClr {
 		// pngButton
 		// 
 		this->pngButton->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9));
-		this->pngButton->Location = System::Drawing::Point(91, 560);
+		this->pngButton->Location = System::Drawing::Point(91, 556);
 		this->pngButton->Name = L"pngButton";
 		this->pngButton->Size = System::Drawing::Size(67, 27);
 		this->pngButton->TabIndex = 28;
@@ -209,7 +209,7 @@ namespace RgbFractalGenClr {
 		// gifButton
 		// 
 		this->gifButton->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9));
-		this->gifButton->Location = System::Drawing::Point(175, 560);
+		this->gifButton->Location = System::Drawing::Point(175, 556);
 		this->gifButton->Name = L"gifButton";
 		this->gifButton->Size = System::Drawing::Size(121, 27);
 		this->gifButton->TabIndex = 29;
@@ -295,7 +295,7 @@ namespace RgbFractalGenClr {
 		this->statusLabel->AutoSize = true;
 		this->statusLabel->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9));
 		this->statusLabel->ForeColor = System::Drawing::Color::White;
-		this->statusLabel->Location = System::Drawing::Point(21, 524);
+		this->statusLabel->Location = System::Drawing::Point(21, 530);
 		this->statusLabel->Name = L"statusLabel";
 		this->statusLabel->Size = System::Drawing::Size(64, 15);
 		this->statusLabel->TabIndex = 0;
@@ -306,7 +306,7 @@ namespace RgbFractalGenClr {
 		this->infoLabel->AutoSize = true;
 		this->infoLabel->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9));
 		this->infoLabel->ForeColor = System::Drawing::Color::White;
-		this->infoLabel->Location = System::Drawing::Point(91, 524);
+		this->infoLabel->Location = System::Drawing::Point(91, 530);
 		this->infoLabel->Name = L"infoLabel";
 		this->infoLabel->Size = System::Drawing::Size(28, 15);
 		this->infoLabel->TabIndex = 0;
@@ -333,17 +333,6 @@ namespace RgbFractalGenClr {
 		this->defaultAngle->TabIndex = 13;
 		this->defaultAngle->Text = L"0";
 		this->defaultAngle->TextChanged += gcnew System::EventHandler(this, &GeneratorForm::DefaultAngle_TextChanged);
-		// 
-		// encodeButton
-		// 
-		this->encodeButton->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9));
-		this->encodeButton->Location = System::Drawing::Point(175, 527);
-		this->encodeButton->Name = L"encodeButton";
-		this->encodeButton->Size = System::Drawing::Size(121, 27);
-		this->encodeButton->TabIndex = 27;
-		this->encodeButton->Text = L"Encode GIF";
-		this->encodeButton->UseVisualStyleBackColor = true;
-		this->encodeButton->Click += gcnew System::EventHandler(this, &GeneratorForm::EncodeButton_Click);
 		// 
 		// cutparamBox
 		// 
@@ -448,7 +437,7 @@ namespace RgbFractalGenClr {
 		// helpButton
 		// 
 		this->helpButton->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9));
-		this->helpButton->Location = System::Drawing::Point(17, 560);
+		this->helpButton->Location = System::Drawing::Point(17, 556);
 		this->helpButton->Name = L"helpButton";
 		this->helpButton->Size = System::Drawing::Size(68, 27);
 		this->helpButton->TabIndex = 35;
@@ -758,6 +747,19 @@ namespace RgbFractalGenClr {
 		this->resSelect->Text = L"Select Resolution";
 		this->resSelect->SelectedIndexChanged += gcnew System::EventHandler(this, &GeneratorForm::ResolutionChanged);
 		// 
+		// encodeSelect
+		// 
+		this->encodeSelect->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+																static_cast<System::Byte>(238)));
+		this->encodeSelect->FormattingEnabled = true;
+		this->encodeSelect->Items->AddRange(gcnew cli::array< System::Object^  >(3) { L"Only Image", L"Animation RAM", L"Encode GIF" });
+		this->encodeSelect->Location = System::Drawing::Point(175, 527);
+		this->encodeSelect->Name = L"encodeSelect";
+		this->encodeSelect->Size = System::Drawing::Size(121, 23);
+		this->encodeSelect->TabIndex = 62;
+		this->encodeSelect->Text = L"Generation Type";
+		this->encodeSelect->SelectedIndexChanged += gcnew System::EventHandler(this, &GeneratorForm::EncodeSelect_SelectedIndexChanged);
+		// 
 		// GeneratorForm
 		// 
 		this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
@@ -765,6 +767,7 @@ namespace RgbFractalGenClr {
 		this->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(64)), static_cast<System::Int32>(static_cast<System::Byte>(64)),
 														   static_cast<System::Int32>(static_cast<System::Byte>(64)));
 		this->ClientSize = System::Drawing::Size(1079, 605);
+		this->Controls->Add(this->encodeSelect);
 		this->Controls->Add(this->resSelect);
 		this->Controls->Add(this->restartButton);
 		this->Controls->Add(this->zoomSelect);
@@ -799,7 +802,6 @@ namespace RgbFractalGenClr {
 		this->Controls->Add(this->periodMultiplierBox);
 		this->Controls->Add(this->defaultHue);
 		this->Controls->Add(this->cutparamBox);
-		this->Controls->Add(this->encodeButton);
 		this->Controls->Add(this->defaultAngle);
 		this->Controls->Add(this->defaultZoom);
 		this->Controls->Add(this->pngButton);
@@ -867,7 +869,7 @@ namespace RgbFractalGenClr {
 		SetupControl(prevButton, L"Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 		SetupControl(nextButton, L"Stop the animation and move to the next frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 		SetupControl(animateButton, L"Toggle preview animation.\nWill seamlessly loop when the fractal is finished generating.\nClicking on the image does the same thing.");
-		SetupControl(encodeButton, L"Only Image - only generates one image\nAnimation RAM - generated an animation without GIF encoding, faster but can't save GIF afterwards\nEncode GIF - encodes GIF while generating an animation - can save a GIF afterwards");
+		SetupControl(encodeSelect, L"Only Image - only generates one image\nAnimation RAM - generated an animation without GIF encoding, faster but can't save GIF afterwards\nEncode GIF - encodes GIF while generating an animation - can save a GIF afterwards");
 		SetupControl(helpButton, L"Show README.txt.");
 		SetupControl(pngButton, L"Save the currently displayed frame into a PNG file.\nStop the animation and select the frame you wish to export with the buttons above.");
 		SetupControl(gifButton, L"Save the full animation into a GIF file.");
@@ -904,8 +906,9 @@ namespace RgbFractalGenClr {
 		spinSelect->SelectedIndex = 1;
 		zoomSelect->SelectedIndex = 1;
 		hueSelect->SelectedIndex = 1;
+		encodeSelect->SelectedIndex = 1; // TODO set it to 2 when gif is debugged
 		SetupFractal();
-		threadsBox->Text = (maxTasks = Math::Max(0, Environment::ProcessorCount - 2)).ToString();
+		threadsBox->Text = (maxTasks = Math::Max(1, Environment::ProcessorCount - 2)).ToString();
 		modifySettings = false;
 		helpPanel->Visible = false;
 
@@ -1107,7 +1110,7 @@ namespace RgbFractalGenClr {
 
 	int16_t GeneratorForm::Parse(System::Windows::Forms::TextBox^ BOX) { int16_t v = 0; return int16_t::TryParse(BOX->Text, v) ? v : (int16_t)0; }
 	//int16_t GeneratorForm::Clamp(int16_t NEW, int16_t MIN, int16_t MAX) { return Math::Max(MIN, Math::Min(MAX, NEW)); }
-	int16_t GeneratorForm::Retext(System::Windows::Forms::TextBox^ BOX, int16_t NEW) { BOX->Text = NEW == 0 ? "" : NEW.ToString(); return NEW; }
+	int16_t GeneratorForm::Retext(System::Windows::Forms::TextBox^ BOX, int16_t NEW) { int16_t t; BOX->Text = NEW == 0 ? (int16_t::TryParse(BOX->Text, t) ? "" : BOX->Text) : NEW.ToString(); return NEW; }
 	int16_t GeneratorForm::Mod(int16_t NEW, int16_t MIN, int16_t MAX) { const auto D = MAX - MIN; while (NEW < MIN) NEW += D; while (NEW > MAX) NEW -= D; return NEW; }
 	bool GeneratorForm::Diff(int16_t NEW, int16_t GEN) { return GEN == NEW; }
 	bool GeneratorForm::Diff(float NEW, float GEN) { return GEN == NEW; }
@@ -1252,19 +1255,19 @@ namespace RgbFractalGenClr {
 		ParseClampRetextMulDiffApply(bloomBox, &generator->selectBloom, static_cast<int16_t>(0), static_cast<int16_t>(40), .25f);
 	}
 	System::Void GeneratorForm::BlurBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(blurBox, &generator->selectBlur, static_cast<int16_t>(1), static_cast<int16_t>(40));
+		ParseClampRetextDiffApply(blurBox, &generator->selectBlur, static_cast<int16_t>(0), static_cast<int16_t>(40));
 	}
 	System::Void GeneratorForm::BrightnessBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		ParseClampRetextDiffApply(brightnessBox, &generator->selectBrightness, static_cast<int16_t>(0), static_cast<int16_t>(300));
 	}
 	System::Void GeneratorForm::Parallel_Changed(System::Object^ sender, System::EventArgs^ e) {
-		short newThreads = ParseClampRetext(threadsBox, static_cast<int16_t>(0), static_cast<int16_t>(maxTasks));
-		generator->selectMaxTasks = (short)(newThreads > 0 ? newThreads : -1);
-		generator->selectMaxGenerationTasks = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(generator->selectMaxTasks - 1));
+		short newThreads = ParseClampRetext(threadsBox, static_cast<int16_t>(1), static_cast<int16_t>(maxTasks));
+		generator->selectMaxTasks = (short)(newThreads > 1 ? newThreads : 1);
+		//generator->selectMaxGenerationTasks = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(generator->selectMaxTasks - 1));
 		generator->SelectThreadingDepth();
 	}
 	System::Void GeneratorForm::ParallelTypeBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		generator->selectParallelType = parallelTypeBox->SelectedIndex;
+		generator->selectParallelType = (ParallelType)parallelTypeBox->SelectedIndex;
 	}
 	System::Void GeneratorForm::AbortBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		abortDelay = ParseClampRetext(abortBox, static_cast<int16_t>(0), static_cast<int16_t>(10000));
@@ -1279,7 +1282,7 @@ namespace RgbFractalGenClr {
 		const auto fpsrate = 100 / generator->selectDelay;
 		timer->Interval = generator->selectDelay * 10;
 		delayLabel->Text = "Abort / FPS: " + fpsrate.ToString();
-		if (generator->selectEncode == 2)
+		if (generator->selectGenerationType == 2)
 			QueueReset(false);
 	}
 	System::Void GeneratorForm::MoveFrame(int16_t move) {
@@ -1301,23 +1304,19 @@ namespace RgbFractalGenClr {
 		restartButton->Enabled = false;
 		QueueReset(true);
 	}
-	System::Void GeneratorForm::EncodeButton_Click(System::Object^ sender, System::EventArgs^ e) {
-		switch (generator->selectEncode = (generator->selectEncode + 1) % 3) {
-		case 0:
-			// Only generates one image
-			encodeButton->Text = "Only Image";
-			break;
-		case 1:
-			// Generates an animation for you to see faster, but without encoding a Gif to export
-			encodeButton->Text = "RAM Animation";
-			break;
-		case 2:
-			// Full generation including GIF encoding
-			encodeButton->Text = "Encode GIF";
-			if (!generator->IsGifReady())
-				QueueReset(false);
-			break;
+	System::Void GeneratorForm::EncodeSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
+		if (encodeSelect->SelectedIndex == 2) {
+			auto result = MessageBox::Show(
+				"GIF encoding is not available in Clr version yet.\n You can use GIF encoding in the Cs version.",
+				"Not available",
+				MessageBoxButtons::OK,
+				MessageBoxIcon::Error);
+			encodeSelect->SelectedIndex = 1;
+			return;
 		}
+
+		if ((generator->selectGenerationType = (GenerationType)Math::Max(0, encodeSelect->SelectedIndex)) && !generator->IsGifReady())
+			QueueReset(false);
 	}
 	System::Void GeneratorForm::HelpButton_Click(System::Object^ sender, System::EventArgs^ e) {
 		helpPanel->Visible = screenPanel->Visible;

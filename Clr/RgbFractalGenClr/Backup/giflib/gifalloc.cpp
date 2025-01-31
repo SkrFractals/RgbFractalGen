@@ -85,7 +85,7 @@ GifFreeMapObject(ColorMapObject *Object)
     }
 }
 
-#ifdef DEBUG
+#ifdef CUSTOMDEBUG
 void
 DumpColorMap(ColorMapObject *Object,
              FILE * fp)

@@ -24,13 +24,13 @@
 #include <cstdio>
 #include <cstdint>
 
-
 #define netsize		256			/* number of colours used */
 
+ /* defs for decreasing radius factor */
+#define initrad        32        /* for 256 cols, radius starts */
 
 /* For 256 colours, fixed arrays need 8kb, plus space for the image
    ---------------------------------------------------------------- */
-
 
 /* four primes near 500 - assume no image has a length so large */
 /* that it is divisible by all four primes */
@@ -41,40 +41,75 @@
 
 #define minpicturebytes	(3*prime4)		/* minimum size for input image */
 
-int getNetwork(int i, int j);
+public struct NeuQuant {
 
-/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
-   ----------------------------------------------------------------------- */
-void initnet(const unsigned char *thepic, int nBytes, int sample);
+/* Types and Global Variables
+   -------------------------- */
 
-/* Unbias network to give byte values 0..255 and record position i to prepare for sort
-   ----------------------------------------------------------------------------------- */
-void unbiasnet();	/* can edit this function to do output of colour map */
+	const unsigned char* thepicture;        /* the input image itself */
+	int lengthcount;                /* lengthcount = H*W*3 */
+	int samplefac;                /* sampling factor 1..30 */
+	typedef int pixel[4];                /* BGRc */
+	pixel network[netsize];            /* the network itself */
+	int netindex[256];            /* for network lookup - really 256 */
+	int bias[netsize];            /* bias and freq arrays for learning */
+	int freq[netsize];
+	int radpower[initrad];            /* radpower for precomputation */
+	int alphadec;                    /* biased by 10 bits */
 
-/* Output colour map
-   ----------------- */
-void writecolourmap(FILE *f);
+	int factor;
+	int samplepixels;
 
-void getcolourmap(uint8_t *colorMap);
+	//int getNetwork(int i, int j);
 
-/* Insertion sort of network and building of netindex[0..255] (to do after unbias)
-   ------------------------------------------------------------------------------- */
-void inxbuild();
+	/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
+	   ----------------------------------------------------------------------- */
+	void initnet(const unsigned char* thepic, const int len, const int sample, const int samplepix);
 
-/* Search for BGR values 0..255 (after net is unbiased) and return colour index
-   ---------------------------------------------------------------------------- */
-int inxsearch(int b, int g, int r);
+	/* Unbias network to give byte values 0..255 and record position i to prepare for sort
+	   ----------------------------------------------------------------------------------- */
+	void unbiasnet();	/* can edit this function to do output of colour map */
 
-/* Main Learning Loop
-   ------------------ */
-void learn(System::Threading::CancellationToken token);
+	/* Output colour map
+	   ----------------- */
+	   //void writecolourmap(FILE *f);
 
+	void getcolourmap(uint8_t* colorMap);
+
+	/* Insertion sort of network and building of netindex[0..255] (to do after unbias)
+	   ------------------------------------------------------------------------------- */
+	void inxbuild();
+
+	/* Search for BGR values 0..255 (after net is unbiased) and return colour index
+	   ---------------------------------------------------------------------------- */
+	int inxsearch(const int b, const int g, const int r);
+
+	/* Main Learning Loop
+	   ------------------ */
+	bool learn(System::Threading::CancellationToken* canceltoken);
+
+private:
+    /* Search for biased BGR values
+   ---------------------------- */
+
+	int NeuQuant::contest(const int b, const int g, const int r);
+    /* Move neuron i towards biased (b,g,r) by factor alpha
+       ---------------------------------------------------- */
+
+	void NeuQuant::altersingle(const int alpha, const int i, const int b, const int g, const int r, const int div);
+
+    /* Move adjacent neurons by precomputed alpha*(1-((i-j)^2/[r]^2)) in radpower[|i-j|]
+       --------------------------------------------------------------------------------- */
+
+	void NeuQuant::alterneigh(int rad, int i, int b, int g, int r);
+
+};
 /* Program Skeleton
    ----------------
   [select samplefac in range 1..30]
   pic = (unsigned char*) malloc(3*width*height);
   [read image from input file into pic]
-	initnet(pic,width,height,samplefac);
+	initnet(pic,3*width*height,samplefac);
 	learn();
 	unbiasnet();
 	[write output image header, using writecolourmap(f),
