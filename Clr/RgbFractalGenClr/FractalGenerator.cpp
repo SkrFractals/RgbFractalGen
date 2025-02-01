@@ -373,14 +373,6 @@ namespace RgbFractalGenClr {
 				parallelTasks = gcnew array<Task^>(applyMaxTasks);
 				for (uint16_t t = 0; t < applyMaxTasks; parallelTasks[t++] = nullptr);
 				SetMaxIterations(true);
-				//tuples = new std::tuple<double, double, uint8_t, int, uint8_t>[Math::Max(1, applyMaxGenerationTasks * 8)];
-				//voidDepth = new int16_t * *[applyMaxTasks];
-				//voidQueue = new std::queue<std::pair<int16_t, int16_t>>* [applyMaxTasks];
-				//taskStarted = new bool[applyMaxTasks];
-				//parallelTaskFinished = new uint8_t[applyMaxTasks];
-				//buffer = new Vector * *[allocatedTasks = applyMaxTasks];
-				//for (int t = 0; t < applyMaxTasks; NewBuffer(t++))
-				//	voidQueue[t] = new std::queue<std::pair<int16_t, int16_t>>();
 			}
 			if (selectHeight != allocatedHeight) {
 				for (uint16_t t = 0; t < applyMaxTasks; ++t) {
@@ -414,10 +406,10 @@ namespace RgbFractalGenClr {
 			// Image parallelism
 			//imageTasks = applyParallelType == 2 ? gcnew ConcurrentBag<Task^>() : nullptr;
 			// The other implementation are using the FinishTasks lambda argument function, but I couldn't get that to work in this managed class, so I had to unpack it:
-
 			for (auto tasksRemaining = true; tasksRemaining; MakeDebugString()) {
 				TryFinishBitmaps();
 				while (bitmapsFinished < bitmap->Length && bitmapState[bitmapsFinished] >= (applyGenerationType >= GenerationType::EncodeGIF ? BitmapState::Finished : BitmapState::Encoding)) {
+					bitmapState[bitmapsFinished] = BitmapState::Unlocked;
 					bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]);
 					++bitmapsFinished;
 				}
@@ -450,7 +442,7 @@ namespace RgbFractalGenClr {
 		for (int t = allocatedTasks; 0 <= --t; Join(tasks[t]));
 		// Unlock unfinished bitmaps:
 		for (int b = 0; b < bitmap->Length; ++b)
-			if (bitmapState[b] > BitmapState::Dots && bitmapState[b] < BitmapState::Finished && bitmap[b] != nullptr) {
+			if (bitmapState[b] >= BitmapState::Drawing && bitmapState[b] < BitmapState::Unlocked && bitmap[b] != nullptr) {
 				try {
 					bitmap[b]->UnlockBits(bitmapData[b]);
 				} catch (Exception^) {}
@@ -1258,7 +1250,7 @@ namespace RgbFractalGenClr {
 		}
 		auto laststate = BitmapState::Error;
 		auto b = 0;; 
-		for(auto i = 0; i < 8; counter[i++] = 0);
+		for(auto i = 0; i < 9; counter[i++] = 0);
 		for (_debugString += "\n\nIMAGES:"; b < bitmapsFinished; ++b)
 			++counter[(int)bitmapState[b]];
 		System::String^ _memoryString = "";
@@ -1275,7 +1267,7 @@ namespace RgbFractalGenClr {
 		}
 		if (bitmapState[bitmapsFinished] > BitmapState::Queued) 
 			_memoryString += "-" + (b - 1) + ": " + GetBitmapState(laststate);
-		for (int c = 0; c < 8; ++c) 
+		for (int c = 0; c < 9; ++c) 
 			_debugString += "\n" + counter[c] + "x: " + GetBitmapState((BitmapState)c);
 		_debugString += "\n" + _memoryString;
 		debugString = b < bitmap->Length ? _debugString + "\n" + b + "+: " + "QUEUED" : _debugString;

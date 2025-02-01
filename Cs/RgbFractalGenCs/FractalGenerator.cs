@@ -12,7 +12,6 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Numerics;
-using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,8 +26,9 @@ internal class FractalGenerator {
 		Void = 2,				// Started Dijksring the Void
 		Drawing = 3,			// Started drawing
 		Encoding = 4,			// Started Encoding
-		Finished = 5,			// Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
-		Error = 6				// Unused, unless error obviously
+		Finished = 5,           // Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
+		Unlocked = 6,           // Unlocked bitmap
+		Error = 7				// Unused, unless error obviously
 	}
 	private enum TaskState : byte {
 		Free = 0,		// The task has not been started yet, or already finished and joined and ready to be started again
@@ -216,7 +216,7 @@ internal class FractalGenerator {
 
 	internal bool debugmode = false;
 	internal string debugString = "";
-	private readonly short[] counter = new short[8];
+	private readonly short[] counter = new short[9];
 
 	#region Init
 	internal FractalGenerator() {
@@ -939,62 +939,6 @@ internal class FractalGenerator {
 #endif
 			task.state = TaskState.Done;
 		}
-		/** Tries to encode a gif in a separate parallel thread
-		 * 
-		 * @param task - a free task to which we can start and assign the encoding thread
-		 * @return - failed to create the thread for any reason - so that this task can still be user for something else
-		 */
-		/*bool TryGif(FractalTask task, short tryEncode = -1) {
-			// mark as sequentilly finished and unlock any bitmaps that have a finished state and all of the previous bitmaps before them were finished as well
-			while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] == BitmapState.Finished) {
-				bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
-				++bitmapsFinished;
-			}
-			if (tryEncode < 0) {
-				// OfAnimation type encodes the gif within it's generate dots task
-				if (applyParallelType == ParallelType.OfAnimation)
-					return true;
-				// Find a next bitmap to encode:
-				while (bitmapToEncode < bitmap.Length && bitmapState[bitmapToEncode] >= BitmapState.Encoding)
-					++bitmapToEncode;
-				tryEncode = bitmapToEncode;
-				while (tryEncode <= bitmapToEncode + applyMaxTasks && tryEncode < bitmap.Length && bitmapState[tryEncode] != BitmapState.DrawingFinished)
-					++tryEncode;
-			}
-			if (applyGenerationType >= GenerationType.EncodeGIF && gifEncoder != null) {
-				bool tryWrite = true;
-				while (tryWrite) {
-					int unlock = gifEncoder.FinishedFrame();
-					// Try to finalize the previous encoder tasks
-					switch (gifEncoder.TryWrite()) {
-						default:
-							tryWrite = false;
-							break;
-						case TryWrite.Failed:
-							// Failed, or FinishedAnimation which should never happen
-							if (bitmapState[tryEncode] >= BitmapState.DrawingFinished)
-							bitmapState[tryEncode] = BitmapState.Finished;
-							tryWrite = false;
-							return true;
-						case TryWrite.Waiting:
-							tryWrite = false;
-							break;
-						case TryWrite.FinishedFrame:
-							bitmapState[unlock] = BitmapState.Finished;
-							break;
-					}
-				}
-				if (bitmapState[tryEncode] != BitmapState.DrawingFinished)
-					return true;
-				//exportingGif = true;
-				bitmapState[tryEncode] = BitmapState.Encoding; // Started encoding state
-				//task.Start();
-				GenerateGif(task, tryEncode);
-				return false;
-			} else if (bitmapState[tryEncode] == BitmapState.DrawingFinished)
-				bitmapState[tryEncode] = BitmapState.Finished;
-			return true;
-		}*/
 		/** Parallel threading management - will keep creating new threads unless cancelled and return when all threads are finished
 		 * 
 		 * @param includingGif - gif threads can still keep running when we return
@@ -1003,8 +947,10 @@ internal class FractalGenerator {
 		void FinishTasks(bool includingAnimation, Func<short, bool> lambda) {
 			FractalTask task;
 			for (var tasksRemaining = true; tasksRemaining; MakeDebugString()) {
+				Thread.Sleep(50); // let's make this thread to so CPU intense
 				TryFinishBitmaps();
 				while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (applyGenerationType >= GenerationType.EncodeGIF ? BitmapState.Finished : BitmapState.Encoding)) {
+					bitmapState[bitmapsFinished] = BitmapState.Unlocked;
 					bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
 					++bitmapsFinished;
 				}
@@ -1142,13 +1088,6 @@ internal class FractalGenerator {
 				rect = new(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
 				tasks = new FractalTask[allocatedTasks = applyMaxTasks];
 				tuples = new (short, (float, float), (float, float), byte, int, byte)[applyMaxTasks * 8];
-				//voidDepth = new short[batchTasks][][];
-				//voidQueue = new Queue<(short, short)>[batchTasks];
-				//parallelTasks = new Task[batchTasks + 1];
-				//taskStarted = new bool[batchTasks + 1];
-				//parallelTaskFinished = new byte[batchTasks + 1];
-				//buffer = new Vector3[allocatedTasks = batchTasks][][];
-
 				for (short t = applyMaxTasks; 0 <= --t;) {
 					var task = tasks[t] = new FractalTask();
 					task.voidDepth = new short[applyMaxTasks][];
@@ -1206,7 +1145,7 @@ internal class FractalGenerator {
 		for (var t = allocatedTasks; 0 <= --t; tasks[t].Join()) ;
 		// Unlock unfinished bitmaps:
 		for (var b = 0; b < bitmap.Length; ++b)
-			if (bitmapState[b] is > BitmapState.Dots and < BitmapState.Finished) {
+			if (bitmapState[b] is >= BitmapState.Drawing and < BitmapState.Unlocked) {
 				try {
 					//bitmapState[bitmapsFinished] = BitmapState.Finished;
 					bitmap[b]?.UnlockBits(bitmapData[b]);
@@ -1339,11 +1278,12 @@ internal class FractalGenerator {
 	private void MakeDebugString() {
 		static string GetBitmapState(BitmapState state) => state switch {
 			BitmapState.Queued => "QUEUED (NOT SPAWNED)",
-			BitmapState.Dots => "GENERATING FRACTAL DOTS (NOT SPAWNED)",
-			BitmapState.Void => "GENERATING DIJKSTRA VOID (NOT SPAWNED)",
+			BitmapState.Dots => "GENERATING FRACTAL DOTS",
+			BitmapState.Void => "GENERATING DIJKSTRA VOID",
 			BitmapState.Drawing => "DRAWING (LOCKED)",
 			BitmapState.Encoding => "ENCODING (LOCKED)",
-			BitmapState.Finished => "FINISHED (UNLOCKED)",
+			BitmapState.Finished => "FINISHED (LOCKED)",
+			BitmapState.Unlocked => "UNLOCKED",
 			_ => "ERROR! (SHOULDN'T HAPPEN)",
 		};
 
@@ -1359,10 +1299,10 @@ internal class FractalGenerator {
 			_debugString += "\n" + t + ": ";
 			switch (task.state) {
 				case TaskState.Running:
-					_debugString += "RUN: " + GetBitmapState(bitmapState[task.bitmapIndex]);
+					_debugString += GetBitmapState(bitmapState[task.bitmapIndex]);
 					break;
 				case TaskState.Done:
-					_debugString += "DONE: " + GetBitmapState(bitmapState[task.bitmapIndex]);
+					_debugString += "DONE";
 					break;
 				case TaskState.Free:
 					_debugString += "FREE";
@@ -1371,7 +1311,7 @@ internal class FractalGenerator {
 		}
 		var laststate = BitmapState.Error;
 		var b = 0;
-		for (var i = 0; i < 8; counter[i++] = 0) ;
+		for (var i = 0; i < 9; counter[i++] = 0) ;
 		for (_debugString += "\n\nIMAGES:"; b < bitmapsFinished; ++b)
 			++counter[(int)bitmapState[b]];
 		var _memoryString = "";
@@ -1388,7 +1328,7 @@ internal class FractalGenerator {
 		}
 		if (bitmapState[bitmapsFinished] > BitmapState.Queued) 
 			_memoryString += "-" + (b - 1) + ": " + GetBitmapState(laststate);
-		for (int c = 0; c < 8; ++c) 
+		for (int c = 0; c < 9; ++c) 
 			_debugString += "\n" + counter[c] +"x: "+ GetBitmapState((BitmapState)c);
 		_debugString += "\n" + _memoryString;
 		debugString = b < bitmap.Length ? _debugString + "\n" + b + "+: " + "QUEUED" : _debugString;

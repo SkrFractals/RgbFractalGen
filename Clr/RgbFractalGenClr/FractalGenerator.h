@@ -30,7 +30,8 @@ namespace RgbFractalGenClr {
         Drawing = 3,			// Started drawing
         Encoding = 4,			// Started Encoding
         Finished = 5,			// Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
-        Error = 6				// Unused, unless error obviously
+        Unlocked = 6,           // Unlocked bitmap
+        Error = 7				// Unused, unless error obviously
     };
 
     private enum TaskState : uint8_t {
@@ -192,7 +193,7 @@ namespace RgbFractalGenClr {
 
         bool debugmode = false;
         System::String^ debugString;
-        int16_t* counter = new int16_t[8];
+        int16_t* counter = new int16_t[9];
 
 #pragma region Init
     public:
@@ -281,12 +282,13 @@ namespace RgbFractalGenClr {
         System::Void DebugStart();
         static inline System::String^ GetBitmapState(BitmapState state) {
             switch (state) {
-            case BitmapState::Queued: return "QUEUED (NOT SPAWNED)";
-            case BitmapState::Dots: return"GENERATING FRACTAL DOTS (NOT SPAWNED)";
-            case BitmapState::Void: return"GENERATING DIJKSTRA VOID (NOT SPAWNED)";
+            case BitmapState::Queued: return "QUEUED";
+            case BitmapState::Dots: return"GENERATING FRACTAL DOTS";
+            case BitmapState::Void: return"GENERATING DIJKSTRA VOID";
             case BitmapState::Drawing: return"DRAWING (LOCKED)";
             case BitmapState::Encoding:return "ENCODING (LOCKED)";
-            case BitmapState::Finished: return "FINISHED (UNLOCKED)";
+            case BitmapState::Finished: return "FINISHED (LOCKED)";
+            case BitmapState::Unlocked: return "UNLOCKED";
             default: return"ERROR! (SHOULDN'T HAPPEN)";
             }
         }
