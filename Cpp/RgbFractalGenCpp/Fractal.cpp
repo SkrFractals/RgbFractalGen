@@ -54,7 +54,6 @@ namespace RgbFractalGenCpp {
 		this->cutFunction = cutFunction;
 	}
 
-
 #pragma region CutFunctions_Param
 	int Fractal::Trees_NoChildParam(int8_t index, int inFlags) {
 		// Not a very good one...

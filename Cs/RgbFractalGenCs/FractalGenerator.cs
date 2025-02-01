@@ -533,9 +533,9 @@ internal class FractalGenerator {
 				FinishTasks(false, (short taskIndex) => {
 					if (count <= 0)
 						return false;
-					//var tupleIndex = index++;
+					var tupleIndex = index++;
 					tasks[taskIndex].Start(bitmapIndex, () => {
-						(var bufferIndex, var inXY, var inAngle, var inColor, var inFlags, var inDepth) = tuples[index++/*tupleIndex*/];
+						(var bufferIndex, var inXY, var inAngle, var inColor, var inFlags, var inDepth) = tuples[tupleIndex];
 						GenerateDots_SingleTask(bufferIndex, inXY, inAngle, inColor, inFlags, inDepth);
 						tasks[taskIndex].state = TaskState.Done;
 					});
@@ -1193,10 +1193,10 @@ internal class FractalGenerator {
 					var task = tasks[taskIndex];
 					ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 					var bmp = nextBitmap++;
-					/*float _size = size, _angle = angle, _hueAngle = hueAngle; 
+					float _size = size, _angle = angle, _hueAngle = hueAngle; 
 					var _spin = spin; 
-					var _color = color;*/
-					task.Start(bmp, () => GenerateDots(bmp, taskIndex, size, angle, spin, hueAngle, color/*_size, _angle, _spin, _hueAngle, _color*/));
+					var _color = color;
+					task.Start(bmp, () => GenerateDots(bmp, taskIndex, _size, _angle, _spin, _hueAngle, _color));
 					IncFrameParameters(ref size, ref angle, spin, ref hueAngle, 1);
 					return true; // A task finished, but started another one - keep checking before new master loop
 				});

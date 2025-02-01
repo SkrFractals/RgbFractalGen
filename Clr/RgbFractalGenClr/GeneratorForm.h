@@ -55,7 +55,8 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::Label^ label1;
 	private: System::Windows::Forms::TextBox^ spinSpeedBox;
 	private: System::Windows::Forms::TextBox^ hueSpeedBox;
-	private: System::Windows::Forms::ComboBox^ parallelTypeBox;
+	private: System::Windows::Forms::ComboBox^ parallelTypeSelect;
+
 	private: System::Windows::Forms::TextBox^ ambBox;
 	private: System::Windows::Forms::TextBox^ noiseBox;
 	private: System::Windows::Forms::TextBox^ saturateBox;
@@ -71,6 +72,8 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::Button^ restartButton;
 	private: System::Windows::Forms::ComboBox^ resSelect;
 	private: System::Windows::Forms::ComboBox^ encodeSelect;
+	private: System::Windows::Forms::CheckBox^ debugBox;
+	private: System::Windows::Forms::Label^ debugLabel;
 
 	private: System::ComponentModel::IContainer^ components;
 
@@ -207,7 +210,6 @@ namespace RgbFractalGenClr {
 		template <typename T, typename F> bool ParseClampRetextMulDiffApply(System::Windows::Forms::TextBox^ BOX, interior_ptr<F> GEN, T MIN, T MAX, F MUL);*/
 
 		int16_t Parse(System::Windows::Forms::TextBox^ BOX);
-		//int16_t Clamp(int16_t NEW, int16_t MIN, int16_t MAX);
 		int16_t Retext(System::Windows::Forms::TextBox^ BOX, int16_t NEW);
 		int16_t Mod(int16_t NEW, int16_t MIN, int16_t MAX);
 		bool Diff(int16_t NEW, int16_t GEN);
@@ -223,12 +225,10 @@ namespace RgbFractalGenClr {
 		bool ParseClampRetextDiffApply(System::Windows::Forms::TextBox^ BOX, interior_ptr<int16_t> GEN, int16_t MIN, int16_t MAX);
 		bool ParseClampRetextMulDiffApply(System::Windows::Forms::TextBox^ BOX, interior_ptr<int16_t> GEN, int16_t MIN, int16_t MAX, int16_t MUL);
 		bool ParseClampRetextMulDiffApply(System::Windows::Forms::TextBox^ BOX, interior_ptr<float> GEN, int16_t MIN, int16_t MAX, float MUL);
-
 		System::Void SetupFractal();
 		System::Void QueueReset(bool allow);
 		System::Void FillCutParams();
 		System::Void FillSelects();
-
 		System::Void FractalBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void AngleSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void ColorSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
@@ -253,7 +253,7 @@ namespace RgbFractalGenClr {
 		System::Void BlurBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void BrightnessBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void Parallel_Changed(System::Object^ sender, System::EventArgs^ e);
-		System::Void ParallelTypeBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
+		System::Void ParallelTypeSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void AbortBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void DelayBox_TextChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void MoveFrame(int16_t move);
@@ -261,11 +261,11 @@ namespace RgbFractalGenClr {
 		System::Void AnimateButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void NextButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void RestartButton_Click(System::Object^ sender, System::EventArgs^ e);
-		//System::Void EncodeButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void EncodeSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);
 		System::Void HelpButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void PngButton_Click(System::Object^ sender, System::EventArgs^ e);
 		System::Void GifButton_Click(System::Object^ sender, System::EventArgs^ e);
+		System::Void DebugBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e);
 #pragma endregion
 
 #pragma region Output

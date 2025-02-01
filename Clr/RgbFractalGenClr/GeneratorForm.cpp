@@ -88,7 +88,7 @@ namespace RgbFractalGenClr {
 		this->label1 = (gcnew System::Windows::Forms::Label());
 		this->spinSpeedBox = (gcnew System::Windows::Forms::TextBox());
 		this->hueSpeedBox = (gcnew System::Windows::Forms::TextBox());
-		this->parallelTypeBox = (gcnew System::Windows::Forms::ComboBox());
+		this->parallelTypeSelect = (gcnew System::Windows::Forms::ComboBox());
 		this->ambBox = (gcnew System::Windows::Forms::TextBox());
 		this->noiseBox = (gcnew System::Windows::Forms::TextBox());
 		this->saturateBox = (gcnew System::Windows::Forms::TextBox());
@@ -104,6 +104,8 @@ namespace RgbFractalGenClr {
 		this->restartButton = (gcnew System::Windows::Forms::Button());
 		this->resSelect = (gcnew System::Windows::Forms::ComboBox());
 		this->encodeSelect = (gcnew System::Windows::Forms::ComboBox());
+		this->debugBox = (gcnew System::Windows::Forms::CheckBox());
+		this->debugLabel = (gcnew System::Windows::Forms::Label());
 		this->helpPanel->SuspendLayout();
 		this->SuspendLayout();
 		// 
@@ -149,7 +151,7 @@ namespace RgbFractalGenClr {
 		this->periodBox->Name = L"periodBox";
 		this->periodBox->Size = System::Drawing::Size(86, 23);
 		this->periodBox->TabIndex = 7;
-		this->periodBox->Text = L"10";
+		this->periodBox->Text = L"120";
 		this->periodBox->TextChanged += gcnew System::EventHandler(this, &GeneratorForm::PeriodBox_TextChanged);
 		// 
 		// delayBox
@@ -565,18 +567,18 @@ namespace RgbFractalGenClr {
 		this->hueSpeedBox->Text = L"0";
 		this->hueSpeedBox->TextChanged += gcnew System::EventHandler(this, &GeneratorForm::HueSpeedBox_TextChanged);
 		// 
-		// parallelTypeBox
+		// parallelTypeSelect
 		// 
-		this->parallelTypeBox->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
-																   static_cast<System::Byte>(238)));
-		this->parallelTypeBox->FormattingEnabled = true;
-		this->parallelTypeBox->Items->AddRange(gcnew cli::array< System::Object^  >(2) { L"Of Animation", L"Of Depth" });
-		this->parallelTypeBox->Location = System::Drawing::Point(119, 436);
-		this->parallelTypeBox->Name = L"parallelTypeBox";
-		this->parallelTypeBox->Size = System::Drawing::Size(111, 23);
-		this->parallelTypeBox->TabIndex = 21;
-		this->parallelTypeBox->Text = L"Parallelism Type";
-		this->parallelTypeBox->SelectedIndexChanged += gcnew System::EventHandler(this, &GeneratorForm::ParallelTypeBox_SelectedIndexChanged);
+		this->parallelTypeSelect->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+																	  static_cast<System::Byte>(238)));
+		this->parallelTypeSelect->FormattingEnabled = true;
+		this->parallelTypeSelect->Items->AddRange(gcnew cli::array< System::Object^  >(2) { L"Of Animation", L"Of Depth" });
+		this->parallelTypeSelect->Location = System::Drawing::Point(119, 436);
+		this->parallelTypeSelect->Name = L"parallelTypeSelect";
+		this->parallelTypeSelect->Size = System::Drawing::Size(111, 23);
+		this->parallelTypeSelect->TabIndex = 21;
+		this->parallelTypeSelect->Text = L"Parallelism Type";
+		this->parallelTypeSelect->SelectedIndexChanged += gcnew System::EventHandler(this, &GeneratorForm::ParallelTypeSelect_SelectedIndexChanged);
 		// 
 		// ambBox
 		// 
@@ -760,13 +762,38 @@ namespace RgbFractalGenClr {
 		this->encodeSelect->Text = L"Generation Type";
 		this->encodeSelect->SelectedIndexChanged += gcnew System::EventHandler(this, &GeneratorForm::EncodeSelect_SelectedIndexChanged);
 		// 
+		// debugBox
+		// 
+		this->debugBox->AutoSize = true;
+		this->debugBox->ForeColor = System::Drawing::Color::White;
+		this->debugBox->Location = System::Drawing::Point(17, 589);
+		this->debugBox->Name = L"debugBox";
+		this->debugBox->Size = System::Drawing::Size(79, 17);
+		this->debugBox->TabIndex = 63;
+		this->debugBox->Text = L"Debug Log";
+		this->debugBox->UseVisualStyleBackColor = true;
+		this->debugBox->CheckedChanged += gcnew System::EventHandler(this, &GeneratorForm::DebugBox_CheckedChanged);
+		// 
+		// debugLabel
+		// 
+		this->debugLabel->AutoSize = true;
+		this->debugLabel->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9));
+		this->debugLabel->ForeColor = System::Drawing::Color::White;
+		this->debugLabel->Location = System::Drawing::Point(17, 609);
+		this->debugLabel->Name = L"debugLabel";
+		this->debugLabel->Size = System::Drawing::Size(73, 15);
+		this->debugLabel->TabIndex = 67;
+		this->debugLabel->Text = L"DebugString";
+		// 
 		// GeneratorForm
 		// 
 		this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
 		this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
 		this->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(64)), static_cast<System::Int32>(static_cast<System::Byte>(64)),
 														   static_cast<System::Int32>(static_cast<System::Byte>(64)));
-		this->ClientSize = System::Drawing::Size(1079, 605);
+		this->ClientSize = System::Drawing::Size(1079, 723);
+		this->Controls->Add(this->debugLabel);
+		this->Controls->Add(this->debugBox);
 		this->Controls->Add(this->encodeSelect);
 		this->Controls->Add(this->resSelect);
 		this->Controls->Add(this->restartButton);
@@ -782,7 +809,7 @@ namespace RgbFractalGenClr {
 		this->Controls->Add(this->saturateBox);
 		this->Controls->Add(this->noiseBox);
 		this->Controls->Add(this->ambBox);
-		this->Controls->Add(this->parallelTypeBox);
+		this->Controls->Add(this->parallelTypeSelect);
 		this->Controls->Add(this->hueSpeedBox);
 		this->Controls->Add(this->spinSpeedBox);
 		this->Controls->Add(this->label1);
@@ -862,7 +889,7 @@ namespace RgbFractalGenClr {
 		SetupControl(bloomBox, L"Bloom: 0 will be maximally crisp, but possibly dark with think fractals. Higher values wil blur/bloom out the fractal dots.");
 		SetupControl(blurBox, L"Motion blur: Lowest no blur and fast generation, highest 10 smeared frames 10 times slower generation.");
 		SetupControl(brightnessBox, L"Brightness level: 0% black, 100% normalized maximum, 300% overexposed 3x maximum");
-		SetupControl(parallelTypeBox, L"Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong");
+		SetupControl(parallelTypeSelect, L"Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommmended for fast single images, 1 in a million pixels might be slightly wrong");
 		SetupControl(threadsBox, L"The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
 		SetupControl(abortBox, L"How many millisecond of pause after the last settings change until the generator restarts?");
 		SetupControl(delayBox, L"A delay between frames in 1/100 of seconds for the preview and exported GIF file.\nThe framerate will be roughly 100/delay");
@@ -882,6 +909,7 @@ namespace RgbFractalGenClr {
 		generator = gcnew FractalGenerator();
 		for (Fractal** i = generator->GetFractals(); *i != nullptr; ++i)
 			fractalSelect->Items->Add(gcnew String(((*i)->name).c_str()));
+
 		generator->selectFractal = -1;
 		fractalSelect->SelectedIndex = 0;
 		resSelect->SelectedIndex = 0;
@@ -890,7 +918,7 @@ namespace RgbFractalGenClr {
 		AbortBox_TextChanged(DN);
 		PeriodBox_TextChanged(DN);
 		PeriodMultiplierBox_TextChanged(DN);
-		ParallelTypeBox_SelectedIndexChanged(DN);
+		ParallelTypeSelect_SelectedIndexChanged(DN);
 		DelayBox_TextChanged(DN);
 		DefaultZoom_TextChanged(DN);
 		SpinSpeedBox_TextChanged(DN);
@@ -902,7 +930,7 @@ namespace RgbFractalGenClr {
 		BlurBox_TextChanged(DN);
 		SaturateBox_TextChanged(DN);
 		BrightnessBox_TextChanged(DN);
-		parallelTypeBox->SelectedIndex = 0;
+		parallelTypeSelect->SelectedIndex = 0;
 		spinSelect->SelectedIndex = 1;
 		zoomSelect->SelectedIndex = 1;
 		hueSelect->SelectedIndex = 1;
@@ -919,14 +947,20 @@ namespace RgbFractalGenClr {
 		generator->StartGenerate();
 	}
 	System::Void GeneratorForm::timer_Tick(System::Object^ sender, System::EventArgs^ e) {
+		if (generator->debugmode) {
+			debugLabel->Text = generator->debugString;
+			SetMinimumSize();
+		}
 		// Window Size Update
 		WindowSizeRefresh();
 		const auto gTaskNotRunning = IsTaskNotRunning(gTask);
 		if (queueReset > 0) {
 			if (!(gTaskNotRunning && IsTaskNotRunning(aTask)))
 				return;
-			if (queueAbort)
+			if (queueAbort) {
 				aTask = Task::Run(gcnew Action(this, &GeneratorForm::Abort), (cancel = gcnew CancellationTokenSource())->Token);
+				return;
+			}
 			if ((queueReset -= (short)timer->Interval) > 0)
 				return;
 			SetupFractal();
@@ -958,14 +992,15 @@ namespace RgbFractalGenClr {
 			}
 		}
 		// Info text refresh
+		System::String^ infoText = " / " + bitmapsTotal.ToString();
 		if (bitmapsFinished < bitmapsTotal) {
 			statusLabel->Text = "Generating: ";
-			infoLabel->Text = bitmapsFinished.ToString();
+			infoText = bitmapsFinished.ToString() + infoText;
 		} else {
 			statusLabel->Text = "Finished: ";
-			infoLabel->Text = currentBitmapIndex.ToString();
+			infoText = currentBitmapIndex.ToString() + infoText;
 		}
-		infoLabel->Text += " / " + bitmapsTotal.ToString();
+		infoLabel->Text = infoText;
 		gifButton->Text = gTaskNotRunning ? "Save GIF" : "Saving GIF...";
 	}
 	System::Void GeneratorForm::GeneratorForm_FormClosing(System::Object^ sender, System::Windows::Forms::FormClosingEventArgs^ e) {
@@ -999,6 +1034,7 @@ namespace RgbFractalGenClr {
 		FillCutParams();*/
 		gifButton->Enabled = false;
 		//aTask = null;
+		currentBitmapIndex = 0;
 	}
 	System::Void GeneratorForm::ResetRestart() {
 		queueReset = restartTimer = 0;
@@ -1079,7 +1115,7 @@ namespace RgbFractalGenClr {
 		int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
 		MinimumSize = System::Drawing::Size(
 			Math::Max(640, bw + width + 284),
-			Math::Max(640, bh + Math::Max(460, height + 8))
+			Math::Max(Math::Max(640, debugLabel->Bounds.Bottom + bh), bh + Math::Max(460, height + 8))
 		);
 	}
 	System::Void GeneratorForm::ResizeScreen() {
@@ -1128,8 +1164,15 @@ namespace RgbFractalGenClr {
 
 	System::Void GeneratorForm::SetupFractal() {
 		generator->SetupFractal();
-		Parallel_Changed(DN);
-		DetailBox_TextChanged(DN);
+		if (!modifySettings) {
+			modifySettings = true;
+			Parallel_Changed(DN);
+			DetailBox_TextChanged(DN);
+			modifySettings = false;
+		} else {
+			Parallel_Changed(DN);
+			DetailBox_TextChanged(DN);
+		}
 		generator->SetupAngle();
 		generator->SetupCutFunction();
 	}
@@ -1266,8 +1309,8 @@ namespace RgbFractalGenClr {
 		//generator->selectMaxGenerationTasks = Math::Max(static_cast<int16_t>(1), static_cast<int16_t>(generator->selectMaxTasks - 1));
 		generator->SelectThreadingDepth();
 	}
-	System::Void GeneratorForm::ParallelTypeBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		generator->selectParallelType = (ParallelType)parallelTypeBox->SelectedIndex;
+	System::Void GeneratorForm::ParallelTypeSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
+		generator->selectParallelType = (ParallelType)parallelTypeSelect->SelectedIndex;
 	}
 	System::Void GeneratorForm::AbortBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		abortDelay = ParseClampRetext(abortBox, static_cast<int16_t>(0), static_cast<int16_t>(10000));
@@ -1327,6 +1370,10 @@ namespace RgbFractalGenClr {
 	}
 	System::Void GeneratorForm::GifButton_Click(System::Object^ sender, System::EventArgs^ e) {
 		saveGif->ShowDialog();
+	}
+	System::Void GeneratorForm::DebugBox_CheckedChanged(System::Object^ sender, System::EventArgs^ e) {
+		if (!(generator->debugmode = debugBox->Checked)) 
+			debugLabel->Text = "";
 	}
 	System::Void GeneratorForm::ScreenPanel_Paint(System::Object^ sender, System::Windows::Forms::PaintEventArgs^ e) {
 		if (currentBitmap == nullptr)

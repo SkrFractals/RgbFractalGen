@@ -64,7 +64,7 @@
    ----------------------------------------------------------------------- */
 
 void NeuQuant::initnet() {
-    for (int *p, i = 0; i < netsize; i++) {
+    for (int* p, i = 0; i < netsize; i++) {
         p = network[i];
         p[0] = p[1] = p[2] = (i << (netbiasshift + 8)) / netsize;
         freq[i] = intbias / netsize;    // 1/netsize
@@ -90,16 +90,16 @@ void NeuQuant::unbiasnet() {
 /* Output colour map
    ----------------- */
 
-/*void writecolourmap(FILE* f) {
-    int i, j;
+   /*void writecolourmap(FILE* f) {
+       int i, j;
 
-    for (i = 2; i >= 0; i--)
-        for (j = 0; j < netsize; j++)
-            putc(network[j][i], f);
-}*/
+       for (i = 2; i >= 0; i--)
+           for (j = 0; j < netsize; j++)
+               putc(network[j][i], f);
+   }*/
 
-void NeuQuant::getcolourmap(uint8_t *colorMap) {
-    int *index = new int[netsize];
+void NeuQuant::getcolourmap(uint8_t* colorMap) {
+    int* index = new int[netsize];
     for (int i = 0; i < netsize; i++)
         index[network[i][3]] = i;
     int k = 0;
@@ -117,9 +117,9 @@ void NeuQuant::getcolourmap(uint8_t *colorMap) {
    ------------------------------------------------------------------------------- */
 
 void NeuQuant::inxbuild() {
-    
+
     int i, j, smallpos, smallval;
-    int *p, *q;
+    int* p, * q;
     int previouscol, startpos;
 
     previouscol = 0;
@@ -171,13 +171,13 @@ void NeuQuant::inxbuild() {
 int NeuQuant::inxsearch(const int b, const int g, const int r) {
     int i = netindex[g], // index on g
         j = i - 1,  // start at netindex[g] and work outwards
-        *p, dist, a, best = -1,
+        * p, dist, a, best = -1,
         bestd = 1000; // biggest possible dist is 256*3
     while (i < netsize || j >= 0) {
         if (i < netsize) {
             if ((dist = (p = network[i])[1] - g) < bestd) { // inx key
                 ++i;
-                if (dist < 0) 
+                if (dist < 0)
                     dist = -dist;
                 if (((a = p[0] - b) < 0 ? dist -= a : dist += a) < bestd && ((a = p[2] - r) < 0 ? dist -= a : dist += a) < bestd) {
                     bestd = dist;
@@ -186,15 +186,15 @@ int NeuQuant::inxsearch(const int b, const int g, const int r) {
             } else i = netsize;    // stop iter 
         }
         if (j >= 0) {
-           if ((dist = g - (p = network[j])[1]) < bestd) { // inx key - reverse dif
-               --j;
-               if (dist < 0) 
-                   dist = -dist;
-               if (((a = p[0] - b) < 0 ? dist -= a : dist += a) < bestd && ((a = p[2] - r) < 0 ? dist -= a : dist += a) < bestd) {
-                   bestd = dist;
-                   best = p[3];
-               }
-           } else j = -1; // stop iter
+            if ((dist = g - (p = network[j])[1]) < bestd) { // inx key - reverse dif
+                --j;
+                if (dist < 0)
+                    dist = -dist;
+                if (((a = p[0] - b) < 0 ? dist -= a : dist += a) < bestd && ((a = p[2] - r) < 0 ? dist -= a : dist += a) < bestd) {
+                    bestd = dist;
+                    best = p[3];
+                }
+            } else j = -1; // stop iter
         }
     }
     return best;
@@ -212,10 +212,10 @@ int NeuQuant::contest(const int b, const int g, const int r) {
 
     int i, dist, a, biasdist, betafreq;
     int bestpos = -1, bestbiaspos = -1, bestd = ~(1 << 31), bestbiasd = ~(1 << 31);
-    int *p = bias, *f = freq, *n;
+    int* p = bias, * f = freq, * n;
 
     for (i = 0; i < netsize; i++) {
-        if ((dist = (n = network[i])[0] - b) < 0) 
+        if ((dist = (n = network[i])[0] - b) < 0)
             dist = -dist;
         dist += (a = n[1] - g) < 0 ? -a : a;
         if (((a = n[2] - r) < 0 ? dist -= a : dist += a) < bestd) {
@@ -254,14 +254,14 @@ void NeuQuant::altersingle(const int alpha, const int i, const int b, const int 
 
 void NeuQuant::alterneigh(int rad, int i, int b, int g, int r) {
     int j = i + 1, k = i - 1, lo = i - rad, hi = i + rad, a;
-    int *q = radpower;
+    int* q = radpower;
     if (lo < -1)
         lo = -1;
     if (hi > netsize)
         hi = netsize;
     while (j < hi || k > lo) {
         a = *++q;
-        if (j < hi) 
+        if (j < hi)
             altersingle(a, j++, b, g, r, alpharadbias);
         if (k > lo)
             altersingle(a, k--, b, g, r, alpharadbias);
@@ -271,11 +271,11 @@ void NeuQuant::alterneigh(int rad, int i, int b, int g, int r) {
 /* Main Learning Loop
    ------------------ */
 
-bool NeuQuant::learn(unsigned char* p, const int lengthcount, const int samplefac, int samplepixels, int factor, System::Threading::CancellationToken* canceltoken) {
+bool NeuQuant::learn(unsigned char* p, const int lengthcount, const int samplefac, int samplepixels, int factor, bool cancelType, void* cancel) {
     int i, j, b, g, r;
-    int radius = initradius, rad = radius >> radiusbiasshift, alpha, step,  delta = samplepixels / ncycles;
+    int radius = initradius, rad = radius >> radiusbiasshift, alpha, step, delta = samplepixels / ncycles;
     //const unsigned char *p = thepicture;
-    const unsigned char *lim = p + lengthcount;
+    const unsigned char* lim = p + lengthcount;
 
     alphadec = 30 + ((samplefac - 1) / 3);
     if (delta <= 0)
@@ -289,7 +289,7 @@ bool NeuQuant::learn(unsigned char* p, const int lengthcount, const int samplefa
     step = (lengthcount % prime1 != 0 ? prime1 : lengthcount % prime2 != 0 ? prime2 : lengthcount % prime3 != 0 ? prime3 : prime4) * 3;
     i = 0;
 
-    if (canceltoken == nullptr) {
+    if (cancel == nullptr) {
         while (0 <= --samplepixels) {
             b = p[0] << netbiasshift;
             g = p[1] << netbiasshift;
@@ -310,11 +310,11 @@ bool NeuQuant::learn(unsigned char* p, const int lengthcount, const int samplefa
         }
         return false;
     }
-    auto& token = *canceltoken;
-    
+    //auto& token = *canceltoken;
+
     samplepixels /= factor;
     while (0 <= --factor) {
-        if (token.IsCancellationRequested)
+        if (isCancel(cancelType, cancel))
             return true;
         for (int s = samplepixels; 0 <= --s;) {
             b = p[0] << netbiasshift;

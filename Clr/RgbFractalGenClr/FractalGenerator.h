@@ -1,13 +1,12 @@
 // Allow debug code, comment this when releasing for slightly better performance
-//#define CUSTOMDEBUG
+#define CUSTOMDEBUG
 
 #pragma once
 #include <vector>
 #include <mutex>
 #include <random>
 #include <queue>
-#include "Vector.h"
-#include <functional> // Required for std::function
+#include "Vector.h"//#include <functional> // Required for std::function
 #include "Fractal.h"
 
 #ifdef CUSTOMDEBUG
@@ -52,8 +51,6 @@ namespace RgbFractalGenClr {
         EncodeGIF = 2,      // Will encode a GIF while generating the animation, will be slower than generating the animation without GIF.
     };
 
-
-
     public struct FractalTask {
         TaskState state;        // States of Animation Tasks
         Vector** buffer;        // Buffer for points to print into bmp
@@ -63,8 +60,8 @@ namespace RgbFractalGenClr {
         Vector H;               // Mixed children color
         Vector I;               // Pure parent color
         bool taskStarted;       // Additional safety, could remove if it never gets triggered for a while
-        uint16_t taskIndex;     // the task index
-        uint16_t bitmapIndex;   // the bitmap index on which bitmap is this task working
+        uint16_t taskIndex;     // The task index
+        uint16_t bitmapIndex;   // The bitmap index on which bitmap is this task working
         std::tuple<float, float, std::pair<float, float>*>*
             preIterate;
         FractalTask() {
@@ -75,8 +72,6 @@ namespace RgbFractalGenClr {
         }
     };
 
-
-
     public ref class FractalGenerator {
 
 #ifdef CUSTOMDEBUG
@@ -84,13 +79,13 @@ namespace RgbFractalGenClr {
         // Debug variables
         System::String^ logString;                  // Debug Log
         std::chrono::steady_clock::time_point* startTime; // Start Stopwatch
-        long long initTimes, iterTimes, voidTimes, drawTimes, gifTimes;
+        long long initTimes, iterTimes, voidTimes, drawTimes, gifsTimes;
 #endif
     private:
         // Definitions
         Fractal** fractals;     // Fractal definitions
         Fractal* f;             // Selected fractal definition
-        uint16_t maxChildren;
+        uint16_t maxChildren;   // The maximum number of children any fractal definition has (for presizing the copy arrays)
         float* childAngle;		// A copy of selected childAngle
         float selectPeriodAngle;// Angle symmetry of current fractal
         float applyPeriodAngle; // Angle symmetry corrected for periodMultiplier
@@ -120,43 +115,46 @@ namespace RgbFractalGenClr {
         uint16_t finalPeriodMultiplier; // How much will the period get finally stretched? (calculated for seamless + user multiplier)
         uint16_t debug;				    // Debug frame count override
         uint16_t bitmapsFinished;		// How many bitmaps are completely finished generating? (ready to display, encoded if possible)
-        //uint16_t bitmapToEncode;        // How many bitmaps haave at least begun encoding?
         uint16_t nextBitmap;			// How many bitmaps have started generating? (next task should begin with this one)
         int16_t allocatedFrames;        // How many bitmap frames are currently allocated?
         int16_t applyZoom;		        // Applied zoom (selected or random)
-        GenerationType applyGenerationType;
+        GenerationType 
+            applyGenerationType;        // Applied generation type (for example a gif error can temporarily change it to AnimationRAM)
 
         // Color
-        int16_t applyBlur;
+        int16_t applyBlur;          // Applied blur level (1 + selectBlur, because 0 would not render any image)
         int16_t applyColorPalette;  // RGB or BGR? (0/1)
         int16_t applyHueCycle;      // Hue Cycling Direction (-1,0,1)
         uint8_t hueCycleMultiplier;	// How fast should the hue shift to loop seamlessly?
 
         // Void
         float ambnoise;         // Normalizer for maximum void depth - Precomputed amb * noise
-        float bloom1;           // Precomputed bloom+1
+        float bloom1;           // Precomputed bloom + 1
         Random random;          // Random generator
 
         // Threading
-        FractalTask* tasks;
-        ParallelType applyParallelType;		// Safely copy parallelType in here so it doesn't change in the middle of generation
-        int16_t applyMaxTasks;				// Safely copy maxTasks in here so it doesn't change in the middle of generation
-        int16_t maxDepth;					// Maximum depth for Recusrion parallelism
-        int16_t allocatedTasks;				// How many buffer tasks are currently allocated?
-        Object^ taskLock = gcnew Object();  // Monitor lock
-        CancellationTokenSource^ cancel;    // Cancellation Token Source
-        Task^ mainTask;                     // Main Generation Task
-        //ConcurrentBag<Task^>^ imageTasks; // Parallel Image Tasks
-        array<Task^>^ parallelTasks;        // Parallel Animation Tasks
-        List<Task^>^ taskSnapshot;          // Snapshot for safely checking imageTasks Wait
+        FractalTask* tasks;             // All available tasks
+        ParallelType 
+            applyParallelType;          // Safely copy parallelType in here so it doesn't change in the middle of generation
+        int16_t applyMaxTasks;			// Safely copy maxTasks in here so it doesn't change in the middle of generation
+        int16_t maxDepth;				// Maximum depth for Recusrion parallelism
+        int16_t allocatedTasks;			// How many buffer tasks are currently allocated?
+        Object^ 
+            taskLock = gcnew Object();  // Monitor lock
+        CancellationTokenSource^ 
+            cancel;                     // Cancellation Token Source
+        Task^ mainTask;                 // Main Generation Task
+        array<Task^>^ parallelTasks;    // Parallel Animation Tasks
         std::tuple<uint16_t, double, double, uint8_t, int, uint8_t>* 
-            tuples;                         // Queue struct for GenerateDots_OfDepth
+            tuples;                     // Queue struct for GenerateDots_OfDepth
 
         // Export
-        void* gifEncoder;               // Export GIF encoder
-        bool gifSuccess;	            // Temp GIF file "gif.tmp" successfuly created
-        System::String^ gifTempPath;    // Temporary GIF file name
-        System::Drawing::Rectangle rect;// Bitmap rectangle TODO implement
+        void* gifEncoder;   // Export GIF encoder
+        bool gifSuccess;	// Temp GIF file "gif.tmp" successfuly created
+        System::String^ 
+            gifTempPath;    // Temporary GIF file name
+        System::Drawing::Rectangle 
+            rect;           // Bitmap rectangle TODO implement
 
     public:
         // Selected Settings
@@ -194,7 +192,7 @@ namespace RgbFractalGenClr {
 
         bool debugmode = false;
         System::String^ debugString;
-        short* counter = new short[8];
+        int16_t* counter = new int16_t[8];
 
 #pragma region Init
     public:
@@ -207,7 +205,6 @@ namespace RgbFractalGenClr {
 
 #pragma region Generate_Tasks
     private:
-        //bool ParallelAnimation(uint16_t taskIndex, uint16_t generateLength, float size, float angle, int8_t spin, float hueAngle, uint8_t color);
         System::Void GenerateAnimation();
         System::Void GenerateDots(const uint16_t& bitmapIndex, const int16_t& stateIndex, float size, float angle, int8_t spin, float hueAngle, uint8_t color);
         System::Void GenerateImage(FractalTask& task);
@@ -216,7 +213,7 @@ namespace RgbFractalGenClr {
         // OfRecusrion is replaced with OdDepth, which is already better
         //System::Void GenerateDots_OfRecursion(const uint16_t taskIndex, double inXY, double AA, const uint8_t inColor, const int inFlags, uint8_t inDepth);
         //FinishTasks had to be unpacked directly into the code because lambdas are not supported here in a managed class
-        /*void FractalGenerator::FinishTasks(bool includingGif, Func<int, bool>^ lambda) {
+        /*System::Void FractalGenerator::FinishTasks(bool includingGif, Func<int, bool>^ lambda) {
 	        for (auto tasksRemaining = true; tasksRemaining; MakeDebugString()) {
 		        tasksRemaining = false;
 		        for (uint16_t t = applyMaxTasks; 0 <= --t; ) {
@@ -229,10 +226,9 @@ namespace RgbFractalGenClr {
 		        }
 	        }
         }
-        void FractalGenerator::FinishTasks(bool includingGif, Func<int, bool>^ lambda);*/
+        System::Void FractalGenerator::FinishTasks(bool includingGif, Func<int, bool>^ lambda);*/
         bool IsTaskStillRunning(FractalTask& task);
-        void TryFinishBitmaps();
-        //bool TryGif(FractalTask& task);
+        System::Void TryFinishBitmaps();
 #pragma endregion
 
 #pragma region Generate_Inline
@@ -255,57 +251,12 @@ namespace RgbFractalGenClr {
 
 #pragma region TaskWrappers
     private:
-        System::Void Task_Animation(System::Object^ obj);
+        System::Void Task_Dots(System::Object^ obj);
         System::Void Task_Image(System::Object^ obj);
         System::Void Task_OfDepth(System::Object^ obj);
         //System::Void Task_OfRecursion(System::Object^ obj);
-        inline bool Join(FractalTask& task) {
-            if (task.taskStarted) {
-                if (parallelTasks[task.taskIndex] != nullptr) {
-#ifdef PARALLELDEBUG
-                    Debug::WriteLine("join" + task.index);
-#endif
-                    parallelTasks[task.taskIndex]->Wait();
-                    parallelTasks[task.taskIndex] = nullptr;
-                } else {
-#ifdef PARALLELDEBUG
-                    Debug::WriteLine("ERROR not joinable " + task.index);
-#endif
-                }
-            } else {
-#ifdef PARALLELDEBUG
-                Debug::WriteLine("ERROR join: task not running " + task.index);
-#endif
-            }
-            task.state = TaskState::Free;
-            return task.taskStarted = false;
-        }
-
-        inline void Start(const uint16_t taskIndex, uint16_t bitmap, Action<Object^>^ action, Object^ state) {
-            auto& task = tasks[taskIndex];
-            if (task.taskStarted) {
-#ifdef PARALLELDEBUG
-                Debug::WriteLine("ERROR start: task already running " + task.index);
-#endif
-
-                if (parallelTasks[task.taskIndex] != nullptr) {
-                    parallelTasks[task.taskIndex]->Wait();
-                    parallelTasks[task.taskIndex] = nullptr;
-                } else {
-#ifdef PARALLELDEBUG
-                    Debug::WriteLine("ERROR not joinable " + task.index);
-#endif
-                }
-            } else {
-#ifdef PARALLELDEBUG
-                Debug::WriteLine("start" + task.index);
-#endif
-            }
-            task.taskStarted = true;
-            task.bitmapIndex = bitmap;
-            task.state = TaskState::Running;
-            parallelTasks[taskIndex] = Task::Factory->StartNew(action, state);
-        }
+        inline bool Join(FractalTask& task);
+        inline System::Void Start(const uint16_t taskIndex, uint16_t bitmap, Action<Object^>^ action, Object^ state);
 #pragma endregion
 
 #pragma region AnimationParameters
@@ -316,7 +267,6 @@ namespace RgbFractalGenClr {
         inline System::Void IncFrameSize(float& size, const uint16_t period) {
             size *= powf(f->childSize, selectZoom * 1.0f / period);
         }
-        //System::Void SetupFrameColorBlend(const float hueAngle, VecRefWrapper^ R);
 #pragma endregion
 
 #pragma region Interface_Calls
@@ -328,7 +278,7 @@ namespace RgbFractalGenClr {
 #ifdef CUSTOMDEBUG
         System::Void Log(System::String^ log, System::String^ line);
 #endif
-        void DebugStart();
+        System::Void DebugStart();
         static inline System::String^ GetBitmapState(BitmapState state) {
             switch (state) {
             case BitmapState::Queued: return "QUEUED (NOT SPAWNED)";
@@ -358,12 +308,6 @@ private:
                 ? nullptr
                 : &f->cutFunction[selectCut].second;
         }
-        /*inline bool SelectDetail(const float detail) {
-            if (this->detail == detail * f->minSize)
-                return true;
-            this->detail = detail * f->minSize;
-            return false;
-        }*/
         inline System::Void SelectThreadingDepth() {
             //preIterate = new std::tuple<float, float, std::pair<float, float>*>*[Math::Max(static_cast<int16_t>(1), selectMaxTasks)];
             //SetMaxIterations(true);
@@ -379,13 +323,17 @@ private:
     public:
         inline Fractal** GetFractals() { return fractals; }
         inline Fractal* GetFractal() { return fractals[selectFractal]; }
-        inline Bitmap^ GetBitmap(const int index) { return bitmap == nullptr || bitmap->Length <= index ? nullptr : bitmap[index]; }
-      //  inline uint16_t GetFinalPeriod();
+        inline Bitmap^ GetBitmap(const int index) { 
+            return bitmap == nullptr || bitmap->Length <= index ? nullptr : bitmap[index]; 
+        }
         inline int GetFrames() { return bitmap == nullptr ? 0 : (int)(bitmap->Length); }
         inline int GetBitmapsFinished() { return bitmapsFinished; }
         inline bool IsGifReady() { return gifSuccess; }
-        //GetTempGif();
-        inline Fractal::CutFunction* GetCutFunction() { return fractals[selectFractal]->cutFunction == nullptr ? nullptr : &fractals[selectFractal]->cutFunction[selectCut].second; }
+        inline Fractal::CutFunction* GetCutFunction() { 
+            return fractals[selectFractal]->cutFunction == nullptr 
+                ? nullptr 
+                : &fractals[selectFractal]->cutFunction[selectCut].second; 
+        }
         std::string ConvertToStdString(System::String^ managedString);
 #pragma endregion
 
@@ -395,7 +343,7 @@ private:
             return *reinterpret_cast<double*>(&combined_bits);    // Reinterpret as a double
         }
         // Unpack a double into two floats
-        void unpack(double packed, float& f1, float& f2) {
+        System::Void unpack(double packed, float& f1, float& f2) {
             uint64_t combined_bits = *reinterpret_cast<uint64_t*>(&packed); // Get bits of double
             uint32_t f1_bits = combined_bits >> 32;         // Extract upper 32 bits
             uint32_t f2_bits = combined_bits & 0xFFFFFFFF;  // Extract lower 32 bits

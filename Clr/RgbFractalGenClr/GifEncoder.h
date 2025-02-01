@@ -10,6 +10,7 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include "giflib/gif_lib.h"
 #include "algorithm/NeuQuant.h"
 
@@ -50,7 +51,7 @@ public struct NeuQuantTask {
     int transIndex;             // index of the transparent color
     int transR, transG, transB; // transparent color
     //int factor;
-    NeuQuant 
+    NeuQuant
         neuquant = NeuQuant();  // unstaticed instance of neuquant to allow it to run in parallel
     NeuQuantTask* nextTask;     // next pushed task (can be out of order frame)
     std::thread* thisTask;      // if the task makes it's own thread, it writes it here, and also to the reference supplied in the push
@@ -58,8 +59,8 @@ public struct NeuQuantTask {
     int lengthcount;            // = Height * Width * 3
     int samplepixels;           // = lengthcount / (3 * quality)
     int factor;                 // balanced factor of samplepixels to evenly split the learn loop
-    System::Threading::CancellationToken* 
-        token;                  // cancellation token
+    void* cancel;               // cancellation pointer
+    bool cancelType;            // false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
 
     NeuQuantTask(const int width, const int height);
 
@@ -100,39 +101,41 @@ public:
     GifEncoder() = default;
 
     /**
-     * create gif file - original synchronous version for compatibily, allowing cancellation
-     *
-     * @param file file path
-     * @param width gif width
-     * @param height gif height
-     * @param quality 1..30, 1 is best
-     * @param useGlobalColorMap if true each frame wil lhave it's own color map, and gets encoded during a push, if false, all framnes get encoded at close
-     * @param loop loop count, 0 is endless
-     * @param preAllocSize For better performance, it's suggested to set preAllocSize. If you can't determine it, set to 0.
-     *        If use global color map (you won't, it's disabled in this threading version), all frames size must be same, and preAllocSize = width * height * 3 * nFrame
-     *        If use local color map, preAllocSize = MAX(width * height) * 3
-     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable
-     * @return success
-     */
-    bool open(const std::string& file, const int width, const int height, 
-              const int quality = 1, const bool useGlobalColorMap = false, const int16_t loop = 0, 
-              const int preAllocSize = 0, System::Threading::CancellationToken* token = nullptr);
+      * create gif file - original synchronous version for compatibily, allowing cancellation
+      *
+      * @param file file path
+      * @param width gif width
+      * @param height gif height
+      * @param quality 1..30, 1 is best
+      * @param useGlobalColorMap if true each frame wil lhave it's own color map, and gets encoded during a push, if false, all framnes get encoded at close
+      * @param loop loop count, 0 is endless
+      * @param preAllocSize For better performance, it's suggested to set preAllocSize. If you can't determine it, set to 0.
+      *        If use global color map (you won't, it's disabled in this threading version), all frames size must be same, and preAllocSize = width * height * 3 * nFrame
+      *        If use local color map, preAllocSize = MAX(width * height) * 3
+      * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
+      * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable
+      * @return success
+      */
+    bool open(const std::string& file, const int width, const int height,
+              const int quality = 1, const bool useGlobalColorMap = false, const int16_t loop = 0,
+              const int preAllocSize = 0, bool cancelType = false, void* cancel = nullptr);
 
     /**
-    * add frame - original compatibility - allowing out of order pushing, allowing cancellation
-    *
-    * @param format pixel format
-    * @param frame frame data
-    * @param width frame width
-    * @param height frame height
-    * @param delay delay time 0.01s
-    * @param task - starts its own push task and puts it into the reference
-    * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
-    * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
-    * @return
-    */
-    bool push(const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, 
-              const int delay = 5, const int frameIndex = -1, System::Threading::CancellationToken* token = nullptr);
+     * add frame - original compatibility - allowing out of order pushing, allowing cancellation
+     *
+     * @param format pixel format
+     * @param frame frame data
+     * @param width frame width
+     * @param height frame height
+     * @param delay delay time 0.01s
+     * @param task - starts its own push task and puts it into the reference
+     * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
+     * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
+     * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
+     * @return
+     */
+    bool push(const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height,
+              const int delay = 5, const int frameIndex = -1, bool cancelType = false, void* cancel = nullptr);
 
     /**
      * add frame - original compatibility - only uncopied BGR, allowing out of order pushing, allowing cancellation
@@ -143,28 +146,30 @@ public:
      * @param delay delay time 0.01s
      * @param task - starts its own push task and puts it into the reference
      * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
-     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
+     * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
+     * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
     inline bool push(uint8_t* frame, const int width, const int height,
-              const int delay = 5, const int frameIndex = -1, System::Threading::CancellationToken* token = nullptr) {
-        return push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, token);
+                     const int delay = 5, const int frameIndex = -1, bool cancelType = false, void* cancel = nullptr) {
+        return push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, cancelType, cancel);
     }
 
     /**
      * close gif file, but if in parallel it just marks the pushes as final, and you need to complete the file by calling tryWrite until a finished or failed result
      *
-     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
+     * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
+     * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
-    bool close(System::Threading::CancellationToken* token = nullptr);
+    bool close(bool cancelType = false, void* cancel = nullptr);
 
 #pragma endregion
 
 private:
 
 #pragma region ORIGINAL_PRIVATES_AND_VARIABLES
-    bool setupTask(NeuQuantTask* pushPtr, const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, System::Threading::CancellationToken* token);
+    bool setupTask(NeuQuantTask* pushPtr, const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, bool cancelType = false, void* cancel = nullptr);
 
     /** Encodes the frame */
     void encodeFrame(NeuQuantTask& task, const int delay);
@@ -192,21 +197,26 @@ public:
 #pragma region EXPANSION_PUBLIC
 
     /**
-    * create gif file
-    *
-    * @param file file path
-    * @param width gif width
-    * @param height gif height
-    * @param quality 1..30, 1 is best
-    * @param loop loop count, 0 is endless
-    * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable
-    * @return success
-    */
+     * create gif file
+     *
+     * @param file file path
+     * @param width gif width
+     * @param height gif height
+     * @param quality 1..30, 1 is best
+     * @param loop loop count, 0 is endless
+     * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
+     * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable
+     * @return success
+     */
     bool open_parallel(const std::string& file, const int width, const int height,
-                       const int quality = 1, int16_t loop = 0, System::Threading::CancellationToken* token = nullptr);
+                       const int quality = 1, int16_t loop = 0, bool cancelType = false, void* cancel = nullptr);
 
-    /** set transparent color */
+    /** set transparent color, if any value is negative, it resets transparency */
     inline void setTransparent(const int b, const int g, const int r) {
+        if (r < 0 || g < 0 || b < 0) {
+            transparent = false;
+            return;
+        }
         transB = b;
         transG = g;
         transR = r;
@@ -220,7 +230,7 @@ public:
     }
 
     /**
-     * add frame - allowing out of order, cancellable (or cancellable from open's token)
+     * add frame - allowing out of order, cancellable (or cancellable from open's cancel)
      *
      * @param format pixel format
      * @param frame frame data
@@ -228,33 +238,35 @@ public:
      * @param height frame height
      * @param delay delay time 0.01s
      * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
-     * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open_parallel()
+     * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
+     * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
     bool push_parallel(const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height,
-                       const int delay = 5, const int frameIndex = -1, System::Threading::CancellationToken* token = nullptr);
+                       const int delay = 5, const int frameIndex = -1, bool cancelType = false, void* cancel = nullptr);
 
     /**
-    * add frame - only uncopied BGR, allowing out of order, cancellable (or cancellable from open's token)
-    *
-    * @param frame frame data
-    * @param width frame width
-    * @param height frame height
-    * @param delay delay time 0.01s
-    * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
-    * @token cancellation token pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open_parallel()
-    * @return
-    */
-    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay = 5, const int frameIndex = -1, System::Threading::CancellationToken* token = nullptr) {
-        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, token);
+     * add frame - only uncopied BGR, allowing out of order, cancellable (or cancellable from open's cancel)
+     *
+     * @param frame frame data
+     * @param width frame width
+     * @param height frame height
+     * @param delay delay time 0.01s
+     * @param frameIndex -1 for original-like in order pushing, otherwise supply the frame index (and don't mix or mess that up or else you get a failed return when closing)
+     * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
+     * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
+     * @return
+     */
+    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay = 5, const int frameIndex = -1, bool cancelType = false, void* cancel = nullptr) {
+        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, cancelType, cancel);
     }
 
     /**
-    * try to write next frame into the file - this is only for parallel mode
-    *
-    * @param parallel - if you are calling this in parallel, set this to true so it locks inself to preserve data integrity!
-    * @return Failed = somethign went wrong, stop trying the file has been closed. Waiting - try again later, or some frames are missing. FinishedFrame - one frame was written. FinishedAnimation - file is completed.
-    */
+     * try to write next frame into the file - this is only for parallel mode
+     *
+     * @param parallel - if you are calling this in parallel, set this to true so it locks inself to preserve data integrity!
+     * @return Failed = somethign went wrong, stop trying the file has been closed. Waiting - try again later, or some frames are missing. FinishedFrame - one frame was written. FinishedAnimation - file is completed.
+     */
     GifEncoderTryWriteResult tryWrite(bool parallel = false);
 
     /** has the file been fully written ? */

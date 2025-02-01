@@ -1,0 +1,6 @@
+CppManaged:
+Init: 0
+Iter: 0
+Void: 2
+Draw: 9
+Gifs: 104

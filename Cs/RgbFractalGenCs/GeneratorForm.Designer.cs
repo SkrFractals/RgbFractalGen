@@ -225,7 +225,7 @@
 			pngButton.TabIndex = 34;
 			pngButton.Text = "Save PNG";
 			pngButton.UseVisualStyleBackColor = true;
-			pngButton.Click += Png_Click;
+			pngButton.Click += PngButton_Click;
 			// 
 			// gifButton
 			// 
@@ -236,7 +236,7 @@
 			gifButton.TabIndex = 35;
 			gifButton.Text = "Save GIF";
 			gifButton.UseVisualStyleBackColor = true;
-			gifButton.Click += Gif_Click;
+			gifButton.Click += GifButton_Click;
 			// 
 			// timer
 			// 
@@ -676,6 +676,7 @@
 			// debugBox
 			// 
 			debugBox.AutoSize = true;
+			debugBox.ForeColor = System.Drawing.Color.White;
 			debugBox.Location = new System.Drawing.Point(17, 584);
 			debugBox.Name = "debugBox";
 			debugBox.Size = new System.Drawing.Size(84, 19);
@@ -687,6 +688,7 @@
 			// debugLabel
 			// 
 			debugLabel.AutoSize = true;
+			debugLabel.ForeColor = System.Drawing.Color.White;
 			debugLabel.Location = new System.Drawing.Point(17, 606);
 			debugLabel.Name = "debugLabel";
 			debugLabel.Size = new System.Drawing.Size(73, 15);

@@ -12,3 +12,4 @@ H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Release\net8.0\Components.cspro
 H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Release\net8.0\Gif.Components.dll
 H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Release\net8.0\refint\Gif.Components.dll
 H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Release\net8.0\ref\Gif.Components.dll
+H:\GitHubFractal\RgbFractalGen\Cs\Components\obj\Release\net8.0\Components.csproj.AssemblyReference.cache

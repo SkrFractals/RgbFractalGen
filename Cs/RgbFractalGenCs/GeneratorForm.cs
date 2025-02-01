@@ -156,8 +156,15 @@ public partial class GeneratorForm : Form {
 		}
 		void SetupFractal() {
 			generator.SetupFractal();
-			Parallel_Changed(null, null);
-			DetailBox_TextChanged(null, null);
+			if (!modifySettings) {
+				modifySettings = true;
+				Parallel_Changed(null, null);
+				DetailBox_TextChanged(null, null);
+				modifySettings = false;
+			} else {
+				Parallel_Changed(null, null);
+				DetailBox_TextChanged(null, null);
+			}
 			generator.SetupAngle();
 			generator.SetupCutFunction();
 		}
@@ -232,8 +239,10 @@ public partial class GeneratorForm : Form {
 		if (queueReset > 0) {
 			if (!(gTask == null && aTask == null))
 				return;
-			if (queueAbort)
+			if (queueAbort) {
 				aTask = Task.Run(Abort, (cancel = new()).Token);
+				return;
+			}
 			if ((queueReset -= (short)timer.Interval) > 0)
 				return;
 			SetupFractal();
@@ -271,10 +280,16 @@ public partial class GeneratorForm : Form {
 				currentBitmapIndex = (currentBitmapIndex + 1) % bitmapsFinished;
 		}
 		// Info text refresh
-		statusLabel.Text = bitmapsFinished < bitmapsTotal ? "Generating: " : "Finished: ";
-		infoLabel.Text = (bitmapsFinished < bitmapsTotal ? bitmapsFinished.ToString() : currentBitmapIndex.ToString()) + " / " + bitmapsTotal.ToString();
-
-
+		string infoText = " / " + bitmapsTotal.ToString();
+		if (bitmapsFinished < bitmapsTotal) {
+			statusLabel.Text = "Generating: ";
+			infoText = bitmapsFinished.ToString() + infoText;
+		} else {
+			statusLabel.Text = "Finished: ";
+			infoText = currentBitmapIndex.ToString() + infoText;
+		}
+		infoLabel.Text = infoText;
+		gifButton.Text = gTask == null ? "Save GIF" : "Saving GIF...";
 	}
 	private void GeneratorForm_FormClosing(object sender, FormClosingEventArgs e) {
 		if (gTask != null) {
@@ -493,11 +508,11 @@ public partial class GeneratorForm : Form {
 		helpPanel.Visible = screenPanel.Visible;
 		screenPanel.Visible = !screenPanel.Visible;
 	}
-	private void Png_Click(object sender, EventArgs e) => savePng.ShowDialog();
-	private void Gif_Click(object sender, EventArgs e) => saveGif.ShowDialog();
-
+	private void PngButton_Click(object sender, EventArgs e) => savePng.ShowDialog();
+	private void GifButton_Click(object sender, EventArgs e) => saveGif.ShowDialog();
 	private void DebugBox_CheckedChanged(object sender, EventArgs e) {
-		if (!(generator.debugmode = debugBox.Checked)) debugLabel.Text = "";
+		if (!(generator.debugmode = debugBox.Checked)) 
+			debugLabel.Text = "";
 	}
 
 	#endregion

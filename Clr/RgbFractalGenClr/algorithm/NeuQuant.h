@@ -23,17 +23,18 @@
 
 #include <cstdio>
 #include <cstdint>
+#include <atomic>
 
-#define netsize		256			/* number of colours used */
+#define netsize		256		/* number of colours used */
 
  /* defs for decreasing radius factor */
-#define initrad        32        /* for 256 cols, radius starts */
+#define initrad        32	/* for 256 cols, radius starts */
 
 /* For 256 colours, fixed arrays need 8kb, plus space for the image
    ---------------------------------------------------------------- */
 
-/* four primes near 500 - assume no image has a length so large */
-/* that it is divisible by all four primes */
+   /* four primes near 500 - assume no image has a length so large */
+   /* that it is divisible by all four primes */
 #define prime1		499
 #define prime2		491
 #define prime3		487
@@ -43,19 +44,16 @@
 
 public struct NeuQuant {
 
-/* Types and Global Variables
-   -------------------------- */
+	/* Types and Global Variables
+	   -------------------------- */
 
-	//const unsigned char* thepicture;        /* the input image itself */
-	//int lengthcount;                /* lengthcount = H*W*3 */
-	//int samplefac;                /* sampling factor 1..30 */
-	typedef int pixel[4];                /* BGRc */
-	pixel network[netsize];            /* the network itself */
-	int netindex[256];            /* for network lookup - really 256 */
-	int bias[netsize];            /* bias and freq arrays for learning */
+	typedef int pixel[4];   /* BGRc */
+	pixel network[netsize]; /* the network itself */
+	int netindex[256];      /* for network lookup - really 256 */
+	int bias[netsize];      /* bias and freq arrays for learning */
 	int freq[netsize];
-	int radpower[initrad];            /* radpower for precomputation */
-	int alphadec;                    /* biased by 10 bits */
+	int radpower[initrad];  /* radpower for precomputation */
+	int alphadec;			/* biased by 10 bits */
 
 	//int factor;
 	//int samplepixels;
@@ -72,7 +70,7 @@ public struct NeuQuant {
 
 	/* Output colour map
 	   ----------------- */
-	//void writecolourmap(FILE *f); // unused
+	   //void writecolourmap(FILE *f); // unused
 
 	void getcolourmap(uint8_t* colorMap);
 
@@ -85,37 +83,43 @@ public struct NeuQuant {
 	int inxsearch(const int b, const int g, const int r);
 
 	/* Main Learning Loop
-	* 
-	* @param thepicture - BGR byte pointer array of the picture
-	* @param lengthcount = Width*Height*3
-	* @param samplefac = sampling factor 1..30, 1 is highest quality
-	* @param canceltoken = pointer to a cancellation token, nullptr to not use one
-	   ------------------ */
-	bool learn(unsigned char* p, const int lengthcount, const int samplefac, int samplepixels, int factor, System::Threading::CancellationToken* canceltoken);
+	 *
+	 * @param thepicture - BGR byte pointer array of the picture
+	 * @param lengthcount = Width*Height*3
+	 * @param samplefac = sampling factor 1..30, 1 is highest quality
+	 * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
+	 * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable
+	   ---------------------------------------------------------------------------------------------------- */
+	bool learn(unsigned char* p, const int lengthcount, const int samplefac, int samplepixels, int factor, bool cancelType, void* cancel);
 
 private:
-    /* Search for biased BGR values
+	/* Search for biased BGR values
    ---------------------------- */
+	int contest(const int b, const int g, const int r);
 
-	int NeuQuant::contest(const int b, const int g, const int r);
-    /* Move neuron i towards biased (b,g,r) by factor alpha
-       ---------------------------------------------------- */
+	/* Move neuron i towards biased (b,g,r) by factor alpha
+	   ---------------------------------------------------- */
+	void altersingle(const int alpha, const int i, const int b, const int g, const int r, const int div);
 
-	void NeuQuant::altersingle(const int alpha, const int i, const int b, const int g, const int r, const int div);
-
-    /* Move adjacent neurons by precomputed alpha*(1-((i-j)^2/[r]^2)) in radpower[|i-j|]
-       --------------------------------------------------------------------------------- */
-
-	void NeuQuant::alterneigh(int rad, int i, int b, int g, int r);
+	/* Move adjacent neurons by precomputed alpha*(1-((i-j)^2/[r]^2)) in radpower[|i-j|]
+	   --------------------------------------------------------------------------------- */
+	void alterneigh(int rad, int i, int b, int g, int r);
 
 };
+
+inline bool isCancel(bool cancelType, void* cancel) {
+	return cancel == nullptr ? false : cancelType
+		? ((System::Threading::CancellationToken*)cancel)->IsCancellationRequested
+		: static_cast<std::atomic<bool>*>(cancel)->load();
+}
+
 /* Program Skeleton
    ----------------
   [select samplefac in range 1..30]
   pic = (unsigned char*) malloc(3*width*height);
   [read image from input file into pic]
-	initnet(pic,3*width*height,samplefac);
-	learn();
+	initnet();
+	learn(pic, 3*width*height,samplefac, width*height/samplefac, <divisor of width*height/samplefac>, false, std::atomic<bool> cancel);
 	unbiasnet();
 	[write output image header, using writecolourmap(f),
 	possibly editing the loops in that function]
