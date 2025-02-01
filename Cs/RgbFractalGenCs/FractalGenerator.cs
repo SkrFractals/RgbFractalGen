@@ -507,6 +507,7 @@ internal class FractalGenerator {
 					count = (max + insertTo - index) % max;
 				while (count > 0 && count < maxcount) {
 					(var taskIndex, var inXY, var inAngle, var inColor, var inFlags, var inDepth) = tuples[index++];
+					index %= max;
 					var task = tasks[taskIndex];
 					var preIterated = task.preIterate[inDepth];
 					if (ApplyDot(preIterated.Item1 < selectDetail, task, inXY.Item1, inXY.Item2, preIterated.Item2, inColor))

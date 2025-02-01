@@ -1,2214 +1,849 @@
 CppManaged:
-Init: 899156235
-Iter: 101662407
-Void: 766249793
-Draw: 774067836
-Gifs: 84367
+Init: 2697507898
+Iter: 304934804
+Void: 2298749197
+Draw: 2322203296
+Gifs: 1665432368
 
 New Generate()
 
-Init:21 time = 12900
-Iter:21 time = 858504700
+Init:3 time = 10600
+Iter:3 time = 138300
 
-Init:19 time = 13600
-Iter:19 time = 870733000
+Init:12 time = 10600
+Iter:12 time = 130200
 
-Void:21 time = 1852400
-Draw:21 time = 1852400
-Gifs:21 time = 8285100
+Init:7 time = 11600
+Iter:7 time = 180700
 
-Init:20 time = 10900
-Iter:20 time = 879818100
+Init:17 time = 9300
+Iter:17 time = 799100
 
-Init:18 time = 14200
-Iter:18 time = 880921500
+Init:1 time = 12300
+Iter:1 time = 143600
 
-Void:19 time = 2316900
-Draw:19 time = 2316900
-Gifs:19 time = 8297600
+Init:9 time = 7100
+Iter:9 time = 152000
 
-Init:17 time = 12400
-Iter:17 time = 890739300
+Init:20 time = 10200
+Iter:20 time = 129600
 
-Void:20 time = 1850700
-Draw:20 time = 1850700
-Gifs:20 time = 8354700
+Init:4 time = 7300
+Iter:4 time = 90100
 
-Void:18 time = 1959800
-Draw:18 time = 1959800
-Gifs:18 time = 7551000
+Init:8 time = 8300
+Iter:8 time = 148700
 
-Void:17 time = 1847400
-Draw:17 time = 1847400
-Gifs:17 time = 6989900
+Init:16 time = 9000
+Iter:16 time = 80300
 
-Init:16 time = 10000
-Iter:16 time = 915674700
+Init:0 time = 15400
+Iter:0 time = 179800
 
-Init:13 time = 10900
-Iter:13 time = 920714300
+Init:14 time = 7500
+Iter:14 time = 140700
 
-Init:15 time = 13500
-Iter:15 time = 921408300
+Init:11 time = 11700
+Iter:11 time = 644000
 
-Void:16 time = 1856300
-Draw:16 time = 1856300
-Gifs:16 time = 8206400
+Init:18 time = 13700
+Iter:18 time = 126200
 
-Void:13 time = 1894000
-Draw:13 time = 1894000
-Gifs:13 time = 7101000
+Init:15 time = 8800
+Iter:15 time = 116800
 
-Void:15 time = 1833400
-Draw:15 time = 1833400
-Gifs:15 time = 8259800
+Init:10 time = 11100
+Iter:10 time = 164500
 
-Init:14 time = 12700
-Iter:14 time = 935637200
-
-Void:14 time = 1873900
-Draw:14 time = 1873900
-Gifs:14 time = 8356000
-
-Init:11 time = 12000
-Iter:11 time = 956384500
-
-Init:12 time = 11700
-Iter:12 time = 963277700
-
-Void:11 time = 1941900
-Draw:11 time = 1941900
-Gifs:11 time = 8331000
-
-Void:12 time = 1878000
-Draw:12 time = 1878000
-Gifs:12 time = 8302800
-
-Init:8 time = 10900
-Iter:8 time = 981276900
-
-Init:10 time = 13500
-Iter:10 time = 982341300
-
-Void:8 time = 1887900
-Draw:8 time = 1887900
-Gifs:8 time = 8336300
-
-Void:10 time = 1989000
-Draw:10 time = 1989000
-Gifs:10 time = 8360900
-
-Init:9 time = 14000
-Iter:9 time = 996053500
-
-Init:7 time = 12700
-Iter:7 time = 1008336700
-
-Void:9 time = 1870000
-Draw:9 time = 1870000
-Gifs:9 time = 8415500
-
-Void:7 time = 1880100
-Draw:7 time = 1880100
-Gifs:7 time = 7888100
-
-Init:6 time = 9900
-Iter:6 time = 1026365100
+Init:19 time = 12100
+Iter:19 time = 143200
 
 Init:5 time = 11400
-Iter:5 time = 1036231500
+Iter:5 time = 10100
 
-Void:6 time = 1890500
-Draw:6 time = 1890500
-Gifs:6 time = 8219500
+Init:13 time = 13000
+Iter:13 time = 17900
 
-Init:4 time = 10000
-Iter:4 time = 1047040900
+Init:21 time = 12800
+Iter:21 time = 17300
 
-Void:5 time = 1878400
-Draw:5 time = 1878400
-Gifs:5 time = 7501700
+Init:6 time = 9700
+Iter:6 time = 23400
 
-Init:3 time = 9700
-Iter:3 time = 1056297000
+Init:2 time = 14400
+Iter:2 time = 26800
 
-Void:4 time = 1863600
-Draw:4 time = 1863600
-Gifs:4 time = 8568000
+Void:17 time = 3607500
+Draw:17 time = 3607500
+Gifs:17 time = 13045500
 
-Void:3 time = 2052300
-Draw:3 time = 2052300
-Gifs:3 time = 8162800
+Void:18 time = 3397000
+Draw:18 time = 3397000
+Gifs:18 time = 12966300
 
-Init:2 time = 10300
-Iter:2 time = 1077470900
+Void:16 time = 3670600
+Draw:16 time = 3670600
+Gifs:16 time = 13162900
 
-Init:1 time = 9000
-Iter:1 time = 1087112000
+Void:9 time = 3649300
+Draw:9 time = 3649300
+Gifs:9 time = 13085100
 
-Void:2 time = 1806800
-Draw:2 time = 1806800
-Gifs:2 time = 8468200
+Void:19 time = 3241500
+Draw:19 time = 3241500
+Gifs:19 time = 12905400
 
-Void:1 time = 1857100
-Draw:1 time = 1857100
-Gifs:1 time = 8566400
+Void:7 time = 3490300
+Draw:7 time = 3490300
+Gifs:7 time = 13188500
 
-Init:0 time = 10200
-Iter:0 time = 1111839500
+Void:6 time = 2315700
+Draw:6 time = 2315700
+Gifs:6 time = 13221800
 
-Void:0 time = 1919800
-Draw:0 time = 1919800
-Gifs:0 time = 8626200
+Void:21 time = 3142300
+Draw:21 time = 3142300
+Gifs:21 time = 13059900
 
-Init:25 time = 13000
-Iter:25 time = 824991500
+Void:20 time = 3492500
+Draw:20 time = 3492500
+Gifs:20 time = 13338000
 
-Init:30 time = 11600
-Iter:30 time = 776871000
+Void:12 time = 3865700
+Draw:12 time = 3865700
+Gifs:12 time = 13658700
 
-Init:26 time = 13000
-Iter:26 time = 826140400
+Void:5 time = 3102900
+Draw:5 time = 3102900
+Gifs:5 time = 13682200
 
-Init:22 time = 23300
-Iter:22 time = 858566700
+Void:3 time = 3843500
+Draw:3 time = 3843500
+Gifs:3 time = 13704200
 
-Void:25 time = 1972400
-Draw:25 time = 1972400
-Gifs:25 time = 7115000
+Void:15 time = 4583800
+Draw:15 time = 4583800
+Gifs:15 time = 12895900
 
-Init:24 time = 13300
-Iter:24 time = 838145500
+Void:11 time = 3522600
+Draw:11 time = 3522600
+Gifs:11 time = 13692000
 
-Init:28 time = 14300
-Iter:28 time = 802464600
+Void:13 time = 2147600
+Draw:13 time = 2147600
+Gifs:13 time = 13551400
 
-Init:27 time = 13100
-Iter:27 time = 807188600
+Void:1 time = 3599400
+Draw:1 time = 3599400
+Gifs:1 time = 13711000
 
-Init:29 time = 23100
-Iter:29 time = 802127200
+Void:10 time = 3525300
+Draw:10 time = 3525300
+Gifs:10 time = 13187000
 
-Void:30 time = 1796000
-Draw:30 time = 1796000
-Gifs:30 time = 8263100
+Init:22 time = 27800
+Iter:22 time = 3000
 
-Void:26 time = 1810300
-Draw:26 time = 1810300
-Gifs:26 time = 8427200
+Void:4 time = 6265900
+Draw:4 time = 6265900
+Gifs:4 time = 11526500
 
-Void:22 time = 1797200
-Draw:22 time = 1797200
-Gifs:22 time = 8774300
+Init:23 time = 8600
+Iter:23 time = 2500
 
-Void:24 time = 1805400
-Draw:24 time = 1805400
-Gifs:24 time = 8320500
+Init:25 time = 26200
+Iter:25 time = 3400
 
-Void:28 time = 1111000
-Draw:28 time = 1111000
-Gifs:28 time = 8256100
+Init:24 time = 14200
+Iter:24 time = 2900
 
-Void:27 time = 1833100
-Draw:27 time = 1833100
-Gifs:27 time = 7985700
+Init:26 time = 23400
+Iter:26 time = 3100
 
-Void:29 time = 1787700
-Draw:29 time = 1787700
-Gifs:29 time = 8299400
+Init:27 time = 10100
+Iter:27 time = 2600
 
-Init:23 time = 13600
-Iter:23 time = 870530500
+Init:28 time = 21100
+Iter:28 time = 3100
 
-Void:23 time = 2235100
-Draw:23 time = 2235100
-Gifs:23 time = 5859700
+Init:29 time = 23600
+Iter:29 time = 2500
 
-Init:42 time = 23800
-Iter:42 time = 2706915800
+Init:30 time = 22300
+Iter:30 time = 2600
 
-Void:42 time = 1816900
-Draw:42 time = 1816900
-Gifs:42 time = 8236400
+Init:31 time = 37900
+Iter:31 time = 2600
 
-Init:43 time = 22400
-Iter:43 time = 2696732900
+Init:32 time = 23400
+Iter:32 time = 2700
 
-Void:43 time = 1612000
-Draw:43 time = 1612000
-Gifs:43 time = 8021300
+Init:33 time = 22300
+Iter:33 time = 2800
 
-Init:41 time = 21900
-Iter:41 time = 2763660800
+Init:34 time = 20700
+Iter:34 time = 2700
 
-Void:41 time = 2352200
-Draw:41 time = 2352200
-Gifs:41 time = 8939600
+Init:35 time = 11500
+Iter:35 time = 2600
 
-Init:40 time = 12000
-Iter:40 time = 2813177500
+Init:39 time = 19500
+Iter:39 time = 2900
 
-Void:40 time = 1812800
-Draw:40 time = 1812800
-Gifs:40 time = 8300400
+Void:14 time = 3319900
+Draw:14 time = 3319900
+Gifs:14 time = 14920400
 
-Init:39 time = 15700
-Iter:39 time = 2843361200
+Init:37 time = 20700
+Iter:37 time = 2900
 
-Init:37 time = 12800
-Iter:37 time = 2869259500
+Init:38 time = 20500
+Iter:38 time = 2600
 
-Void:39 time = 1818700
-Draw:39 time = 1818700
-Gifs:39 time = 8191800
+Void:8 time = 3383600
+Draw:8 time = 3383600
+Gifs:8 time = 15487000
 
-Void:37 time = 1745700
-Draw:37 time = 1745700
-Gifs:37 time = 8253400
+Init:36 time = 14200
+Iter:36 time = 2900
 
-Init:35 time = 10800
-Iter:35 time = 2953906800
+Init:40 time = 13000
+Iter:40 time = 2700
 
-Void:35 time = 1828400
-Draw:35 time = 1828400
-Gifs:35 time = 8150100
+Init:41 time = 68800
+Iter:41 time = 2800
 
-Init:36 time = 23400
-Iter:36 time = 2963681600
+Void:2 time = 1817900
+Draw:2 time = 1817900
+Gifs:2 time = 20295100
 
-Init:38 time = 9900
-Iter:38 time = 2938002000
+Init:42 time = 108700
+Iter:42 time = 3000
 
-Void:38 time = 1871900
-Draw:38 time = 1871900
-Gifs:38 time = 8150900
+Void:0 time = 3393200
+Draw:0 time = 3393200
+Gifs:0 time = 24283300
 
-Void:36 time = 5638400
-Draw:36 time = 5638400
-Gifs:36 time = 8285300
+Init:43 time = 21100
+Iter:43 time = 2800
 
-Init:33 time = 11600
-Iter:33 time = 3011796100
+Void:23 time = 1632300
+Draw:23 time = 1632300
+Gifs:23 time = 9024600
 
-Void:33 time = 1782800
-Draw:33 time = 1782800
-Gifs:33 time = 8485700
+Void:28 time = 1615300
+Draw:28 time = 1615300
+Gifs:28 time = 8857500
 
-Init:32 time = 14200
-Iter:32 time = 3088245900
+Void:29 time = 1691100
+Draw:29 time = 1691100
+Gifs:29 time = 8895800
 
-Init:34 time = 11600
-Iter:34 time = 3069845600
+Init:44 time = 9700
+Iter:44 time = 3100
 
-Void:32 time = 1808200
-Draw:32 time = 1808200
-Gifs:32 time = 8160200
+Init:45 time = 11200
+Iter:45 time = 2800
 
-Void:34 time = 2405900
-Draw:34 time = 2405900
-Gifs:34 time = 8421100
+Void:31 time = 1645900
+Draw:31 time = 1645900
+Gifs:31 time = 9105300
 
-Init:31 time = 12500
-Iter:31 time = 3144810800
+Void:27 time = 1622900
+Draw:27 time = 1622900
+Gifs:27 time = 9273700
 
-Void:31 time = 2432800
-Draw:31 time = 2432800
-Gifs:31 time = 8573300
+Void:22 time = 1667100
+Draw:22 time = 1667100
+Gifs:22 time = 9445500
 
-Init:52 time = 14300
-Iter:52 time = 2439789200
+Void:30 time = 1731000
+Draw:30 time = 1731000
+Gifs:30 time = 9018700
 
-Void:52 time = 2435500
-Draw:52 time = 2435500
-Gifs:52 time = 8361800
+Void:24 time = 1659300
+Draw:24 time = 1659300
+Gifs:24 time = 9438800
 
-Init:51 time = 12100
-Iter:51 time = 2484895100
+Init:46 time = 9800
+Iter:46 time = 2800
 
-Init:49 time = 12900
-Iter:49 time = 2488893500
+Init:47 time = 21100
+Iter:47 time = 2600
 
-Void:51 time = 1817000
-Draw:51 time = 1817000
-Gifs:51 time = 8336500
+Void:26 time = 2060000
+Draw:26 time = 2060000
+Gifs:26 time = 9093200
 
-Void:49 time = 1824000
-Draw:49 time = 1824000
-Gifs:49 time = 8295200
+Init:48 time = 24400
+Iter:48 time = 2500
 
-Init:48 time = 12200
-Iter:48 time = 2532875800
+Init:49 time = 23300
+Iter:49 time = 3200
 
-Init:50 time = 22600
-Iter:50 time = 2537779700
+Init:50 time = 11400
+Iter:50 time = 2400
 
-Void:48 time = 1865100
-Draw:48 time = 1865100
-Gifs:48 time = 10370600
+Init:51 time = 23300
+Iter:51 time = 3000
 
-Void:50 time = 1846700
-Draw:50 time = 1846700
-Gifs:50 time = 8386700
+Init:52 time = 30100
+Iter:52 time = 2200
 
-Init:47 time = 22700
-Iter:47 time = 2612840300
+Void:39 time = 1614900
+Draw:39 time = 1614900
+Gifs:39 time = 9170500
 
-Void:47 time = 1813100
-Draw:47 time = 1813100
-Gifs:47 time = 8281900
+Void:38 time = 1664900
+Draw:38 time = 1664900
+Gifs:38 time = 9024700
 
-Init:45 time = 13900
-Iter:45 time = 2635782100
+Void:34 time = 1808100
+Draw:34 time = 1808100
+Gifs:34 time = 10052900
 
-Void:45 time = 1833300
-Draw:45 time = 1833300
-Gifs:45 time = 8267600
+Init:53 time = 11400
+Iter:53 time = 2900
 
-Init:46 time = 12700
-Iter:46 time = 2681912600
+Init:54 time = 15200
+Iter:54 time = 3000
 
-Void:46 time = 1302400
-Draw:46 time = 1302400
-Gifs:46 time = 4560700
+Void:37 time = 1718400
+Draw:37 time = 1718400
+Gifs:37 time = 9565100
 
-Init:44 time = 23500
-Iter:44 time = 2708145100
+Void:33 time = 1732900
+Draw:33 time = 1732900
+Gifs:33 time = 10301800
 
-Void:44 time = 1551400
-Draw:44 time = 1551400
-Gifs:44 time = 8322600
+Init:55 time = 22200
+Iter:55 time = 4500
 
-Init:55 time = 13000
-Iter:55 time = 2294225700
+Void:40 time = 1647600
+Draw:40 time = 1647600
+Gifs:40 time = 9424000
 
-Init:62 time = 11900
-Iter:62 time = 2150604900
+Void:32 time = 3692200
+Draw:32 time = 3692200
+Gifs:32 time = 8981900
 
-Void:55 time = 2414700
-Draw:55 time = 2414700
-Gifs:55 time = 8201200
+Init:56 time = 23100
+Iter:56 time = 2800
 
-Init:58 time = 16500
-Iter:58 time = 2251674900
+Init:57 time = 22200
+Iter:57 time = 2800
 
-Init:57 time = 21400
-Iter:57 time = 2266943800
+Void:36 time = 1886500
+Draw:36 time = 1886500
+Gifs:36 time = 9275800
 
-Void:62 time = 1759200
-Draw:62 time = 1759200
-Gifs:62 time = 8294300
+Init:58 time = 10600
+Iter:58 time = 2800
 
-Void:58 time = 1818900
-Draw:58 time = 1818900
-Gifs:58 time = 8509500
+Init:59 time = 22700
+Iter:59 time = 124100
 
-Void:57 time = 1831300
-Draw:57 time = 1831300
-Gifs:57 time = 8396700
+Void:35 time = 1624800
+Draw:35 time = 1624800
+Gifs:35 time = 11316300
 
-Init:61 time = 16700
-Iter:61 time = 2182353100
+Init:60 time = 20000
+Iter:60 time = 2600
 
-Init:60 time = 13200
-Iter:60 time = 2207341100
+Void:41 time = 1891000
+Draw:41 time = 1891000
+Gifs:41 time = 9367200
 
-Init:64 time = 12100
-Iter:64 time = 2114282100
+Void:42 time = 1751800
+Draw:42 time = 1751800
+Gifs:42 time = 9634900
 
-Void:61 time = 1835800
-Draw:61 time = 1835800
-Gifs:61 time = 8380700
+Init:61 time = 12000
+Iter:61 time = 2700
 
-Init:54 time = 12700
-Iter:54 time = 2376506100
+Init:63 time = 14100
+Iter:63 time = 3200
 
-Init:59 time = 12400
-Iter:59 time = 2220585600
+Void:43 time = 1808900
+Draw:43 time = 1808900
+Gifs:43 time = 9065000
 
-Init:63 time = 17700
-Iter:63 time = 2135576500
+Void:25 time = 6991700
+Draw:25 time = 6991700
+Gifs:25 time = 14562700
 
-Void:60 time = 1797100
-Draw:60 time = 1797100
-Gifs:60 time = 8304000
+Init:62 time = 28500
+Iter:62 time = 2700
 
-Init:53 time = 13900
-Iter:53 time = 2390018500
+Init:64 time = 23800
+Iter:64 time = 2900
 
-Void:64 time = 1904600
-Draw:64 time = 1904600
-Gifs:64 time = 8423200
+Void:45 time = 1779200
+Draw:45 time = 1779200
+Gifs:45 time = 9081500
 
-Init:65 time = 10900
-Iter:65 time = 2094252100
+Void:44 time = 1678100
+Draw:44 time = 1678100
+Gifs:44 time = 9330400
 
-Void:54 time = 1825800
-Draw:54 time = 1825800
-Gifs:54 time = 8448900
+Void:47 time = 1676100
+Draw:47 time = 1676100
+Gifs:47 time = 8954800
 
-Void:59 time = 1836900
-Draw:59 time = 1836900
-Gifs:59 time = 8456200
+Void:46 time = 1712500
+Draw:46 time = 1712500
+Gifs:46 time = 9116500
 
-Void:63 time = 1842300
-Draw:63 time = 1842300
-Gifs:63 time = 8273600
+Init:67 time = 15400
+Iter:67 time = 2700
 
-Void:53 time = 1803000
-Draw:53 time = 1803000
-Gifs:53 time = 8307600
+Init:69 time = 9400
+Iter:69 time = 2900
 
-Void:65 time = 2404300
-Draw:65 time = 2404300
-Gifs:65 time = 8625100
+Init:65 time = 25000
+Iter:65 time = 2800
 
-Init:56 time = 16800
-Iter:56 time = 2336816000
+Init:66 time = 25800
+Iter:66 time = 2100
 
-Init:70 time = 11200
-Iter:70 time = 1958817200
+Void:49 time = 1662700
+Draw:49 time = 1662700
+Gifs:49 time = 9103000
 
-Void:56 time = 1886300
-Draw:56 time = 1886300
-Gifs:56 time = 8416900
+Void:50 time = 1643400
+Draw:50 time = 1643400
+Gifs:50 time = 9252500
 
-Init:66 time = 24700
-Iter:66 time = 2045872000
+Init:70 time = 13200
+Iter:70 time = 2500
 
-Init:68 time = 8200
-Iter:68 time = 2016672900
+Void:52 time = 1955600
+Draw:52 time = 1955600
+Gifs:52 time = 9063000
 
-Void:70 time = 1818200
-Draw:70 time = 1818200
-Gifs:70 time = 8390600
+Void:51 time = 1891500
+Draw:51 time = 1891500
+Gifs:51 time = 9238000
 
-Init:67 time = 10100
-Iter:67 time = 2024788200
+Init:71 time = 10300
+Iter:71 time = 2500
 
-Void:66 time = 2431000
-Draw:66 time = 2431000
-Gifs:66 time = 8180100
+Init:68 time = 22700
+Iter:68 time = 2900
 
-Void:68 time = 1810600
-Draw:68 time = 1810600
-Gifs:68 time = 8605100
+Void:48 time = 1789700
+Draw:48 time = 1789700
+Gifs:48 time = 9462600
 
-Void:67 time = 1832900
-Draw:67 time = 1832900
-Gifs:67 time = 8133200
+Init:73 time = 21100
+Iter:73 time = 3000
 
-Init:69 time = 24100
-Iter:69 time = 1994467500
+Init:72 time = 22100
+Iter:72 time = 2400
 
-Void:69 time = 1838000
-Draw:69 time = 1838000
-Gifs:69 time = 8334200
+Init:74 time = 13100
+Iter:74 time = 2800
 
-Init:72 time = 10900
-Iter:72 time = 1913661800
+Void:53 time = 1883800
+Draw:53 time = 1883800
+Gifs:53 time = 9350100
 
-Void:72 time = 1843100
-Draw:72 time = 1843100
-Gifs:72 time = 8358500
+Init:75 time = 11000
+Iter:75 time = 2700
 
-Init:71 time = 11200
-Iter:71 time = 1947915900
+Void:54 time = 1851400
+Draw:54 time = 1851400
+Gifs:54 time = 9185400
 
-Void:71 time = 1837800
-Draw:71 time = 1837800
-Gifs:71 time = 8316700
+Init:76 time = 21400
+Iter:76 time = 2800
 
-Init:73 time = 6600
-Iter:73 time = 1899879900
+Void:60 time = 1651800
+Draw:60 time = 1651800
+Gifs:60 time = 9086900
 
-Init:74 time = 10700
-Iter:74 time = 1886728300
+Void:55 time = 1724400
+Draw:55 time = 1724400
+Gifs:55 time = 9879700
 
-Void:73 time = 1815900
-Draw:73 time = 1815900
-Gifs:73 time = 8419500
-
-Void:74 time = 2461200
-Draw:74 time = 2461200
-Gifs:74 time = 8356600
-
-Init:96 time = 13000
-Iter:96 time = 1467685000
-
-Void:96 time = 1181000
-Draw:96 time = 1181000
-Gifs:96 time = 8385500
-
-Init:95 time = 13700
-Iter:95 time = 1493921000
-
-Init:92 time = 14900
-Iter:92 time = 1540358100
-
-Void:95 time = 1793400
-Draw:95 time = 1793400
-Gifs:95 time = 8408000
-
-Void:92 time = 1884800
-Draw:92 time = 1884800
-Gifs:92 time = 8313400
-
-Init:90 time = 15200
-Iter:90 time = 1575345000
-
-Init:93 time = 11800
-Iter:93 time = 1543431900
-
-Init:91 time = 10400
-Iter:91 time = 1579364300
-
-Void:90 time = 1890500
-Draw:90 time = 1890500
-Gifs:90 time = 8379600
-
-Init:94 time = 22100
-Iter:94 time = 1538542600
-
-Void:93 time = 1881100
-Draw:93 time = 1881100
-Gifs:93 time = 8410600
-
-Void:91 time = 1829800
-Draw:91 time = 1829800
-Gifs:91 time = 8760800
-
-Void:94 time = 1854100
-Draw:94 time = 1854100
-Gifs:94 time = 8322000
-
-Init:89 time = 12400
-Iter:89 time = 1605045100
-
-Void:89 time = 1804700
-Draw:89 time = 1804700
-Gifs:89 time = 8427600
-
-Init:87 time = 12900
-Iter:87 time = 1651564500
-
-Init:85 time = 12200
-Iter:85 time = 1676411100
-
-Init:86 time = 22100
-Iter:86 time = 1677882400
-
-Init:88 time = 10700
-Iter:88 time = 1652914000
-
-Void:87 time = 1828900
-Draw:87 time = 1828900
-Gifs:87 time = 8144700
-
-Void:85 time = 1865100
-Draw:85 time = 1865100
-Gifs:85 time = 8469900
-
-Void:86 time = 1860300
-Draw:86 time = 1860300
-Gifs:86 time = 8457400
-
-Void:88 time = 1848700
-Draw:88 time = 1848700
-Gifs:88 time = 8339800
-
-Init:83 time = 11400
-Iter:83 time = 1715715600
-
-Init:84 time = 12900
-Iter:84 time = 1724086100
-
-Void:83 time = 1808800
-Draw:83 time = 1808800
-Gifs:83 time = 8740200
-
-Init:82 time = 12000
-Iter:82 time = 1734947200
-
-Void:84 time = 1837000
-Draw:84 time = 1837000
-Gifs:84 time = 7910200
-
-Void:82 time = 1861100
-Draw:82 time = 1861100
-Gifs:82 time = 8618700
-
-Init:80 time = 23900
-Iter:80 time = 1783011100
-
-Init:79 time = 23500
-Iter:79 time = 1794700800
-
-Void:80 time = 1822800
-Draw:80 time = 1822800
-Gifs:80 time = 8303800
-
-Void:79 time = 1800000
-Draw:79 time = 1800000
-Gifs:79 time = 8383100
+Init:77 time = 22800
+Iter:77 time = 3000
 
 Init:78 time = 11500
-Iter:78 time = 1826018100
+Iter:78 time = 2000
 
-Void:78 time = 1847500
-Draw:78 time = 1847500
-Gifs:78 time = 8299800
+Void:56 time = 2120200
+Draw:56 time = 2120200
+Gifs:56 time = 9270300
 
-Init:81 time = 23700
-Iter:81 time = 1831326200
+Init:79 time = 11500
+Iter:79 time = 2500
 
-Init:77 time = 23200
-Iter:77 time = 1874910200
+Void:59 time = 2767100
+Draw:59 time = 2767100
+Gifs:59 time = 9418700
 
-Void:81 time = 1837100
-Draw:81 time = 1837100
-Gifs:81 time = 8369900
+Init:80 time = 21900
+Iter:80 time = 2600
 
-Init:76 time = 10700
-Iter:76 time = 1889732500
+Void:57 time = 1699300
+Draw:57 time = 1699300
+Gifs:57 time = 13379900
 
-Void:77 time = 1844800
-Draw:77 time = 1844800
-Gifs:77 time = 8466300
+Init:81 time = 9100
+Iter:81 time = 2900
 
-Void:76 time = 1823600
-Draw:76 time = 1823600
-Gifs:76 time = 8312300
+Void:58 time = 3402000
+Draw:58 time = 3402000
+Gifs:58 time = 9767300
 
-Init:75 time = 10700
-Iter:75 time = 1911572700
+Init:82 time = 22200
+Iter:82 time = 2900
 
-Void:75 time = 1817000
-Draw:75 time = 1817000
-Gifs:75 time = 8193200
+Void:63 time = 1722700
+Draw:63 time = 1722700
+Gifs:63 time = 9499900
 
-Init:117 time = 23400
-Iter:117 time = 1133219100
+Init:83 time = 22000
+Iter:83 time = 2800
 
-Init:103 time = 24000
-Iter:103 time = 1343158400
+Void:61 time = 1678600
+Draw:61 time = 1678600
+Gifs:61 time = 10453100
 
-Init:109 time = 11400
-Iter:109 time = 1271097100
+Init:84 time = 12600
+Iter:84 time = 3000
 
-Void:117 time = 1856000
-Draw:117 time = 1856000
-Gifs:117 time = 8514900
+Void:64 time = 1697000
+Draw:64 time = 1697000
+Gifs:64 time = 9161000
 
-Void:103 time = 1651600
-Draw:103 time = 1651600
-Gifs:103 time = 7817300
+Void:62 time = 1774300
+Draw:62 time = 1774300
+Gifs:62 time = 9291900
 
-Void:109 time = 1611400
-Draw:109 time = 1611400
-Gifs:109 time = 8342500
+Init:85 time = 11200
+Iter:85 time = 2700
 
-Init:110 time = 21600
-Iter:110 time = 1282432200
+Void:66 time = 1685300
+Draw:66 time = 1685300
+Gifs:66 time = 9198400
 
-Init:106 time = 12600
-Iter:106 time = 1330652100
+Void:70 time = 1700900
+Draw:70 time = 1700900
+Gifs:70 time = 9099500
 
-Void:110 time = 1841000
-Draw:110 time = 1841000
-Gifs:110 time = 8461800
+Init:86 time = 12200
+Iter:86 time = 13000
 
-Void:106 time = 1790700
-Draw:106 time = 1790700
-Gifs:106 time = 8184500
+Void:67 time = 1692800
+Draw:67 time = 1692800
+Gifs:67 time = 9509700
 
-Init:102 time = 23200
-Iter:102 time = 1397427200
+Init:87 time = 20000
+Iter:87 time = 2700
 
-Init:108 time = 21000
-Iter:108 time = 1339301800
+Void:65 time = 2057700
+Draw:65 time = 2057700
+Gifs:65 time = 9130700
 
-Void:108 time = 1820600
-Draw:108 time = 1820600
-Gifs:108 time = 8182500
+Init:89 time = 12100
+Iter:89 time = 3100
 
-Void:102 time = 1804600
-Draw:102 time = 1804600
-Gifs:102 time = 8458100
+Void:68 time = 1726800
+Draw:68 time = 1726800
+Gifs:68 time = 9126600
 
-Init:111 time = 19500
-Iter:111 time = 1308266600
+Init:88 time = 11100
+Iter:88 time = 3100
 
-Init:116 time = 13200
-Iter:116 time = 1216465800
+Void:71 time = 1742700
+Draw:71 time = 1742700
+Gifs:71 time = 9209900
 
-Init:105 time = 12300
-Iter:105 time = 1373505600
+Init:90 time = 16100
+Iter:90 time = 2700
 
-Init:107 time = 14000
-Iter:107 time = 1365090500
+Init:91 time = 10600
+Iter:91 time = 2800
 
-Init:114 time = 23500
-Iter:114 time = 1263847700
+Void:73 time = 1730900
+Draw:73 time = 1730900
+Gifs:73 time = 9166200
 
-Void:111 time = 1784700
-Draw:111 time = 1784700
-Gifs:111 time = 12841000
+Init:92 time = 25000
+Iter:92 time = 2800
 
-Init:118 time = 21200
-Iter:118 time = 1207174500
+Void:72 time = 1751800
+Draw:72 time = 1751800
+Gifs:72 time = 9181400
 
-Void:116 time = 1805500
-Draw:116 time = 1805500
-Gifs:116 time = 12752600
+Init:93 time = 10600
+Iter:93 time = 2900
 
-Init:113 time = 10800
-Iter:113 time = 1291958800
+Void:69 time = 1784500
+Draw:69 time = 1784500
+Gifs:69 time = 9314100
 
-Void:105 time = 1840200
-Draw:105 time = 1840200
-Gifs:105 time = 12732900
+Init:94 time = 10200
+Iter:94 time = 2800
 
-Init:100 time = 22400
-Iter:100 time = 1448367200
+Void:74 time = 2135300
+Draw:74 time = 2135300
+Gifs:74 time = 9267500
 
-Init:112 time = 23200
-Iter:112 time = 1297293300
+Init:95 time = 8500
+Iter:95 time = 2300
 
-Init:104 time = 13600
-Iter:104 time = 1420874100
+Init:96 time = 13200
+Iter:96 time = 2800
 
-Void:107 time = 1824400
-Draw:107 time = 1824400
-Gifs:107 time = 8885100
+Void:75 time = 1736100
+Draw:75 time = 1736100
+Gifs:75 time = 10100000
 
-Void:114 time = 6292700
-Draw:114 time = 6292700
-Gifs:114 time = 7958100
+Void:78 time = 1662800
+Draw:78 time = 1662800
+Gifs:78 time = 9829100
 
-Init:101 time = 23300
-Iter:101 time = 1451526100
+Void:79 time = 2041900
+Draw:79 time = 2041900
+Gifs:79 time = 9169900
 
-Init:99 time = 12800
-Iter:99 time = 1470466700
+Void:76 time = 1756900
+Draw:76 time = 1756900
+Gifs:76 time = 10287700
 
-Void:118 time = 1816500
-Draw:118 time = 1816500
-Gifs:118 time = 9317600
+Init:97 time = 22100
+Iter:97 time = 2800
 
-Void:113 time = 1730200
-Draw:113 time = 1730200
-Gifs:113 time = 8843400
+Init:98 time = 21900
+Iter:98 time = 2000
 
-Void:100 time = 1705000
-Draw:100 time = 1705000
-Gifs:100 time = 8602900
+Init:99 time = 10100
+Iter:99 time = 2900
 
-Init:98 time = 12600
-Iter:98 time = 1478104700
+Void:77 time = 2080400
+Draw:77 time = 2080400
+Gifs:77 time = 9953300
 
-Void:112 time = 1749700
-Draw:112 time = 1749700
-Gifs:112 time = 8473400
+Init:101 time = 10900
+Iter:101 time = 2900
 
-Void:104 time = 1842100
-Draw:104 time = 1842100
-Gifs:104 time = 8540500
+Void:80 time = 1701000
+Draw:80 time = 1701000
+Gifs:80 time = 9247200
 
-Void:101 time = 1792100
-Draw:101 time = 1792100
-Gifs:101 time = 8410600
+Init:100 time = 19300
+Iter:100 time = 2700
 
-Void:99 time = 1808400
-Draw:99 time = 1808400
-Gifs:99 time = 8304100
+Void:81 time = 1896500
+Draw:81 time = 1896500
+Gifs:81 time = 9126500
 
-Void:98 time = 1796500
-Draw:98 time = 1796500
-Gifs:98 time = 8287800
+Init:102 time = 11400
+Iter:102 time = 2700
 
-Init:97 time = 12800
-Iter:97 time = 1519400500
+Init:103 time = 22900
+Iter:103 time = 2800
 
-Void:97 time = 1845800
-Draw:97 time = 1845800
-Gifs:97 time = 8497100
+Void:82 time = 1685700
+Draw:82 time = 1685700
+Gifs:82 time = 9112000
 
-Init:115 time = 11500
-Iter:115 time = 1301588500
+Void:83 time = 1710000
+Draw:83 time = 1710000
+Gifs:83 time = 9793100
 
-Void:115 time = 1825000
-Draw:115 time = 1825000
-Gifs:115 time = 8326700
+Init:105 time = 11400
+Iter:105 time = 2800
 
-Init:138 time = 12300
-Iter:138 time = 904158800
+Void:84 time = 1674400
+Draw:84 time = 1674400
+Gifs:84 time = 9654700
 
-Void:138 time = 1835800
-Draw:138 time = 1835800
-Gifs:138 time = 8415700
+Init:104 time = 21500
+Iter:104 time = 2700
 
-Init:135 time = 21100
-Iter:135 time = 930826100
+Init:106 time = 10000
+Iter:106 time = 3100
 
-Init:137 time = 23000
-Iter:137 time = 933015100
+Void:85 time = 1786000
+Draw:85 time = 1786000
+Gifs:85 time = 9071000
 
-Void:135 time = 1705600
-Draw:135 time = 1705600
-Gifs:135 time = 7678900
+Init:107 time = 22300
+Iter:107 time = 2900
 
-Void:137 time = 1798000
-Draw:137 time = 1798000
-Gifs:137 time = 8448000
+Void:86 time = 1827700
+Draw:86 time = 1827700
+Gifs:86 time = 9483300
 
-Init:136 time = 20800
-Iter:136 time = 949953000
+Void:88 time = 1773500
+Draw:88 time = 1773500
+Gifs:88 time = 9313900
 
-Init:140 time = 10300
-Iter:140 time = 910692100
+Void:92 time = 1689900
+Draw:92 time = 1689900
+Gifs:92 time = 9245400
 
-Void:136 time = 1976200
-Draw:136 time = 1976200
-Gifs:136 time = 8545000
+Init:108 time = 11700
+Iter:108 time = 2700
 
-Init:129 time = 19800
-Iter:129 time = 980693900
+Void:89 time = 1743700
+Draw:89 time = 1743700
+Gifs:89 time = 9527100
 
-Init:132 time = 12000
-Iter:132 time = 978087000
+Init:109 time = 24800
+Iter:109 time = 2600
 
-Void:140 time = 1847600
-Draw:140 time = 1847600
-Gifs:140 time = 8401500
+Init:110 time = 11600
+Iter:110 time = 2900
 
-Void:129 time = 2019700
-Draw:129 time = 2019700
-Gifs:129 time = 9603000
+Void:91 time = 1682600
+Draw:91 time = 1682600
+Gifs:91 time = 9623800
 
-Init:134 time = 12300
-Iter:134 time = 988871700
+Init:111 time = 12200
+Iter:111 time = 3000
 
-Init:133 time = 20900
-Iter:133 time = 989713800
+Void:95 time = 1615400
+Draw:95 time = 1615400
+Gifs:95 time = 9155300
 
-Init:139 time = 13900
-Iter:139 time = 936658900
+Init:112 time = 34000
+Iter:112 time = 2700
 
-Void:132 time = 1806400
-Draw:132 time = 1806400
-Gifs:132 time = 11129000
+Void:93 time = 2248600
+Draw:93 time = 2248600
+Gifs:93 time = 9310200
 
-Init:130 time = 19900
-Iter:130 time = 1005065000
+Void:90 time = 2200000
+Draw:90 time = 2200000
+Gifs:90 time = 9616400
 
-Void:134 time = 1800900
-Draw:134 time = 1800900
-Gifs:134 time = 8338700
+Void:96 time = 1675900
+Draw:96 time = 1675900
+Gifs:96 time = 9281800
 
-Void:133 time = 1825600
-Draw:133 time = 1825600
-Gifs:133 time = 8803800
+Init:113 time = 22400
+Iter:113 time = 28400
 
-Void:139 time = 6315800
-Draw:139 time = 6315800
-Gifs:139 time = 8366000
+Void:94 time = 1738800
+Draw:94 time = 1738800
+Gifs:94 time = 9577600
 
-Void:130 time = 1816300
-Draw:130 time = 1816300
-Gifs:130 time = 8710100
+Init:114 time = 21800
+Iter:114 time = 2900
 
-Init:131 time = 20100
-Iter:131 time = 1017307900
+Init:116 time = 24500
+Iter:116 time = 2400
 
-Init:126 time = 12500
-Iter:126 time = 1032796700
+Init:115 time = 36300
+Iter:115 time = 2700
 
-Init:123 time = 12800
-Iter:123 time = 1074465000
+Init:117 time = 19600
+Iter:117 time = 2800
 
-Void:131 time = 1703200
-Draw:131 time = 1703200
-Gifs:131 time = 7941600
+Void:87 time = 1758300
+Draw:87 time = 1758300
+Gifs:87 time = 11043700
 
-Void:126 time = 1804300
-Draw:126 time = 1804300
-Gifs:126 time = 8378000
+Init:118 time = 11300
+Iter:118 time = 2900
 
-Init:128 time = 16600
-Iter:128 time = 1040594400
+Void:98 time = 1682300
+Draw:98 time = 1682300
+Gifs:98 time = 9191000
 
-Init:125 time = 11800
-Iter:125 time = 1069537900
+Init:119 time = 9800
+Iter:119 time = 2600
 
-Void:123 time = 1779800
-Draw:123 time = 1779800
-Gifs:123 time = 8534500
+Void:97 time = 1709000
+Draw:97 time = 1709000
+Gifs:97 time = 9708200
 
-Init:122 time = 12100
-Iter:122 time = 1095057100
+Void:99 time = 2049900
+Draw:99 time = 2049900
+Gifs:99 time = 9519100
 
-Void:128 time = 1854100
-Draw:128 time = 1854100
-Gifs:128 time = 8616600
+Void:101 time = 2070800
+Draw:101 time = 2070800
+Gifs:101 time = 9329900
 
-Void:125 time = 1853400
-Draw:125 time = 1853400
-Gifs:125 time = 8421700
+Void:100 time = 1701900
+Draw:100 time = 1701900
+Gifs:100 time = 9064300
 
-Void:122 time = 1793400
-Draw:122 time = 1793400
-Gifs:122 time = 8403500
+Void:102 time = 1759100
+Draw:102 time = 1759100
+Gifs:102 time = 8445100
 
-Init:120 time = 21600
-Iter:120 time = 1139313100
+Void:103 time = 1773700
+Draw:103 time = 1773700
+Gifs:103 time = 9313700
 
-Init:127 time = 11300
-Iter:127 time = 1061875400
+Void:105 time = 1688000
+Draw:105 time = 1688000
+Gifs:105 time = 8740400
 
-Void:120 time = 1784700
-Draw:120 time = 1784700
-Gifs:120 time = 8456600
+Void:104 time = 4012400
+Draw:104 time = 4012400
+Gifs:104 time = 6220800
 
-Void:127 time = 1866100
-Draw:127 time = 1866100
-Gifs:127 time = 8579700
+Void:106 time = 1695200
+Draw:106 time = 1695200
+Gifs:106 time = 9001800
 
-Init:124 time = 18500
-Iter:124 time = 1084645900
+Void:107 time = 1711000
+Draw:107 time = 1711000
+Gifs:107 time = 6602000
 
-Init:119 time = 24100
-Iter:119 time = 1163791900
+Void:117 time = 1777200
+Draw:117 time = 1777200
+Gifs:117 time = 5133900
 
-Init:121 time = 23600
-Iter:121 time = 1153204900
+Void:115 time = 1673000
+Draw:115 time = 1673000
+Gifs:115 time = 6947800
 
-Void:124 time = 1789300
-Draw:124 time = 1789300
-Gifs:124 time = 8482900
+Void:111 time = 1714900
+Draw:111 time = 1714900
+Gifs:111 time = 7597700
 
-Void:119 time = 1816800
-Draw:119 time = 1816800
-Gifs:119 time = 8248300
+Void:110 time = 1701700
+Draw:110 time = 1701700
+Gifs:110 time = 7906400
 
-Void:121 time = 1832600
-Draw:121 time = 1832600
-Gifs:121 time = 8471200
+Void:118 time = 1670000
+Draw:118 time = 1670000
+Gifs:118 time = 6710800
 
-Init:150 time = 2514400
-Iter:150 time = 798251100
+Void:116 time = 2142300
+Draw:116 time = 2142300
+Gifs:116 time = 7314300
 
-Void:150 time = 1854300
-Draw:150 time = 1854300
-Gifs:150 time = 8246700
+Void:108 time = 1705100
+Draw:108 time = 1705100
+Gifs:108 time = 8811300
 
-Init:144 time = 11900
-Iter:144 time = 856669900
+Void:109 time = 2029500
+Draw:109 time = 2029500
+Gifs:109 time = 8872800
 
-Init:149 time = 23900
-Iter:149 time = 824312900
+Void:113 time = 1779900
+Draw:113 time = 1779900
+Gifs:113 time = 8759500
 
-Init:142 time = 22800
-Iter:142 time = 880772500
+Void:112 time = 2019500
+Draw:112 time = 2019500
+Gifs:112 time = 8782700
 
-Init:141 time = 12500
-Iter:141 time = 889025700
+Void:114 time = 2050100
+Draw:114 time = 2050100
+Gifs:114 time = 8663800
 
-Init:148 time = 15200
-Iter:148 time = 810196100
-
-Init:145 time = 20300
-Iter:145 time = 858072800
-
-Void:144 time = 1875600
-Draw:144 time = 1875600
-Gifs:144 time = 8358500
-
-Void:149 time = 1856000
-Draw:149 time = 1856000
-Gifs:149 time = 8438200
-
-Void:142 time = 1849800
-Draw:142 time = 1849800
-Gifs:142 time = 8142300
-
-Init:146 time = 19200
-Iter:146 time = 841151100
-
-Init:147 time = 13200
-Iter:147 time = 822002100
-
-Void:141 time = 1890200
-Draw:141 time = 1890200
-Gifs:141 time = 8548700
-
-Void:148 time = 1804300
-Draw:148 time = 1804300
-Gifs:148 time = 8282300
-
-Init:143 time = 13300
-Iter:143 time = 896062500
-
-Void:145 time = 1864200
-Draw:145 time = 1864200
-Gifs:145 time = 8199400
-
-Void:146 time = 1791000
-Draw:146 time = 1791000
-Gifs:146 time = 8131500
-
-Void:147 time = 1630500
-Draw:147 time = 1630500
-Gifs:147 time = 11743200
-
-Void:143 time = 1841600
-Draw:143 time = 1841600
-Gifs:143 time = 8247300
-
-Init:162 time = 12100
-Iter:162 time = 2797477400
-
-Void:162 time = 1810000
-Draw:162 time = 1810000
-Gifs:162 time = 8159100
-
-Init:161 time = 12200
-Iter:161 time = 2834172400
-
-Init:160 time = 11900
-Iter:160 time = 2840215400
-
-Void:161 time = 1825300
-Draw:161 time = 1825300
-Gifs:161 time = 9752900
-
-Void:160 time = 1825100
-Draw:160 time = 1825100
-Gifs:160 time = 8369400
-
-Init:159 time = 13100
-Iter:159 time = 2878774800
-
-Void:159 time = 1837900
-Draw:159 time = 1837900
-Gifs:159 time = 8263100
-
-Init:158 time = 13300
-Iter:158 time = 2961336800
-
-Init:157 time = 12100
-Iter:157 time = 2985979000
-
-Void:158 time = 1850400
-Draw:158 time = 1850400
-Gifs:158 time = 8290900
-
-Init:156 time = 10700
-Iter:156 time = 2992544600
-
-Void:157 time = 1859200
-Draw:157 time = 1859200
-Gifs:157 time = 8263400
-
-Void:156 time = 1809200
-Draw:156 time = 1809200
-Gifs:156 time = 8246600
-
-Init:155 time = 22400
-Iter:155 time = 3023385600
-
-Void:155 time = 1871900
-Draw:155 time = 1871900
-Gifs:155 time = 8292500
-
-Init:154 time = 22300
-Iter:154 time = 3048917100
-
-Void:154 time = 1813100
-Draw:154 time = 1813100
-Gifs:154 time = 8392700
-
-Init:153 time = 13200
-Iter:153 time = 3108488600
-
-Void:153 time = 1798900
-Draw:153 time = 1798900
-Gifs:153 time = 8764300
-
-Init:151 time = 12700
-Iter:151 time = 3145114300
-
-Init:152 time = 58100
-Iter:152 time = 3147983100
-
-Void:151 time = 1824400
-Draw:151 time = 1824400
-Gifs:151 time = 8606900
-
-Void:152 time = 1888300
-Draw:152 time = 1888300
-Gifs:152 time = 8360800
-
-Init:172 time = 14200
-Iter:172 time = 2490274100
-
-Void:172 time = 1630000
-Draw:172 time = 1630000
-Gifs:172 time = 8359400
-
-Init:171 time = 10500
-Iter:171 time = 2544856200
-
-Void:171 time = 1842000
-Draw:171 time = 1842000
-Gifs:171 time = 8320500
-
-Init:170 time = 12500
-Iter:170 time = 2581448700
-
-Init:168 time = 12000
-Iter:168 time = 2591766800
-
-Void:170 time = 1837300
-Draw:170 time = 1837300
-Gifs:170 time = 8454300
-
-Void:168 time = 1582500
-Draw:168 time = 1582500
-Gifs:168 time = 7023900
-
-Init:169 time = 10900
-Iter:169 time = 2599724700
-
-Void:169 time = 1801600
-Draw:169 time = 1801600
-Gifs:169 time = 8476100
-
-Init:167 time = 22700
-Iter:167 time = 2654920600
-
-Init:166 time = 11500
-Iter:166 time = 2660484700
-
-Void:167 time = 1791900
-Draw:167 time = 1791900
-Gifs:167 time = 8372300
-
-Void:166 time = 1825300
-Draw:166 time = 1825300
-Gifs:166 time = 8350200
-
-Init:165 time = 11800
-Iter:165 time = 2702279500
-
-Init:164 time = 11900
-Iter:164 time = 2718672200
-
-Void:165 time = 1936700
-Draw:165 time = 1936700
-Gifs:165 time = 8262100
-
-Void:164 time = 1859400
-Draw:164 time = 1859400
-Gifs:164 time = 8187100
-
-Init:163 time = 10700
-Iter:163 time = 2788765500
-
-Void:163 time = 1825800
-Draw:163 time = 1825800
-Gifs:163 time = 8306200
-
-Init:179 time = 12400
-Iter:179 time = 2256858900
-
-Void:179 time = 1817400
-Draw:179 time = 1817400
-Gifs:179 time = 8179700
-
-Init:176 time = 41500
-Iter:176 time = 2365017700
-
-Init:181 time = 13100
-Iter:181 time = 2222701500
-
-Init:184 time = 11200
-Iter:184 time = 2144746700
-
-Init:174 time = 13100
-Iter:174 time = 2404045800
-
-Init:175 time = 11600
-Iter:175 time = 2404224400
-
-Void:176 time = 1864700
-Draw:176 time = 1864700
-Gifs:176 time = 8420800
-
-Void:181 time = 1826100
-Draw:181 time = 1826100
-Gifs:181 time = 8601500
-
-Init:182 time = 22300
-Iter:182 time = 2190850600
-
-Void:184 time = 1821000
-Draw:184 time = 1821000
-Gifs:184 time = 8739900
-
-Void:174 time = 1828300
-Draw:174 time = 1828300
-Gifs:174 time = 8590800
-
-Void:175 time = 1799200
-Draw:175 time = 1799200
-Gifs:175 time = 8299700
-
-Init:180 time = 20900
-Iter:180 time = 2269037600
-
-Init:178 time = 22900
-Iter:178 time = 2304467600
-
-Void:182 time = 1792200
-Draw:182 time = 1792200
-Gifs:182 time = 8474300
-
-Void:180 time = 1877800
-Draw:180 time = 1877800
-Gifs:180 time = 8308900
-
-Void:178 time = 1960200
-Draw:178 time = 1960200
-Gifs:178 time = 8512100
-
-Init:173 time = 22800
-Iter:173 time = 2465409600
-
-Init:183 time = 11900
-Iter:183 time = 2187774100
-
-Init:177 time = 19800
-Iter:177 time = 2338054600
-
-Void:173 time = 1818300
-Draw:173 time = 1818300
-Gifs:173 time = 8468300
-
-Void:183 time = 1848800
-Draw:183 time = 1848800
-Gifs:183 time = 9843300
-
-Void:177 time = 1835700
-Draw:177 time = 1835700
-Gifs:177 time = 8328800
-
-Init:189 time = 22900
-Iter:189 time = 1989360600
-
-Void:189 time = 1802300
-Draw:189 time = 1802300
-Gifs:189 time = 8302600
-
-Init:192 time = 10400
-Iter:192 time = 1931079200
-
-Void:192 time = 1825500
-Draw:192 time = 1825500
-Gifs:192 time = 8423000
-
-Init:188 time = 9200
-Iter:188 time = 2055836200
-
-Init:186 time = 9900
-Iter:186 time = 2092461800
-
-Init:185 time = 21000
-Iter:185 time = 2131698600
-
-Void:188 time = 1908900
-Draw:188 time = 1908900
-Gifs:188 time = 8368100
-
-Void:186 time = 1795700
-Draw:186 time = 1795700
-Gifs:186 time = 8419300
-
-Void:185 time = 1820900
-Draw:185 time = 1820900
-Gifs:185 time = 8551900
-
-Init:190 time = 12100
-Iter:190 time = 2005047800
-
-Void:190 time = 1822200
-Draw:190 time = 1822200
-Gifs:190 time = 8396400
-
-Init:191 time = 13300
-Iter:191 time = 2020729300
-
-Init:193 time = 10200
-Iter:193 time = 1979601500
-
-Void:191 time = 2009900
-Draw:191 time = 2009900
-Gifs:191 time = 8625700
-
-Init:194 time = 18000
-Iter:194 time = 1929506500
-
-Void:193 time = 1912800
-Draw:193 time = 1912800
-Gifs:193 time = 8373900
-
-Void:194 time = 1941100
-Draw:194 time = 1941100
-Gifs:194 time = 8567400
-
-Init:187 time = 22800
-Iter:187 time = 2126231400
-
-Void:187 time = 1809600
-Draw:187 time = 1809600
-Gifs:187 time = 8431500
-
-Init:206 time = 11600
-Iter:206 time = 1661659900
-
-Void:206 time = 1888000
-Draw:206 time = 1888000
-Gifs:206 time = 8539700
-
-Init:205 time = 13900
-Iter:205 time = 1685294600
-
-Init:214 time = 30100
-Iter:214 time = 1507101800
-
-Init:213 time = 23500
-Iter:213 time = 1511257700
-
-Init:215 time = 12900
-Iter:215 time = 1506855900
-
-Init:216 time = 10700
-Iter:216 time = 1487699300
-
-Void:205 time = 1852200
-Draw:205 time = 1852200
-Gifs:205 time = 8506700
-
-Void:214 time = 1848200
-Draw:214 time = 1848200
-Gifs:214 time = 8298500
-
-Init:204 time = 23000
-Iter:204 time = 1705546900
-
-Void:213 time = 1870000
-Draw:213 time = 1870000
-Gifs:213 time = 8665300
-
-Void:215 time = 1847300
-Draw:215 time = 1847300
-Gifs:215 time = 8543700
-
-Void:216 time = 1842700
-Draw:216 time = 1842700
-Gifs:216 time = 8740600
-
-Void:204 time = 1819600
-Draw:204 time = 1819600
-Gifs:204 time = 8366500
-
-Init:212 time = 13100
-Iter:212 time = 1563405100
-
-Init:203 time = 13400
-Iter:203 time = 1738870300
-
-Init:211 time = 13700
-Iter:211 time = 1581604600
-
-Init:201 time = 13800
-Iter:201 time = 1753676000
-
-Init:200 time = 11700
-Iter:200 time = 1760083800
-
-Void:212 time = 1821200
-Draw:212 time = 1821200
-Gifs:212 time = 6827500
-
-Init:202 time = 21800
-Iter:202 time = 1750252400
-
-Void:203 time = 1861000
-Draw:203 time = 1861000
-Gifs:203 time = 8579600
-
-Void:211 time = 1805200
-Draw:211 time = 1805200
-Gifs:211 time = 8452800
-
-Void:201 time = 1790900
-Draw:201 time = 1790900
-Gifs:201 time = 8566400
-
-Void:200 time = 1859500
-Draw:200 time = 1859500
-Gifs:200 time = 8333800
-
-Init:209 time = 19800
-Iter:209 time = 1599898600
-
-Void:202 time = 1175600
-Draw:202 time = 1175600
-Gifs:202 time = 5838600
-
-Init:210 time = 14400
-Iter:210 time = 1605463600
-
-Void:209 time = 1834300
-Draw:209 time = 1834300
-Gifs:209 time = 8536600
-
-Init:208 time = 23400
-Iter:208 time = 1636639400
-
-Void:210 time = 1930500
-Draw:210 time = 1930500
-Gifs:210 time = 8304200
-
-Init:207 time = 21900
-Iter:207 time = 1674762200
-
-Void:208 time = 1860600
-Draw:208 time = 1860600
-Gifs:208 time = 8507500
-
-Void:207 time = 1845500
-Draw:207 time = 1845500
-Gifs:207 time = 8410500
-
-Init:199 time = 22800
-Iter:199 time = 1818811700
-
-Init:198 time = 14100
-Iter:198 time = 1825536600
-
-Void:199 time = 1129000
-Draw:199 time = 1129000
-Gifs:199 time = 6751500
-
-Void:198 time = 1833300
-Draw:198 time = 1833300
-Gifs:198 time = 8552700
-
-Init:196 time = 23800
-Iter:196 time = 1850197100
-
-Init:197 time = 12700
-Iter:197 time = 1851278900
-
-Void:196 time = 1842000
-Draw:196 time = 1842000
-Gifs:196 time = 6488600
-
-Void:197 time = 1853900
-Draw:197 time = 1853900
-Gifs:197 time = 8437200
-
-Init:195 time = 11700
-Iter:195 time = 1937357700
-
-Void:195 time = 1871300
-Draw:195 time = 1871300
-Gifs:195 time = 8687600
-
-Init:231 time = 12800
-Iter:231 time = 1223985400
-
-Init:236 time = 22900
-Iter:236 time = 1177480000
-
-Void:231 time = 1806600
-Draw:231 time = 1806600
-Gifs:231 time = 8278500
-
-Init:237 time = 23400
-Iter:237 time = 1176234100
-
-Init:235 time = 23200
-Iter:235 time = 1195809400
-
-Init:232 time = 11200
-Iter:232 time = 1233989000
-
-Void:236 time = 1838300
-Draw:236 time = 1838300
-Gifs:236 time = 8742600
-
-Void:237 time = 1791000
-Draw:237 time = 1791000
-Gifs:237 time = 8256100
-
-Void:235 time = 1826700
-Draw:235 time = 1826700
-Gifs:235 time = 8340600
-
-Init:230 time = 11800
-Iter:230 time = 1258894700
-
-Void:232 time = 1843000
-Draw:232 time = 1843000
-Gifs:232 time = 8477800
-
-Init:234 time = 22300
-Iter:234 time = 1222817800
-
-Init:229 time = 13100
-Iter:229 time = 1283494400
-
-Void:230 time = 1800800
-Draw:230 time = 1800800
-Gifs:230 time = 8218700
-
-Init:233 time = 11400
-Iter:233 time = 1249637800
-
-Void:234 time = 1750400
-Draw:234 time = 1750400
-Gifs:234 time = 8417900
-
-Init:228 time = 12600
-Iter:228 time = 1294435200
-
-Void:229 time = 1815500
-Draw:229 time = 1815500
-Gifs:229 time = 8556600
-
-Void:233 time = 2132700
-Draw:233 time = 2132700
-Gifs:233 time = 8489600
-
-Init:238 time = 13200
-Iter:238 time = 1153191600
-
-Void:228 time = 1797900
-Draw:228 time = 1797900
-Gifs:228 time = 8386600
-
-Void:238 time = 1849200
-Draw:238 time = 1849200
-Gifs:238 time = 8407200
-
-Init:226 time = 11700
-Iter:226 time = 1325987500
-
-Init:225 time = 12700
-Iter:225 time = 1341495700
-
-Void:226 time = 1796900
-Draw:226 time = 1796900
-Gifs:226 time = 8426700
-
-Init:227 time = 11100
-Iter:227 time = 1342846100
-
-Init:223 time = 9100
-Iter:223 time = 1372204100
-
-Void:225 time = 1870300
-Draw:225 time = 1870300
-Gifs:225 time = 8318100
-
-Void:227 time = 1780500
-Draw:227 time = 1780500
-Gifs:227 time = 7616900
-
-Void:223 time = 1788800
-Draw:223 time = 1788800
-Gifs:223 time = 8244300
-
-Init:224 time = 21700
-Iter:224 time = 1368894900
-
-Init:222 time = 23800
-Iter:222 time = 1396992100
-
-Void:224 time = 1803300
-Draw:224 time = 1803300
-Gifs:224 time = 8392500
-
-Init:217 time = 75300
-Iter:217 time = 1437108200
-
-Init:221 time = 12600
-Iter:221 time = 1407709300
-
-Void:222 time = 1871000
-Draw:222 time = 1871000
-Gifs:222 time = 8192800
-
-Init:219 time = 21800
-Iter:219 time = 1419881700
-
-Void:217 time = 1804400
-Draw:217 time = 1804400
-Gifs:217 time = 8206700
-
-Void:221 time = 1825400
-Draw:221 time = 1825400
-Gifs:221 time = 8067700
-
-Void:219 time = 1829900
-Draw:219 time = 1829900
-Gifs:219 time = 8364800
-
-Init:218 time = 11500
-Iter:218 time = 1446960000
-
-Init:220 time = 24000
-Iter:220 time = 1444014100
-
-Void:218 time = 1827000
-Draw:218 time = 1827000
-Gifs:218 time = 8522800
-
-Void:220 time = 1852800
-Draw:220 time = 1852800
-Gifs:220 time = 8291400
-
-Init:255 time = 24000
-Iter:255 time = 934970300
-
-Init:253 time = 11800
-Iter:253 time = 957157100
-
-Init:259 time = 24300
-Iter:259 time = 908137600
-
-Void:255 time = 1833900
-Draw:255 time = 1833900
-Gifs:255 time = 8222200
-
-Void:253 time = 1797500
-Draw:253 time = 1797500
-Gifs:253 time = 8282700
-
-Init:254 time = 11700
-Iter:254 time = 960098200
-
-Init:258 time = 17900
-Iter:258 time = 942502400
-
-Init:247 time = 22100
-Iter:247 time = 1037750600
-
-Init:251 time = 23700
-Iter:251 time = 988825100
-
-Init:248 time = 12600
-Iter:248 time = 1014086600
-
-Void:259 time = 1858200
-Draw:259 time = 1858200
-Gifs:259 time = 8240900
-
-Init:256 time = 11100
-Iter:256 time = 956952900
-
-Void:254 time = 1823500
-Draw:254 time = 1823500
-Gifs:254 time = 8414600
-
-Void:258 time = 1795900
-Draw:258 time = 1795900
-Gifs:258 time = 8191500
-
-Void:247 time = 1797700
-Draw:247 time = 1797700
-Gifs:247 time = 8208500
-
-Init:249 time = 22500
-Iter:249 time = 1035769800
-
-Void:251 time = 1855700
-Draw:251 time = 1855700
-Gifs:251 time = 8460100
-
-Init:257 time = 14500
-Iter:257 time = 961467300
-
-Void:248 time = 1801500
-Draw:248 time = 1801500
-Gifs:248 time = 8219400
-
-Init:252 time = 17800
-Iter:252 time = 995590600
-
-Void:256 time = 1827200
-Draw:256 time = 1827200
-Gifs:256 time = 6549400
-
-Init:260 time = 20400
-Iter:260 time = 915803000
-
-Init:250 time = 29500
-Iter:250 time = 1018893300
-
-Init:244 time = 11200
-Iter:244 time = 1073754500
-
-Void:249 time = 1827200
-Draw:249 time = 1827200
-Gifs:249 time = 8429400
-
-Void:257 time = 1785400
-Draw:257 time = 1785400
-Gifs:257 time = 8178800
-
-Void:252 time = 1821500
-Draw:252 time = 1821500
-Gifs:252 time = 8397300
-
-Void:260 time = 1799300
-Draw:260 time = 1799300
-Gifs:260 time = 8391000
-
-Void:250 time = 1783600
-Draw:250 time = 1783600
-Gifs:250 time = 8364200
-
-Void:244 time = 1863000
-Draw:244 time = 1863000
-Gifs:244 time = 8247000
-
-Init:245 time = 21800
-Iter:245 time = 1078853100
-
-Init:246 time = 12800
-Iter:246 time = 1075888000
-
-Void:245 time = 1873900
-Draw:245 time = 1873900
-Gifs:245 time = 8278200
-
-Init:242 time = 23600
-Iter:242 time = 1111247100
-
-Init:240 time = 11200
-Iter:240 time = 1118537500
-
-Void:246 time = 1858800
-Draw:246 time = 1858800
-Gifs:246 time = 8489900
-
-Init:243 time = 13200
-Iter:243 time = 1117489300
-
-Void:242 time = 1943600
-Draw:242 time = 1943600
-Gifs:242 time = 8200500
-
-Void:240 time = 1853400
-Draw:240 time = 1853400
-Gifs:240 time = 8374300
-
-Init:239 time = 10500
-Iter:239 time = 1147318700
-
-Void:243 time = 1900100
-Draw:243 time = 1900100
-Gifs:243 time = 8666200
-
-Void:239 time = 1864100
-Draw:239 time = 1864100
-Gifs:239 time = 8210800
-
-Init:241 time = 21600
-Iter:241 time = 1167819400
-
-Void:241 time = 1831300
-Draw:241 time = 1831300
-Gifs:241 time = 8293500
-
-Init:269 time = 14100
-Iter:269 time = 803450400
-
-Init:268 time = 8300
-Iter:268 time = 809340500
-
-Void:269 time = 1842700
-Draw:269 time = 1842700
-Gifs:269 time = 8139400
-
-Init:267 time = 11900
-Iter:267 time = 820435200
-
-Void:268 time = 1789900
-Draw:268 time = 1789900
-Gifs:268 time = 8368600
-
-Init:266 time = 10800
-Iter:266 time = 828597900
-
-Init:270 time = 13000
-Iter:270 time = 816414400
-
-Void:267 time = 1846700
-Draw:267 time = 1846700
-Gifs:267 time = 4742300
-
-Init:263 time = 11100
-Iter:263 time = 840015200
-
-Void:266 time = 1803700
-Draw:266 time = 1803700
-Gifs:266 time = 8328900
-
-Void:270 time = 1822100
-Draw:270 time = 1822100
-Gifs:270 time = 8409700
-
-Void:263 time = 1830200
-Draw:263 time = 1830200
-Gifs:263 time = 8188400
-
-Init:262 time = 11300
-Iter:262 time = 873947400
-
-Init:265 time = 10700
-Iter:265 time = 856050000
-
-Init:264 time = 13300
-Iter:264 time = 861589300
-
-Void:262 time = 1823400
-Draw:262 time = 1823400
-Gifs:262 time = 8446400
-
-Init:261 time = 12600
-Iter:261 time = 888565500
-
-Void:265 time = 1824600
-Draw:265 time = 1824600
-Gifs:265 time = 8206700
-
-Void:264 time = 1794400
-Draw:264 time = 1794400
-Gifs:264 time = 9077700
-
-Void:261 time = 1852000
-Draw:261 time = 1852000
-Gifs:261 time = 8341500
-
-Init:281 time = 11500
-Iter:281 time = 2766604700
-
-Void:281 time = 1807600
-Draw:281 time = 1807600
-Gifs:281 time = 8308900
-
-Init:280 time = 14800
-Iter:280 time = 2820795100
-
-Void:280 time = 1819700
-Draw:280 time = 1819700
-Gifs:280 time = 8202500
-
-Init:282 time = 22500
-Iter:282 time = 2810036600
-
-Init:278 time = 22600
-Iter:278 time = 2875185000
-
-Void:282 time = 1835300
-Draw:282 time = 1835300
-Gifs:282 time = 8517800
-
-Init:279 time = 11000
-Iter:279 time = 2882246500
-
-Void:278 time = 1831800
-Draw:278 time = 1831800
-Gifs:278 time = 8275100
-
-Void:279 time = 1814800
-Draw:279 time = 1814800
-Gifs:279 time = 8315000
-
-Init:277 time = 14100
-Iter:277 time = 2925837100
-
-Void:277 time = 1856500
-Draw:277 time = 1856500
-Gifs:277 time = 8286600
-
-Init:276 time = 24500
-Iter:276 time = 2949796100
-
-Void:276 time = 1835000
-Draw:276 time = 1835000
-Gifs:276 time = 8480300
-
-Init:274 time = 11600
-Iter:274 time = 3022729200
-
-Init:275 time = 10600
-Iter:275 time = 3029574600
-
-Void:274 time = 1826000
-Draw:274 time = 1826000
-Gifs:274 time = 8239900
-
-Init:273 time = 13400
-Iter:273 time = 3036587500
-
-Void:275 time = 1851400
-Draw:275 time = 1851400
-Gifs:275 time = 8406700
-
-Void:273 time = 1846900
-Draw:273 time = 1846900
-Gifs:273 time = 4635400
-
-Init:272 time = 10500
-Iter:272 time = 3119621000
-
-Void:272 time = 1821200
-Draw:272 time = 1821200
-Gifs:272 time = 8233000
-
-Init:271 time = 12100
-Iter:271 time = 3138725000
-
-Void:271 time = 1940000
-Draw:271 time = 1940000
-Gifs:271 time = 8506700
-
-Init:292 time = 40800
-Iter:292 time = 2471222400
-
-Init:290 time = 13800
-Iter:290 time = 2494269400
-
-Init:291 time = 14700
-Iter:291 time = 2490485200
-
-Void:292 time = 1862600
-Draw:292 time = 1862600
-Gifs:292 time = 8244300
-
-Void:290 time = 1807800
-Draw:290 time = 1807800
-Gifs:290 time = 8362300
-
-Void:291 time = 1763800
-Draw:291 time = 1763800
-Gifs:291 time = 8419900
-
-Init:288 time = 11500
-Iter:288 time = 2548174800
-
-Void:288 time = 1842000
-Draw:288 time = 1842000
-Gifs:288 time = 8166200
-
-Init:289 time = 11800
-Iter:289 time = 2567803600
-
-Void:289 time = 1857000
-Draw:289 time = 1857000
-Gifs:289 time = 8296600
-
-Init:286 time = 22000
-Iter:286 time = 2622802000
-
-Void:286 time = 1841200
-Draw:286 time = 1841200
-Gifs:286 time = 8236900
-
-Init:285 time = 12500
-Iter:285 time = 2677710500
-
-Init:284 time = 21300
-Iter:284 time = 2683457300
-
-Init:287 time = 23300
-Iter:287 time = 2667729300
-
-Init:283 time = 24000
-Iter:283 time = 2695295000
-
-Void:285 time = 1842300
-Draw:285 time = 1842300
-Gifs:285 time = 7297600
-
-Void:284 time = 1884700
-Draw:284 time = 1884700
-Gifs:284 time = 8163800
-
-Void:287 time = 1803600
-Draw:287 time = 1803600
-Gifs:287 time = 8294200
-
-Void:283 time = 1805300
-Draw:283 time = 1805300
-Gifs:283 time = 8135600
-
-Init:297 time = 13000
-Iter:297 time = 2299051900
-
-Void:297 time = 1791300
-Draw:297 time = 1791300
-Gifs:297 time = 8310700
-
-Init:301 time = 11400
-Iter:301 time = 2195818200
-
-Init:298 time = 11600
-Iter:298 time = 2296473600
-
-Void:301 time = 1832700
-Draw:301 time = 1832700
-Gifs:301 time = 8512000
-
-Init:300 time = 11800
-Iter:300 time = 2224175600
-
-Void:298 time = 1998500
-Draw:298 time = 1998500
-Gifs:298 time = 8843000
-
-Init:304 time = 22500
-Iter:304 time = 2123908200
-
-Void:300 time = 1837400
-Draw:300 time = 1837400
-Gifs:300 time = 8259100
-
-Init:302 time = 12900
-Iter:302 time = 2234621000
-
-Void:304 time = 1812300
-Draw:304 time = 1812300
-Gifs:304 time = 8170700
-
-Void:302 time = 1761200
-Draw:302 time = 1761200
-Gifs:302 time = 7313600
-
-Init:299 time = 12700
-Iter:299 time = 2347494700
-
-Void:299 time = 1805000
-Draw:299 time = 1805000
-Gifs:299 time = 8384800
-
-Init:294 time = 12400
-Iter:294 time = 2467566400
-
-Init:296 time = 13300
-Iter:296 time = 2429109300
-
-Void:294 time = 1811400
-Draw:294 time = 1811400
-Gifs:294 time = 8218900
-
-Void:296 time = 1921800
-Draw:296 time = 1921800
-Gifs:296 time = 8225600
-
-Init:295 time = 24600
-Iter:295 time = 2454031600
-
-Init:293 time = 12000
-Iter:293 time = 2542084800
-
-Void:295 time = 1804800
-Draw:295 time = 1804800
-Gifs:295 time = 10592600
-
-Void:293 time = 1809800
-Draw:293 time = 1809800
-Gifs:293 time = 8246400
-
-Init:303 time = 13100
-Iter:303 time = 2291665500
-
-Init:307 time = 11500
-Iter:307 time = 2070485900
-
-Void:303 time = 1803900
-Draw:303 time = 1803900
-Gifs:303 time = 8296700
-
-Void:307 time = 6995400
-Draw:307 time = 6995400
-Gifs:307 time = 16019800
-
-Init:308 time = 24100
-Iter:308 time = 2074485700
-
-Init:306 time = 11100
-Iter:306 time = 2108038300
-
-Init:314 time = 11500
-Iter:314 time = 1957762600
-
-Init:309 time = 10400
-Iter:309 time = 2042537500
-
-Void:306 time = 1769700
-Draw:306 time = 1769700
-Gifs:306 time = 8235700
-
-Void:314 time = 1818300
-Draw:314 time = 1818300
-Gifs:314 time = 8408300
-
-Void:308 time = 7725500
-Draw:308 time = 7725500
-Gifs:308 time = 8336200
-
-Init:313 time = 25900
-Iter:313 time = 1978454400
-
-Init:312 time = 11700
-Iter:312 time = 1980550200
-
-Void:309 time = 1796100
-Draw:309 time = 1796100
-Gifs:309 time = 8231000
-
-Init:305 time = 11700
-Iter:305 time = 2141577900
-
-Void:312 time = 1828900
-Draw:312 time = 1828900
-Gifs:312 time = 8340100
-
-Void:313 time = 1830800
-Draw:313 time = 1830800
-Gifs:313 time = 12539900
-
-Void:305 time = 1883300
-Draw:305 time = 1883300
-Gifs:305 time = 11337900
-
-Init:311 time = 12700
-Iter:311 time = 2112529400
-
-Void:311 time = 1845700
-Draw:311 time = 1845700
-Gifs:311 time = 8572900
-
-Init:310 time = 12100
-Iter:310 time = 2169948200
-
-Void:310 time = 1810900
-Draw:310 time = 1810900
-Gifs:310 time = 9128600
-Generate time = 886506152211032
+Void:119 time = 1709800
+Draw:119 time = 1709800
+Gifs:119 time = 7836000
+Generate time = 925621293871580

@@ -826,6 +826,7 @@ namespace RgbFractalGenCpp {
 		int16_t count = (max + insertTo - index) % max;
 		while (count > 0 && count < maxcount) {
 			const auto& params = tuples[index++];
+			index %= max;
 			const uint16_t& taskIndex = std::get<0>(params);
 			const std::pair<float, float>& inXY = std::get<1>(params);
 			const std::pair<float, float>& inAngle = std::get<2>(params);
