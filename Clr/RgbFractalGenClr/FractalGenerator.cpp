@@ -311,7 +311,7 @@ namespace RgbFractalGenClr {
 			uint8_t gifIndex = 0;
 			while (gifIndex < 255) {
 				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
-				if(!e->open_parallel(ConvertToStdString(gifTempPath), selectWidth, selectHeight, 1, 0, true, &cancel->Token)) {
+				if(!e->open_parallel(ConvertToStdString(gifTempPath), selectWidth, selectHeight, 1, applyGenerationType == GenerationType::GlobalGIF, 0, true, &cancel->Token)) {
 #ifdef CUSTOMDEBUG
 					Log(logString, "Error opening gif file: " + gifTempPath);
 #endif
@@ -407,11 +407,14 @@ namespace RgbFractalGenClr {
 			//imageTasks = applyParallelType == 2 ? gcnew ConcurrentBag<Task^>() : nullptr;
 			// The other implementation are using the FinishTasks lambda argument function, but I couldn't get that to work in this managed class, so I had to unpack it:
 			for (auto tasksRemaining = true; tasksRemaining; MakeDebugString()) {
-				TryFinishBitmaps();
-				while (bitmapsFinished < bitmap->Length && bitmapState[bitmapsFinished] >= (applyGenerationType >= GenerationType::EncodeGIF ? BitmapState::Finished : BitmapState::Encoding)) {
-					bitmapState[bitmapsFinished] = BitmapState::Unlocked;
-					bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]);
-					++bitmapsFinished;
+				if (!cancel->IsCancellationRequested) {
+					Thread::Sleep(50); // Let's make this thred not as CPU intense
+					TryFinishBitmaps();
+					while (bitmapsFinished < bitmap->Length && bitmapState[bitmapsFinished] >= (applyGenerationType >= GenerationType::EncodeGIF ? BitmapState::Finished : BitmapState::Encoding)) {
+						bitmapState[bitmapsFinished] = BitmapState::Unlocked;
+						bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]);
+						++bitmapsFinished;
+					}
 				}
 				tasksRemaining = false;
 				for (short taskIndex = applyMaxTasks; 0 <= --taskIndex; ) {
@@ -452,7 +455,7 @@ namespace RgbFractalGenClr {
 
 		// Save the temp GIF file
 		gifSuccess = false;
-		if (applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr && ((GifEncoder*)gifEncoder)->close(true, &cancel->Token))
+		if (!cancel->IsCancellationRequested && applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr && ((GifEncoder*)gifEncoder)->close(true, &cancel->Token))
 			while (/*!cancel->Token.IsCancellationRequested &&*/ gifEncoder != nullptr) {
 				auto& encoder = *((GifEncoder*)gifEncoder);
 				switch (encoder.tryWrite()) {
@@ -1233,44 +1236,37 @@ namespace RgbFractalGenClr {
 			return;
 		}
 		System::String^ _debugString = "TASKS:";
-		for (auto t = 0; t < applyMaxTasks; ++t) {
-			auto& task = tasks[t];
-			_debugString += "\n" + t + ": ";
+		auto i = 0, li = 0;
+		while (i < applyMaxTasks) {
+			auto& task = tasks[i];
+			_debugString += "\n" + i++ + ": ";
 			switch (task.state) {
 			case TaskState::Running:
-				_debugString += "RUN: " + GetBitmapState(bitmapState[task.bitmapIndex]);
+				_debugString += GetBitmapState(bitmapState[task.bitmapIndex]);
 				break;
 			case TaskState::Done:
-				_debugString += "DONE: " + GetBitmapState(bitmapState[task.bitmapIndex]);
+				_debugString += "DONE";
 				break;
 			case TaskState::Free:
 				_debugString += "FREE";
 				break;
 			}
 		}
-		auto laststate = BitmapState::Error;
-		auto b = 0;; 
-		for(auto i = 0; i < 9; counter[i++] = 0);
-		for (_debugString += "\n\nIMAGES:"; b < bitmapsFinished; ++b)
-			++counter[(int)bitmapState[b]];
-		System::String^ _memoryString = "";
-		while (b < bitmap->Length && bitmapState[b] > BitmapState::Queued) {
-			auto state = bitmapState[b];
-			if (state != laststate) {
-				if (laststate != BitmapState::Error) 
-					_memoryString += "-" + (b - 1) + ": " + GetBitmapState(laststate);
-				_memoryString += "\n" + b;
-				laststate = state;
+		BitmapState state, laststate = bitmapState[0];
+		for(auto c = i = 0; c < 8; counter[c++] = 0);
+		for (_debugString += "\n\nIMAGES:"; i < bitmap->Length; ++i)
+			++counter[(int)bitmapState[i]];
+		System::String^ _memoryString = "\n";
+		for (i = 0; i < bitmap->Length; ++i, laststate = state) 
+			if ((state = bitmapState[i]) != laststate) {
+				_memoryString += (li == i - 1 ? li + ": " : li + "-" + (i - 1) + ": ") + GetBitmapState(laststate) + "\n";
+				li = i;
 			}
-			++counter[(int)state];
-			++b;
-		}
-		if (bitmapState[bitmapsFinished] > BitmapState::Queued) 
-			_memoryString += "-" + (b - 1) + ": " + GetBitmapState(laststate);
-		for (int c = 0; c < 9; ++c) 
+		_memoryString += (li == i - 1 ? li + ": " : li + "-" + (i - 1) + ": ") + GetBitmapState(laststate);
+		for (int c = 0; c < 8; ++c) 
 			_debugString += "\n" + counter[c] + "x: " + GetBitmapState((BitmapState)c);
-		_debugString += "\n" + _memoryString;
-		debugString = b < bitmap->Length ? _debugString + "\n" + b + "+: " + "QUEUED" : _debugString;
+		_debugString += "\n\nANIMATION:" + _memoryString;
+		debugString = i < bitmap->Length ? _debugString + "\n" + i + "+: " + "QUEUED" : _debugString;
 	}
 	System::Void FractalGenerator::TestEncoder(array<Bitmap^>^ bitmap) {
 

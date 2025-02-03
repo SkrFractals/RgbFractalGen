@@ -32,7 +32,7 @@ namespace RgbFractalGenCpp {
     private enum TaskState : uint8_t {
         Free = 0,		// The task has not been started yet, or already finished and joined and ready to be started again
         Done = 1,	    // The task if finished and ready to join without waiting
-        Running = 2,    // The task is running
+        Running = 2     // The task is running
     };
 
     enum ParallelType : uint8_t {
@@ -45,6 +45,7 @@ namespace RgbFractalGenCpp {
         OnlyImage = 0,      // Only generates the first single image, and then halts. Or stops generating animation, if selected during an animation generation and at least one frame has already been finished.
         AnimationRAM = 1,   // Will only generate the animation for preview, faster than encoding GIF, but cannot save the GIF when finished.
         EncodeGIF = 2,      // Will encode a GIF while generating the animation, will be slower than generating the animation without GIF.
+        GlobalGIF = 3       // Will encode a gif but only analyze the first frame for a color map, much faster, but not recommended for shifting hues or if you want the highest possible quality
     };
 
     public struct FractalTask {
@@ -233,7 +234,7 @@ namespace RgbFractalGenCpp {
 
         bool debugmode = false;
         std::string debugString;
-        int16_t* counter = new int16_t[9];
+        int16_t* counter = new int16_t[8];
 
 #pragma region Init
     public:

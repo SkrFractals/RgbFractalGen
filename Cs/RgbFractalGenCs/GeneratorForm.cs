@@ -422,6 +422,7 @@ public partial class GeneratorForm : Form {
 			modifySettings = true;
 			FillSelects();
 			FillCutParams();
+			cutparamBox.Text = "0";
 			modifySettings = false;
 			QueueReset();
 		} else {
@@ -479,7 +480,7 @@ public partial class GeneratorForm : Form {
 		var fpsrate = 100 / generator.selectDelay;
 		timer.Interval = generator.selectDelay * 10;
 		delayLabel.Text = "Abort / FPS: " + fpsrate.ToString();
-		if (generator.selectGenerationType == FractalGenerator.GenerationType.EncodeGIF)
+		if (generator.selectGenerationType >= FractalGenerator.GenerationType.EncodeGIF)
 			QueueReset();
 	}
 	private void MoveFrame(int move) { animated = false; var b = generator.GetBitmapsFinished(); currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b; }
@@ -499,9 +500,9 @@ public partial class GeneratorForm : Form {
 	}
 
 	private void EncodeSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (
-			(generator.selectGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex)) == FractalGenerator.GenerationType.EncodeGIF 
-			&& !generator.IsGifReady()
+		var prev = generator.selectGenerationType;
+		if ((generator.selectGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex)) >= FractalGenerator.GenerationType.EncodeGIF 
+			&& (!generator.IsGifReady() || prev != generator.selectGenerationType)
 		) QueueReset();
 	}
 	private void HelpButton_Click(object sender, EventArgs e) {

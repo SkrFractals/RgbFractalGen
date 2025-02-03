@@ -38,9 +38,37 @@
 #endregion
 
 using System;
+using System.Drawing.Imaging;
+using System.Drawing;
 using System.Threading;
+using System.Threading.Tasks;
+using static Gif.Components.AnimatedGifEncoder;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace Gif.Components {
+
+	/** A struct containing data for each analyzis task, and also acting like a pointer list of the tasks. */
+	public class EncoderTaskData {
+		public int transIndex;          // transparent index in color table
+		public byte[] indexedPixels;    // converted frame indexed to palette
+		public byte[] colorTab;         // RGB palette
+		public unsafe byte*
+			pixelsPtr = null;           // BGR bytes (pointer array) from frame
+		public byte[] pixelsArr;        // BGR bytes (classic array) from frame
+		public bool finished = false;   // Is this task finished? Will let TryWriteFrameIntoFile to write this frame, and release the data
+		public bool failed = false;     // Has something failed in this task?
+		public NeuQuant nq = null;
+		public Task thisTask = null;    // If you add task referrence in AddFrame, it will crate its own task, and save it for both that reference and this
+		public int frameIndex;          // Frame index within the animation
+		public BitmapData
+			bitmapData = null;          // LockBits when added direct image
+		public Bitmap bitmap = null;    // Direct image
+		public EncoderTaskData
+			nextTask = null;            // The task for next frame
+										// (if its null, the previous task was the last frame and the animation shoudl complete upon it's finish)
+	}
+
 	public class NeuQuant {
 		protected static readonly int netsize = 256; /* number of colours used */
 		/* four primes near 500 - assume no image has a length so large */
@@ -100,6 +128,7 @@ namespace Gif.Components {
 		/* Types and Global Variables
 		-------------------------- */
 
+		protected EncoderTaskData encode = null;
 		unsafe protected byte* pixelsPtr = null; /* the input image itself as a byte pointer array */
 		protected byte[] pixelsArr; /* the input image itself as a byte classic array */
 
@@ -120,6 +149,17 @@ namespace Gif.Components {
 		protected int[] freq = new int[netsize];
 		protected int[] radpower = new int[initrad];
 		/* radpower for precomputation */
+
+		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
+		   ----------------------------------------------------------------------- */
+		unsafe public NeuQuant(EncoderTaskData encode, int len, int sample) {
+			this.encode = encode;
+			lengthcount = len;
+			samplefac = sample;
+			network = new int[netsize][];
+			for (int i = 0; i < netsize; ++i)
+				InitNetwork(i);
+		}
 
 		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 		   ----------------------------------------------------------------------- */
@@ -144,7 +184,7 @@ namespace Gif.Components {
 					return;
 				InitNetwork(i);
 			}
-			FactorizeLength(token);
+			FactorizeLength(token, lengthcount);
 		}
 
 		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
@@ -170,7 +210,7 @@ namespace Gif.Components {
 					return;
 				InitNetwork(i);
 			}
-			FactorizeLength(token);
+			FactorizeLength(token, lengthcount);
 		}
 
 		protected void InitNetwork(int i) {
@@ -180,8 +220,8 @@ namespace Gif.Components {
 			bias[i] = 0;
 		}
 
-		protected void FactorizeLength(CancellationToken token) {
-			int samplepixels = lengthcount / (3 * samplefac);
+		protected void FactorizeLength(CancellationToken token, int len) {
+			int samplepixels = len / (3 * samplefac);
 			factor = 1;
 			for (int t = 2, xt = factor * t, st = samplepixels / t; xt - st < samplepixels - factor; xt = factor * t, st = samplepixels / t) {
 				if (token.IsCancellationRequested)
@@ -288,17 +328,41 @@ namespace Gif.Components {
 			return false;
 		}
 
+		protected struct PixelsFrame {
+			internal byte[] arr;
+			unsafe internal byte* ptr;
+			internal unsafe PixelsFrame(byte* ptr, byte[] arr) {
+				this.ptr = ptr;
+				this.arr = arr;
+			}
+		}
+
 		/* Main Learning Loop
 		   ------------------ */
-		public bool Learn() {
+		unsafe public bool Learn() {
 
-			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim;
+			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim, modpix;
+			int len = 0;
+			PixelsFrame f;
+			List<PixelsFrame> ani = [];
 
-			if (lengthcount < minpicturebytes)
+			if (encode != null) {
+				var e = encode;
+				while (e.nextTask != null) {
+					len += lengthcount;
+					ani.Add(new PixelsFrame(e.pixelsPtr, e.pixelsArr));
+					e = e.nextTask;
+				}
+			} else { 
+				len = lengthcount;
+				ani.Add(new PixelsFrame(pixelsPtr, pixelsArr)); 
+			}
+
+			if (len < minpicturebytes)
 				samplefac = 1;
 			alphadec = 30 + ((samplefac - 1) / 3);
-			lim = lengthcount;
-			delta = (samplepixels = lengthcount / (3 * samplefac)) / ncycles;
+			lim = len;
+			delta = (samplepixels = len / (3 * samplefac)) / ncycles;
 			if (delta <= 0)
 				delta = 1;
 			alpha = initalpha;
@@ -308,45 +372,28 @@ namespace Gif.Components {
 			for (i = 0; i < rad; ++i)
 				radpower[i] = alpha * (((rad2 - i * i) * radbias) / rad2);
 
-			//fprintf(stderr,"beginning 1D learning: initial radius=%d\n", rad);
-
-			step = lengthcount < minpicturebytes ? 3 : ((lengthcount % prime1) != 0 ? 3 * prime1 : ((lengthcount % prime2) != 0 ? 3 * prime2 : ((lengthcount % prime3) != 0 ? 3 * prime3 : 3 * prime4)));
+			step = len < minpicturebytes ? 3 : ((len % prime1) != 0 ? 3 * prime1 : ((len % prime2) != 0 ? 3 * prime2 : ((len % prime3) != 0 ? 3 * prime3 : 3 * prime4)));
 			i = pix = 0;
-			unsafe {
-				if (pixelsPtr != null) {
-					for (int x = 0; x < samplepixels; ++x) {
-						// we don't need & 0xff for bytes
-						r = (pixelsPtr[pix + 0] /*& 0xff*/) << netbiasshift;
-						g = (pixelsPtr[pix + 1] /*& 0xff*/) << netbiasshift;
-						b = (pixelsPtr[pix + 2] /*& 0xff*/) << netbiasshift;
-						Altersingle(alpha, j = Contest(b, g, r), b, g, r);
-						if (rad != 0)
-							Alterneigh(rad, j, b, g, r); /* alter neighbours */
-						if ((pix += step) >= lim)
-							pix -= lengthcount;
-						if ((++i) % delta != 0)
-							continue;
-						alpha -= alpha / alphadec;
-						rad = (radius -= radius / radiusdec) >> radiusbiasshift;
-						if (rad <= 1)
-							rad = 0;
-						rad2 = rad * rad;
-						for (j = 0; j < rad; ++j)
-							radpower[j] = alpha * (((rad2 - j * j) * radbias) / rad2);
-					}
-					return false;
-				}
-			}
 			for (int x = 0; x < samplepixels; ++x) {
+
+				f = ani[pix / lengthcount];
+				modpix = pix % lengthcount;
+
 				// we don't need & 0xff for bytes
-				r = (pixelsArr[pix + 0] /*& 0xff*/) << netbiasshift;
-				g = (pixelsArr[pix + 1] /*& 0xff*/) << netbiasshift;
-				b = (pixelsArr[pix + 2] /*& 0xff*/) << netbiasshift;
+				if (f.ptr != null) {
+					r = (f.ptr[modpix + 0] /*& 0xff*/) << netbiasshift;
+					g = (f.ptr[modpix + 1] /*& 0xff*/) << netbiasshift;
+					b = (f.ptr[modpix + 2] /*& 0xff*/) << netbiasshift;
+				} else {
+					r = (f.arr[modpix + 0] /*& 0xff*/) << netbiasshift;
+					g = (f.arr[modpix + 1] /*& 0xff*/) << netbiasshift;
+					b = (f.arr[modpix + 2] /*& 0xff*/) << netbiasshift;
+				}
 				Altersingle(alpha, j = Contest(b, g, r), b, g, r);
 				if (rad != 0)
 					Alterneigh(rad, j, b, g, r); /* alter neighbours */
 				if ((pix += step) >= lim)
-					pix -= lengthcount;
+					pix -= len;
 				if ((++i) % delta != 0)
 					continue;
 				alpha -= alpha / alphadec;
@@ -356,21 +403,39 @@ namespace Gif.Components {
 				rad2 = rad * rad;
 				for (j = 0; j < rad; ++j)
 					radpower[j] = alpha * (((rad2 - j * j) * radbias) / rad2);
+
 			}
 			return false;
-			//fprintf(stderr,"finished 1D learning: readonly alpha=%f !\n",((float)alpha)/initalpha);
 		}
 		/* Main Learning Loop - cancellable
 		   ------------------ */
-		public bool Learn(CancellationToken token) {
+		unsafe public bool Learn(CancellationToken token) {
 
-			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim;
+			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim, modpix;
+			int len = 0;
+			PixelsFrame f;
+			List<PixelsFrame> ani = [];
 
-			if (lengthcount < minpicturebytes)
+			if (encode != null) {
+				var e = encode;
+				while (e.nextTask != null) {
+					len += lengthcount;
+					ani.Add(new PixelsFrame(e.pixelsPtr, e.pixelsArr));
+					e = e.nextTask;
+				}
+				delta = (samplepixels = len / (3 * samplefac)) / ncycles;
+				FactorizeLength(token, len);
+			} else {
+				len = lengthcount;
+				ani.Add(new PixelsFrame(pixelsPtr, pixelsArr));
+				delta = (samplepixels = len / (3 * samplefac)) / ncycles;
+			}
+
+			if (len < minpicturebytes)
 				samplefac = 1;
 			alphadec = 30 + ((samplefac - 1) / 3);
-			lim = lengthcount;
-			delta = (samplepixels = lengthcount / (3 * samplefac)) / ncycles;
+			lim = len;
+			
 			if (delta <= 0)
 				delta = 1;
 			alpha = initalpha;
@@ -380,48 +445,28 @@ namespace Gif.Components {
 			for (i = 0; i < rad; ++i)
 				radpower[i] = alpha * (((rad2 - i * i) * radbias) / rad2);
 
-			//fprintf(stderr,"beginning 1D learning: initial radius=%d\n", rad);
-
-			step = lengthcount < minpicturebytes ? 3 : ((lengthcount % prime1) != 0 ? 3 * prime1 : ((lengthcount % prime2) != 0 ? 3 * prime2 : ((lengthcount % prime3) != 0 ? 3 * prime3 : 3 * prime4)));
+			step = len < minpicturebytes ? 3 : ((len % prime1) != 0 ? 3 * prime1 : ((len % prime2) != 0 ? 3 * prime2 : ((len % prime3) != 0 ? 3 * prime3 : 3 * prime4)));
 			i = pix = 0;
 			samplepixels /= factor;
-			unsafe {
-				if (pixelsPtr != null) {
-					for (int x = 0; x < factor; ++x) {
-						if (token.IsCancellationRequested)
-							return true;
-						for (int y = 0; y < samplepixels; ++y) {
-							// we don't need & 0xff for bytes
-							r = (pixelsPtr[pix + 0] /*& 0xff*/) << netbiasshift;
-							g = (pixelsPtr[pix + 1] /*& 0xff*/) << netbiasshift;
-							b = (pixelsPtr[pix + 2] /*& 0xff*/) << netbiasshift;
-							Altersingle(alpha, j = Contest(b, g, r), b, g, r);
-							if (rad != 0)
-								Alterneigh(rad, j, b, g, r); /* alter neighbours */
-							if ((pix += step) >= lim)
-								pix -= lengthcount;
-							if ((++i) % delta != 0)
-								continue;
-							alpha -= alpha / alphadec;
-							rad = (radius -= radius / radiusdec) >> radiusbiasshift;
-							if (rad <= 1)
-								rad = 0;
-							rad2 = rad * rad;
-							for (j = 0; j < rad; ++j)
-								radpower[j] = alpha * (((rad2 - j * j) * radbias) / rad2);
-						}
-					}
-					return false;
-				}
-			}
+
 			for (int x = 0; x < factor; ++x) {
 				if (token.IsCancellationRequested)
 					return true;
 				for (int y = 0; y < samplepixels; ++y) {
+
+					f = ani[pix / lengthcount];
+					modpix = pix % lengthcount;
+
 					// we don't need & 0xff for bytes
-					r = (pixelsArr[pix + 0] /*& 0xff*/) << netbiasshift;
-					g = (pixelsArr[pix + 1] /*& 0xff*/) << netbiasshift;
-					b = (pixelsArr[pix + 2] /*& 0xff*/) << netbiasshift;
+					if (f.ptr != null) {
+						r = (f.ptr[modpix + 0] /*& 0xff*/) << netbiasshift;
+						g = (f.ptr[modpix + 1] /*& 0xff*/) << netbiasshift;
+						b = (f.ptr[modpix + 2] /*& 0xff*/) << netbiasshift;
+					} else {
+						r = (f.arr[modpix + 0] /*& 0xff*/) << netbiasshift;
+						g = (f.arr[modpix + 1] /*& 0xff*/) << netbiasshift;
+						b = (f.arr[modpix + 2] /*& 0xff*/) << netbiasshift;
+					}
 					Altersingle(alpha, j = Contest(b, g, r), b, g, r);
 					if (rad != 0)
 						Alterneigh(rad, j, b, g, r); /* alter neighbours */
@@ -439,7 +484,6 @@ namespace Gif.Components {
 				}
 			}
 			return false;
-			//fprintf(stderr,"finished 1D learning: readonly alpha=%f !\n",((float)alpha)/initalpha);
 		}
 
 		/* Search for BGR values 0..255 (after net is unbiased) and return colour index

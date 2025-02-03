@@ -754,7 +754,10 @@ namespace RgbFractalGenClr {
 		this->encodeSelect->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
 																static_cast<System::Byte>(238)));
 		this->encodeSelect->FormattingEnabled = true;
-		this->encodeSelect->Items->AddRange(gcnew cli::array< System::Object^  >(3) { L"Only Image", L"Animation RAM", L"Encode GIF" });
+		this->encodeSelect->Items->AddRange(gcnew cli::array< System::Object^  >(4) {
+			L"Only Image", L"Animation RAM", L"Local GIF",
+				L"Global GIF"
+		});
 		this->encodeSelect->Location = System::Drawing::Point(175, 527);
 		this->encodeSelect->Name = L"encodeSelect";
 		this->encodeSelect->Size = System::Drawing::Size(121, 23);
@@ -850,7 +853,7 @@ namespace RgbFractalGenClr {
 		this->Controls->Add(this->infoLabel);
 		this->Icon = (cli::safe_cast<System::Drawing::Icon^>(resources->GetObject(L"$this.Icon")));
 		this->Name = L"GeneratorForm";
-		this->Text = L"RGB Fractal Zoom Generator Clr v1.83";
+		this->Text = L"RGB Fractal Zoom Generator Clr v1.84";
 		this->FormClosing += gcnew System::Windows::Forms::FormClosingEventHandler(this, &GeneratorForm::GeneratorForm_FormClosing);
 		this->Load += gcnew System::EventHandler(this, &GeneratorForm::GeneratorForm_Load);
 		this->helpPanel->ResumeLayout(false);
@@ -1214,6 +1217,7 @@ namespace RgbFractalGenClr {
 			modifySettings = true;
 			FillSelects();
 			FillCutParams();
+			cutparamBox->Text = "0";
 			modifySettings = false;
 			QueueReset(true);
 		} else {
@@ -1326,7 +1330,7 @@ namespace RgbFractalGenClr {
 		timer->Interval = generator->selectDelay * 10;
 		delayLabel->Text = "Abort / FPS: " + fpsrate.ToString();
 		if (generator->selectGenerationType == 2)
-			QueueReset(false);
+			QueueReset(true);
 	}
 	System::Void GeneratorForm::MoveFrame(int16_t move) {
 		animated = false; const auto b = generator->GetBitmapsFinished(); currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b;
@@ -1358,8 +1362,10 @@ namespace RgbFractalGenClr {
 			return;
 		}*/
 
-		if ((generator->selectGenerationType = (GenerationType)Math::Max(0, encodeSelect->SelectedIndex)) && !generator->IsGifReady())
-			QueueReset(false);
+		const auto prev = generator->selectGenerationType;
+		if ((generator->selectGenerationType = (GenerationType)Math::Max(0, encodeSelect->SelectedIndex)) >= GenerationType::EncodeGIF
+			&& (!generator->IsGifReady() || prev != generator->selectGenerationType))
+			QueueReset(true);
 	}
 	System::Void GeneratorForm::HelpButton_Click(System::Object^ sender, System::EventArgs^ e) {
 		helpPanel->Visible = screenPanel->Visible;

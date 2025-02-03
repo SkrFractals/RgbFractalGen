@@ -79,12 +79,12 @@ public struct NeuQuantTask {
     bool getColorMap(const int quality);
 
     /** gets raster bits according to the colormap */
-    bool getRasterBits(uint8_t* pixels);
+    bool getRasterBits(uint8_t* pixels, NeuQuantTask* task = nullptr);
 
 private:
-    inline void getRasterPix(const uint8_t* pic, const int pix) {
+    inline void getRasterPix(NeuQuant& nq, const uint8_t* pic, const int pix) {
         const auto i3 = pix * 3;
-        rasterBits[pix] = neuquant.inxsearch(pic[i3], pic[i3 + 1], pic[i3 + 2]);
+        rasterBits[pix] = nq.inxsearch(pic[i3], pic[i3 + 1], pic[i3 + 2]);
     }
 };
 #pragma endregion
@@ -158,21 +158,22 @@ public:
     /**
      * close gif file, but if in parallel it just marks the pushes as final, and you need to complete the file by calling tryWrite until a finished or failed result
      *
+     * @multiFrameGlobalMap if left true, it will learn the global colormap from all the frames, if false, it will only learn it from the first frame, assuming the other frames have similar colors
      * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
      * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
-    bool close(bool cancelType = false, void* cancel = nullptr);
+    bool close(bool multiFrameGlobalMap = true, bool cancelType = false, void* cancel = nullptr);
 
 #pragma endregion
 
 private:
 
 #pragma region ORIGINAL_PRIVATES_AND_VARIABLES
-    bool setupTask(NeuQuantTask* pushPtr, const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const int delay, bool cancelType = false, void* cancel = nullptr);
+    bool setupTask(NeuQuantTask* pushPtr, const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height, const bool first, const int delay, bool cancelType = false, void* cancel = nullptr);
 
     /** Encodes the frame */
-    void encodeFrame(NeuQuantTask& task, const int delay);
+    void encodeFrame(NeuQuantTask& task, const int delay, const bool globalColorMap);
 
     //inline bool isFirstFrame() const {return m_frameCount == 0;} // unused
 
@@ -203,13 +204,14 @@ public:
      * @param width gif width
      * @param height gif height
      * @param quality 1..30, 1 is best
+     * @param useGlobalColorMap will only laren a global colormap from the first frame (a global colormap from all frames is not available with parallel mode)
      * @param loop loop count, 0 is endless
      * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
      * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable
      * @return success
      */
     bool open_parallel(const std::string& file, const int width, const int height,
-                       const int quality = 1, int16_t loop = 0, bool cancelType = false, void* cancel = nullptr);
+                       const int quality = 1, const bool useGlobalColorMap = false, int16_t loop = 0, bool cancelType = false, void* cancel = nullptr);
 
     /** set transparent color, if any value is negative, it resets transparency */
     inline void setTransparent(const int b, const int g, const int r) {
@@ -291,7 +293,7 @@ private:
     void clearTask(NeuQuantTask& task);
 
     /** Fetch the next data_encode, and make a new empty one after that, uses a mutex lock for data integrity */
-    NeuQuantTask* GifEncoder::nextEncode(const int index, const int width, const int height);
+    NeuQuantTask* GifEncoder::nextEncode(const int index, const int width, const int height, bool& first);
 
     /** Attempts to abort a cancelled/failed file */
     bool abort(const bool fail);
@@ -306,7 +308,9 @@ private:
     }
 
     // SkrFractal's vareiables:
-    NeuQuantTask* data_push = nullptr,  // tasks data to push frame
+    NeuQuantTask
+        * data_first = nullptr,         // first task data (for a global colormap pointer)
+        * data_push = nullptr,          // task data to push frame
         * data_write = nullptr;         // task data to write next
     bool transparent,                   // is it transparent?
         finishedAnimation = false,      // was the file completed?

@@ -88,7 +88,7 @@ public struct NeuQuant {
 	 * @param lengthcount = Width*Height*3
 	 * @param samplefac = sampling factor 1..30, 1 is highest quality
 	 * @cancelType false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
-     * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable
+	 * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable
 	   ---------------------------------------------------------------------------------------------------- */
 	bool learn(unsigned char* p, const int lengthcount, const int samplefac, int samplepixels, int factor, bool cancelType, void* cancel);
 

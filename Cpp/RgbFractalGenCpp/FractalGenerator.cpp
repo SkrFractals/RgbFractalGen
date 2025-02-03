@@ -320,7 +320,7 @@ namespace RgbFractalGenCpp {
 			uint8_t gifIndex = 0;
 			while (gifIndex < 255) {
 				gifTempPath = "gif" + std::to_string(gifIndex) + ".tmp";
-				if (!e->open_parallel(gifTempPath, selectWidth, selectHeight, 1, 0, false, &cancelRequested)) {
+				if (!e->open_parallel(gifTempPath, selectWidth, selectHeight, 1, applyGenerationType == GenerationType::GlobalGIF, 0, false, &cancelRequested)) {
 #ifdef CUSTOMDEBUG
 					Log(logString, "Error opening gif file: " + gifTempPath);
 #endif
@@ -422,10 +422,10 @@ namespace RgbFractalGenCpp {
 			// The other implementation are using the FinishTasks lambda argument function, but I couldn't get that to work in this managed class, so I had to unpack it:
 
 			for (auto tasksRemaining = true; tasksRemaining; MakeDebugString()) {
-				TryFinishBitmaps();
-				while (bitmapsFinished < frames && bitmapState[bitmapsFinished] >= (applyGenerationType >= GenerationType::EncodeGIF ? BitmapState::Finished : BitmapState::Encoding)) {
-					//bitmap[bitmapsFinished]->UnlockBits(bitmapData[bitmapsFinished]); // TODO return this!
-					++bitmapsFinished;
+				if (!cancelRequested) {
+					TryFinishBitmaps();
+					while (bitmapsFinished < frames && bitmapState[bitmapsFinished] >= (applyGenerationType >= GenerationType::EncodeGIF ? BitmapState::Finished : BitmapState::Encoding)) 
+						++bitmapsFinished;
 				}
 				tasksRemaining = false;
 				for (short taskIndex = applyMaxTasks; 0 <= --taskIndex; ) {
@@ -462,7 +462,7 @@ namespace RgbFractalGenCpp {
 
 		// Save the temp GIF file
 		gifSuccess = false;
-		if (applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr && ((GifEncoder*)gifEncoder)->close(false, &cancelRequested))
+		if (!cancelRequested && applyGenerationType >= GenerationType::EncodeGIF && gifEncoder != nullptr && ((GifEncoder*)gifEncoder)->close(false, &cancelRequested))
 			while (/*!cancel->Token.IsCancellationRequested &&*/ gifEncoder != nullptr) {
 				auto& encoder = *((GifEncoder*)gifEncoder);
 				switch (encoder.tryWrite()) {
@@ -1147,44 +1147,37 @@ namespace RgbFractalGenCpp {
 			return;
 		}
 		std::string _debugString = "TASKS:";
-		for (auto t = 0; t < applyMaxTasks; ++t) {
-			auto& task = tasks[t];
-			_debugString += "\n" + std::to_string(t) + ": ";
+		auto i = 0, li = 0;
+		while (i < applyMaxTasks) {
+			auto& task = tasks[i];
+			_debugString += "\n" + std::to_string(i++) + ": ";
 			switch (task.state) {
 			case TaskState::Running:
-				_debugString += "RUN: " + GetBitmapState(bitmapState[task.bitmapIndex]);
+				_debugString += GetBitmapState(bitmapState[task.bitmapIndex]);
 				break;
 			case TaskState::Done:
-				_debugString += "DONE: " + GetBitmapState(bitmapState[task.bitmapIndex]);
+				_debugString += "DONE";
 				break;
 			case TaskState::Free:
 				_debugString += "FREE";
 				break;
 			}
 		}
-		auto laststate = BitmapState::Error;
-		auto b = 0;;
-		for (auto i = 0; i < 9; counter[i++] = 0);
-		for (_debugString += "\n\nIMAGES:"; b < bitmapsFinished; ++b)
-			++counter[(int)bitmapState[b]];
-		std::string _memoryString = "";
-		while (b < frames && bitmapState[b] > BitmapState::Queued) {
-			auto state = bitmapState[b];
-			if (state != laststate) {
-				if (laststate != BitmapState::Error)
-					_memoryString += "-" + std::to_string(b - 1) + ": " + GetBitmapState(laststate);
-				_memoryString += "\n" + std::to_string(b);
-				laststate = state;
+		BitmapState state, laststate = BitmapState::Error;
+		for (auto c = i = 0; c < 8; counter[c++] = 0);
+		for (_debugString += "\n\nIMAGES:"; i < frames; ++i)
+			++counter[(int)bitmapState[i]];
+		std::string _memoryString = "\n";
+		for (i = 0; i < frames; ++i, laststate = state)
+			if ((state = bitmapState[i]) != laststate) {
+				_memoryString += (li == i - 1 ? std::to_string(li) : std::to_string(li) + "-" + std::to_string(i - 1)) + ": " + GetBitmapState(laststate) + "\n";
+				li = i;
 			}
-			++counter[(int)state];
-			++b;
-		}
-		if (bitmapState[bitmapsFinished] > BitmapState::Queued)
-			_memoryString += "-" + std::to_string(b - 1) + ": " + GetBitmapState(laststate);
-		for (int c = 0; c < 9; ++c)
+		_memoryString += (li == i - 1 ? std::to_string(li) : std::to_string(li) + "-" + std::to_string(i - 1)) + ": " + GetBitmapState(laststate);
+		for (int c = 0; c < 8; ++c)
 			_debugString += "\n" + std::to_string(counter[c]) + "x: " + GetBitmapState((BitmapState)c);
-		_debugString += "\n" + _memoryString;
-		debugString = b < frames ? _debugString + "\n" + std::to_string(b) + "+: " + "QUEUED" : _debugString;
+		_debugString += "\n\nANIMATION:" + _memoryString;
+		debugString = i < frames ? _debugString + "\n" + std::to_string(i) + "+: " + "QUEUED" : _debugString;
 	}
 #pragma endregion
 

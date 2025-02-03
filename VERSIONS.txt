@@ -1,3 +1,8 @@
+1.84
+- bugfixes
+- Encode GIF => Local GIF
+- Global GIF = global color table (much faster, analyzes a global color map from only the first frame, not recommended for hue shifting)
+
 1.83
 - restart button
 - random options

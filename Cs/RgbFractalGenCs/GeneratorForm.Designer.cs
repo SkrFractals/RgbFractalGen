@@ -665,7 +665,7 @@
 			// encodeSelect
 			// 
 			encodeSelect.FormattingEnabled = true;
-			encodeSelect.Items.AddRange(new object[] { "Only Image", "Animation RAM", "Encode GIF" });
+			encodeSelect.Items.AddRange(new object[] { "Only Image", "Animation RAM", "Local GIF", "Global GIF" });
 			encodeSelect.Location = new System.Drawing.Point(165, 522);
 			encodeSelect.Name = "encodeSelect";
 			encodeSelect.Size = new System.Drawing.Size(135, 23);
@@ -760,7 +760,7 @@
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.83";
+			Text = "RGB Fractal Zoom Generator C# v1.84";
 			FormClosing += GeneratorForm_FormClosing;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();
