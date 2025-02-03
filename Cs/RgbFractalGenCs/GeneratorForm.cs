@@ -356,7 +356,8 @@ public partial class GeneratorForm : Form {
 	#region Input
 	private static short Parse(TextBox BOX) => short.TryParse(BOX.Text, out var v) ? v : (short)0;
 	private static T Clamp<T>(T NEW, T MIN, T MAX) where T : struct, IComparable<T> => NEW.CompareTo(MIN) < 0 ? MIN : NEW.CompareTo(MAX) > 0 ? MAX : NEW;
-	private static short Retext(TextBox BOX, short NEW) { BOX.Text = NEW == 0 ? (short.TryParse(BOX.Text, out short t) ? "" : BOX.Text) : NEW.ToString(); return NEW; }
+	private static short Retext(TextBox BOX, short NEW) {
+		BOX.Text = NEW == 0 ? (short.TryParse(BOX.Text, out _) ? "" : BOX.Text) : NEW.ToString(); return NEW; }
 	private static T Mod<T>(T NEW, T MIN, T MAX) where T : struct, IComparable<T> {
 		var D = (dynamic)MAX - MIN; while (NEW.CompareTo(MIN) < 0) NEW = (T)(NEW + D); while (NEW.CompareTo(MAX) > 0) NEW = (T)(NEW - D); return NEW;
 	}
