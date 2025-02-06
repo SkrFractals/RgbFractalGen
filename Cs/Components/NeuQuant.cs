@@ -448,41 +448,42 @@ namespace Gif.Components {
 			step = len < minpicturebytes ? 3 : ((len % prime1) != 0 ? 3 * prime1 : ((len % prime2) != 0 ? 3 * prime2 : ((len % prime3) != 0 ? 3 * prime3 : 3 * prime4)));
 			i = pix = 0;
 			samplepixels /= factor;
+			try {
+				for (int x = 0; x < factor; ++x) {
+					if (token.IsCancellationRequested)
+						return true;
+					for (int y = 0; y < samplepixels; ++y) {
 
-			for (int x = 0; x < factor; ++x) {
-				if (token.IsCancellationRequested)
-					return true;
-				for (int y = 0; y < samplepixels; ++y) {
+						f = ani[pix / lengthcount];
+						modpix = pix % lengthcount;
 
-					f = ani[pix / lengthcount];
-					modpix = pix % lengthcount;
-
-					// we don't need & 0xff for bytes
-					if (f.ptr != null) {
-						r = (f.ptr[modpix + 0] /*& 0xff*/) << netbiasshift;
-						g = (f.ptr[modpix + 1] /*& 0xff*/) << netbiasshift;
-						b = (f.ptr[modpix + 2] /*& 0xff*/) << netbiasshift;
-					} else {
-						r = (f.arr[modpix + 0] /*& 0xff*/) << netbiasshift;
-						g = (f.arr[modpix + 1] /*& 0xff*/) << netbiasshift;
-						b = (f.arr[modpix + 2] /*& 0xff*/) << netbiasshift;
+						// we don't need & 0xff for bytes
+						if (f.ptr != null) {
+							r = (f.ptr[modpix + 0] /*& 0xff*/) << netbiasshift;
+							g = (f.ptr[modpix + 1] /*& 0xff*/) << netbiasshift;
+							b = (f.ptr[modpix + 2] /*& 0xff*/) << netbiasshift;
+						} else {
+							r = (f.arr[modpix + 0] /*& 0xff*/) << netbiasshift;
+							g = (f.arr[modpix + 1] /*& 0xff*/) << netbiasshift;
+							b = (f.arr[modpix + 2] /*& 0xff*/) << netbiasshift;
+						}
+						Altersingle(alpha, j = Contest(b, g, r), b, g, r);
+						if (rad != 0)
+							Alterneigh(rad, j, b, g, r); /* alter neighbours */
+						if ((pix += step) >= lim)
+							pix -= lengthcount;
+						if ((++i) % delta != 0)
+							continue;
+						alpha -= alpha / alphadec;
+						rad = (radius -= radius / radiusdec) >> radiusbiasshift;
+						if (rad <= 1)
+							rad = 0;
+						rad2 = rad * rad;
+						for (j = 0; j < rad; ++j)
+							radpower[j] = alpha * (((rad2 - j * j) * radbias) / rad2);
 					}
-					Altersingle(alpha, j = Contest(b, g, r), b, g, r);
-					if (rad != 0)
-						Alterneigh(rad, j, b, g, r); /* alter neighbours */
-					if ((pix += step) >= lim)
-						pix -= lengthcount;
-					if ((++i) % delta != 0)
-						continue;
-					alpha -= alpha / alphadec;
-					rad = (radius -= radius / radiusdec) >> radiusbiasshift;
-					if (rad <= 1)
-						rad = 0;
-					rad2 = rad * rad;
-					for (j = 0; j < rad; ++j)
-						radpower[j] = alpha * (((rad2 - j * j) * radbias) / rad2);
 				}
-			}
+			} catch (Exception) { }
 			return false;
 		}
 

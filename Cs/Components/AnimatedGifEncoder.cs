@@ -849,7 +849,7 @@ namespace Gif.Components {
 						ok = Output(filename);
 					if (closeStream)
 						ms?.Close();
-				} catch (IOException) {
+				} catch (Exception) {
 					ok = false;
 				}
 				finishedAnimation = firstFrame = true;
@@ -880,11 +880,13 @@ namespace Gif.Components {
 					WritePalette(writeTask.colorTab); // local color table
 				WritePixels(writeTask); // encode and write pixel data
 				++finishedFrame;
-			} catch (IOException) {
+			} catch (Exception) {
 				ok = false;
 			}
 			firstFrame = false;
 			if (prevWrite == null) {
+				if (writeTaskData == null) 
+					return Components.TryWrite.Failed;
 				// Now that I wrote the frame, I can forget the task data, and move on to the next one.
 				writeTaskData = writeTaskData.nextTask;
 			} else {
