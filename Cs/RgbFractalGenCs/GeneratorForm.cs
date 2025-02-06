@@ -42,6 +42,7 @@ public partial class GeneratorForm : Form {
 	protected bool queueAbort = false;          // Generator abortion queued
 	protected short queueReset = 0;             // Counting time until generator Restart
 	private Task gTask = null;                  // CPU gif thread
+	private int isGifReady = 0;
 
 	// Settings
 	protected bool animated = true;             // Animating preview or paused? (default animating)
@@ -368,7 +369,7 @@ public partial class GeneratorForm : Form {
 			return;
 		// Only Allow GIF Export when generation is finished
 		if (gTask == null) {
-			gifButton.Enabled = aTask == null && generator.IsGifReady();
+			gifButton.Enabled = aTask == null && (isGifReady = generator.IsGifReady()) > 0;
 			gifButton.Text = "Save GIF";
 		} else if (gifButton.Text != "Cancel Saving GIF") {
 			gifButton.Enabled = true;
@@ -445,7 +446,7 @@ public partial class GeneratorForm : Form {
 				e.Cancel = true;
 			return;
 		}
-		if (gifButton.Enabled && width > 80 && height > 80) {
+		if (isGifReady > 80) {
 			var result = MessageBox.Show(
 				"You have encoded gif available to save.\nDo you want to save it?",
 				"Confirm Exit",
@@ -511,7 +512,7 @@ public partial class GeneratorForm : Form {
 			return;
 		if (queueReset <= 0) {
 
-			if (gifButton.Enabled && width > 80 && height > 80) {
+			if (isGifReady > 80) {
 				var result = MessageBox.Show(
 					"You have encoded gif available to save.\nDo you want to save it?\nCacenl will turn off gif encoding so you won't keep getting this warning again.",
 					"Saave GIF",
@@ -752,7 +753,7 @@ public partial class GeneratorForm : Form {
 	private void EncodeSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		var prev = generator.selectGenerationType;
 		if ((generator.selectGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex)) >= FractalGenerator.GenerationType.EncodeGIF
-			&& (!generator.IsGifReady() || prev != generator.selectGenerationType)
+			&& (0 == (isGifReady = generator.IsGifReady()) || prev != generator.selectGenerationType)
 		) QueueReset();
 	}
 	private void HelpButton_Click(object sender, EventArgs e) {
@@ -828,7 +829,7 @@ public partial class GeneratorForm : Form {
 	/// <returns></returns>
 	private void ExportGif() {
 		var attempt = 0;
-		while (++attempt <= 10 && !cancel.Token.IsCancellationRequested && generator.SaveGif(gifPath))
+		while (++attempt <= 10 && !cancel.Token.IsCancellationRequested && generator.SaveGif(gifPath) > 0)
 			Thread.Sleep(1000);
 		gTask = null;
 	}

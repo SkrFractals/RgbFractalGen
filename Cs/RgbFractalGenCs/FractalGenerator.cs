@@ -187,7 +187,7 @@ internal class FractalGenerator {
 	// Export
 	private AnimatedGifEncoder 
 		gifEncoder;					// Export GIF encoder
-	private bool gifSuccess;        // Temp GIF file "gif.tmp" successfuly created
+	private int gifSuccess;        // Temp GIF file "gif.tmp" successfuly created
 	private string gifTempPath;		// Temporary GIF file name
 	private System.Drawing.Rectangle 
 		rect;                       // Bitmap rectangle TODO implement
@@ -243,7 +243,7 @@ internal class FractalGenerator {
 		allocatedFrames = selectSpin = selectHue = selectFractal = selectChildColor = selectChildAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks =  -1;
 		gifEncoder = null;
 		bitmap = null;
-		gifSuccess = false;
+		gifSuccess = 0;
 		//taskSnapshot = [];
 		// Constants
 		float pi = MathF.PI, pi23 = 2 * pi / 3, pi43 = 4 * pi / 3, SYMMETRIC = 2 * pi,
@@ -1521,7 +1521,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 		startTime.Start();
 #endif
 		// Open a temp file to presave GIF to - Use AnimatedGifEncoder
-		gifSuccess = false;
+		gifSuccess = 0;
 		gifEncoder = null;
 		hash.Clear();
 		if (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam) {
@@ -1656,7 +1656,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				} catch (Exception) { }
 			}
 		// Save the temp GIF file
-		gifSuccess = false;
+		gifSuccess = 0;
 		if (!cancel.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null && gifEncoder.Finish()) {
 			while (/*!cancel.Token.IsCancellationRequested && */gifEncoder != null) {
 
@@ -1684,7 +1684,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					//	++bitmapsFinished;
 					break;
 					case TryWrite.FinishedAnimation:
-						gifSuccess = true;
+						gifSuccess = Math.Max(selectWidth, selectHeight);
 						// This will follow with gifEncoder.IsFinished()
 						break;
 				}
@@ -1759,7 +1759,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			mainTask?.Wait();
 		} catch (Exception) { }
 	}
-	internal bool SaveGif(string gifPath) {
+	internal int SaveGif(string gifPath) {
 		try {
 			// Try to save (move the temp) the gif file
 			gifEncoder?.Finish();
@@ -1771,21 +1771,21 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 #if CUSTOMDEBUG
 			Log(ref logString, exs);
 #endif
-			return true;
+			return gifSuccess;
 		} catch (UnauthorizedAccessException ex) {
 			var exs = "SaveGif: Access denied: " + ex.Message;
 #if CUSTOMDEBUG
 			Log(ref logString, exs);
 #endif
-			return true;
+			return gifSuccess;
 		} catch (Exception ex) {
 			var exs = "SaveGif: Unexpected error: " + ex.Message;
 #if CUSTOMDEBUG
 			Log(ref logString, exs);
 #endif
-			return true;
+			return gifSuccess;
 		}
-		return gifSuccess = false;
+		return gifSuccess = 0;
 	}
 #if CUSTOMDEBUG
 	private void Log(ref string log, string line) {
@@ -1955,7 +1955,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal int GetBitmapsFinished() => bitmapsFinished;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal bool IsGifReady() => gifSuccess;
+	internal int IsGifReady() => gifSuccess;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	//GetTempGif();
 	internal Fractal.CutFunction GetCutFunction() 
