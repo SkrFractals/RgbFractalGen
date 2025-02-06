@@ -511,7 +511,7 @@ public partial class GeneratorForm : Form {
 			return;
 		if (queueReset <= 0) {
 
-			if (gifButton.Enabled) {
+			if (gifButton.Enabled && width > 80 && height > 80) {
 				var result = MessageBox.Show(
 					"You have encoded gif available to save.\nDo you want to save it?\nCacenl will turn off gif encoding so you won't keep getting this warning again.",
 					"Saave GIF",
