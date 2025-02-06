@@ -20,21 +20,23 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
+using System.Reflection.Metadata;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal class FractalGenerator {
 
 	private enum BitmapState : byte {
-		Queued = 0,		// Hasn't even started generating the dots yet (and it might stay this way if OnlyImage)
-		Dots = 1,		// Started Generating Dots
-		Void = 2,		// Started Dijksring the Void
-		Drawing = 3,    // Started drawing
-		DrawingFinished = 4,	// Finished drawing
-		Encoding = 5,	// Started Encoding
-		Finished = 6,   // Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
-		Unlocked = 7,   // Unlocked bitmap
-		Error = 8		// Unused, unless error obviously
+		Queued = 0,			// Hasn't even started generating the dots yet (and it might stay this way if OnlyImage)
+		Dots = 1,			// Started Generating Dots
+		Void = 2,			// Started Dijksring the Void
+		Drawing = 3,		// Started drawing
+		DrawingFinished = 4,// Finished drawing
+		UnlockedRAM = 5,    // Unlocked bitmap without encoding
+		Encoding = 6,		// Started Encoding
+		Finished = 7,		// Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
+		Unlocked = 8,		// Unlocked bitmap
+		Error = 9			// Unused, unless error obviously
 	}
 	private enum TaskState : byte {
 		Free = 0,	// The task has not been started yet, or already finished and joined and ready to be started again
@@ -60,7 +62,8 @@ internal class FractalGenerator {
 		internal Task task;				// Parallel Animation Tasks
 		internal TaskState state;		// States of Animation Tasks
 		internal Vector3[][] buffer;    // Buffer for points to print into bmp
-		internal short[][] voidDepth;	// Depths of Void
+		internal short[][] voidDepth;   // Depths of Void
+		internal Vector3[][] voidNoise;	// randomized noise samples for the void noise
 		internal Queue<(short, short)> 
 			voidQueue;                  // Void depth calculating Dijktra queue
 		internal Dictionary<long, Vector3[]> F = [];
@@ -69,8 +72,12 @@ internal class FractalGenerator {
 		internal byte huemod;
 		internal bool taskStarted;		// Additional safety, could remove if it never gets triggered for a while
 		internal short taskIndex;           // The task index
-		internal int bitmapIndex;		// The bitmapIndex of which the task is working on
-		//internal BitmapState type;		// 0 = gen, 1 = gif
+		internal int bitmapIndex;       // The bitmapIndex of which the task is working on
+		internal short applyWidth, applyHeight; // can be smaller for previews
+		internal short widthBorder, heightBorder; // slightly below the width and height
+		internal float rightEnd, downEnd;	// slightly beyond width and depth, to ensure even bloomed pixels don't cutoff too early
+		internal float lightNormalizer;	// maximum brightness found in the buffer, for normalizing the final image brightness
+		internal float voidDepthMax;	// maximum reached void depth during the dijkstra search, for normalizing the void intensity
 
 		internal (float, float, (float, float)[])[]
 			preIterate;					// (childSize, childDetail, childSpread, (childX,childY)[])
@@ -106,7 +113,6 @@ internal class FractalGenerator {
 					task = null;
 				}// else { }
 			}// else { }
-			
 		}
 	}
 
@@ -133,22 +139,19 @@ internal class FractalGenerator {
 	// Resolution
 	private short allocatedWidth;	// How much buffer width is currently allocated?
 	private short allocatedHeight;	// How much buffer height is currently allocated?
-	private short widthBorder;		// Precomputed maximum x coord fot pixel input
-	private short heightBorder;		// Precomputed maximum y coord for pixel input
 	private float upleftStart;		// Precomputed minimum x/y for dot iteration/application
-	private float rightEnd;			// Precomputed maximum -x- for dot iteration/application
-	private float downEnd;			// Precomputed maximum -y- for dot iteration/application
 
 	// Frames
-	private Bitmap[] bitmap;			// Prerender as an array of bitmaps
+	private Bitmap[] bitmap;            // Prerender as an array of bitmaps
 	private BitmapState[] bitmapState;	// 0 - not exists, 1 - generating and not exists, 2 - spawned and locked, 3 - finished drawing locked, 4 - started gif locked, 5 - finished unlocked
 	private BitmapData[] bitmapData;	// Locked Bits for bitmaps
 	private short finalPeriodMultiplier;// How much will the period get finally stretched? (calculated for seamless + user multiplier)
 	private short debug;				// Debug frame count override
-	private int bitmapsFinished;      // How many bitmaps are completely finished generating? (ready to display, encoded if possible)
+	private int bitmapsFinished;        // How many bitmaps are completely finished generating? (ready to display, encoded if possible)
+	private int previewFrames;
 	//private short bitmapToEncode;		// How many bitmaps haave at least begun encoding?
-	private int nextBitmap;			// How many bitmaps have started generating? (next task should begin with this one)
-	private int allocatedFrames;      // How many bitmap frames are currently allocated?
+	private int nextBitmap;				// How many bitmaps have started generating? (next task should begin with this one)
+	private int allocatedFrames;		 // How many bitmap frames are currently allocated?
 	private short applyZoom;            // Applied zoom (selected or random)
 	private GenerationType applyGenerationType;
 
@@ -225,11 +228,11 @@ internal class FractalGenerator {
 	internal GenerationType 
 		selectGenerationType;			// 0 = Only Image, 1 = Animation, 2 = Animation + GIF
 	internal int cutparamMaximum;		// Maximum seed for the selected CutFunction
-
+	internal bool restartGif = false;	// Makes me restart the gif encoder (called when delay is changed, which should restart the encoder, but not toss the finished bitmaps)
 
 	internal bool debugmode = false;
 	internal string debugString = "";
-	private readonly short[] counter = new short[9];
+	private readonly short[] counter = new short[10];
 	public readonly Dictionary<string, int> hash = [];
 	private readonly Dictionary<long, Vector3[]> colorBlends = [];
 	private int startCutParam;
@@ -702,18 +705,34 @@ internal class FractalGenerator {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static Vector3 Z(Vector3 X) => new(X.Y, X.Z, X.X);
 	private void GenerateAnimation() {
-		
+
 		#region InitData
-		void NewBuffer(FractalTask task) {
+		void NewBuffer(FractalTask task, int vw, int vh) {
 			var voidT = task.voidDepth = new short[selectHeight][];
 			var buffT = task.buffer = new Vector3[selectHeight][];
+			var noiseT = task.voidNoise = new Vector3[vh][];
 			for (var y = 0; y < selectHeight; voidT[y++] = new short[selectWidth]) {
 				var buffY = buffT[y] = new Vector3[selectWidth];
 				for (var x = 0; x < selectWidth; buffY[x++] = Vector3.Zero) ;
 			}
+			for (var y = 0; y < vh; noiseT[y++] = new Vector3[vw]) ;
 		}
 		#endregion
 		#region GenerateTasks
+		void PreviewResolution(FractalTask task) {
+			if (task.bitmapIndex < previewFrames) {
+				int div = 1 << (previewFrames - task.bitmapIndex);
+				task.applyWidth = (short)(selectWidth / div);
+				task.applyHeight = (short)(selectHeight / div);
+			} else {
+				task.applyWidth = selectWidth;
+				task.applyHeight = selectHeight;
+			}
+			task.widthBorder = (short)(task.applyWidth - 2);
+			task.heightBorder = (short)(task.applyHeight - 2);
+			task.rightEnd = task.widthBorder + bloom1;
+			task.downEnd = task.heightBorder + bloom1;
+		}
 		void PregenerateParam(int bitmapIndex, Dictionary<long, Vector3[]> blends, ref int startParam) {
 			int[] m;
 			startParam = applyGenerationType switch {
@@ -775,7 +794,7 @@ internal class FractalGenerator {
 				var dotColor = Vector3.Lerp(task.H[key][colorindex], task.I[colorindex], inDetail);
 				var buffT = task.buffer;
 				// Iterated deep into a single point - Interpolate inbetween 4 pixels and Stop
-				int startX = Math.Max(1, (int)MathF.Floor(inX - selectBloom)), endX = Math.Min(widthBorder, (int)MathF.Ceiling(inX + selectBloom)), endY = Math.Min(heightBorder, (int)MathF.Ceiling(inY + selectBloom));
+				int startX = Math.Max(1, (int)MathF.Floor(inX - selectBloom)), endX = Math.Min(task.widthBorder, (int)MathF.Ceiling(inX + selectBloom)), endY = Math.Min(task.heightBorder, (int)MathF.Ceiling(inY + selectBloom));
 				for (int x, y = Math.Max(1, (int)MathF.Floor(inY - selectBloom)); y <= endY; ++y) {
 					var yd = bloom1 - MathF.Abs(y - inY);
 					var buffY = buffT[y];
@@ -785,9 +804,9 @@ internal class FractalGenerator {
 			}
 			
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			bool TestSize(float newX, float newY, float inSize) {
+			bool TestSize(FractalTask task, float newX, float newY, float inSize) {
 				var testSize = inSize * f.cutSize;
-				return Math.Min(newX, newY) + testSize > upleftStart && newX - testSize < rightEnd && newY - testSize < downEnd;
+				return Math.Min(newX, newY) + testSize > upleftStart && newX - testSize < task.rightEnd && newY - testSize < task.downEnd;
 			}
 			#endregion
 			#region GenerateDots
@@ -812,7 +831,7 @@ internal class FractalGenerator {
 							continue;
 						var XY = preIterated.Item3[i];
 						var newXY = NewXY(inXY, XY, inAngle.Item1);
-						if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1))
+						if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1))
 							ApplyDot(i + f.childCount * (newFlags & ((1 << f.childCount) - 1)),task,newXY.Item1,newXY.Item2,newPreIterated.Item2, (byte)((inColor + childColor[i]) % 3));
 					}
 				} else {
@@ -826,7 +845,7 @@ internal class FractalGenerator {
 						// Outside View
 						var XY = preIterated.Item3[i];
 						var newXY = NewXY(inXY, XY, inAngle.Item1);
-						if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1))
+						if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1))
 							GenerateDots_SingleTask(taskIndex, newXY,
 								i == 0
 								? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2)
@@ -866,7 +885,7 @@ internal class FractalGenerator {
 						// Outside View
 						var XY = preIterated.Item3[i];
 						var newXY = NewXY(inXY, XY, inAngle.Item1);
-						if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1))
+						if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1))
 							tuples[insertTo++] = (taskIndex, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
 						insertTo %= max;
 					}
@@ -908,7 +927,7 @@ internal class FractalGenerator {
 					// Outside View
 					var XY = preIterated.Item3[i];
 					var newXY = NewXY(inXY, XY, inAngle.Item1);
-					if (TestSize(newXY.Item1, newXY.Item2, preIterated.Item1)) {
+					if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1)) {
 						if (imageTasks != null && imageTasks.Count < applyMaxGenerationTasks && inDepth < maxDepth) {
 							int index = i;
 							imageTasks.Add(Task.Run(() => GenerateDots_OfRecursion(taskIndex, newXY, index == 0 ? (inAngle.Item1 + childAngle[index] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[index], inAngle.Item2), (byte)((inColor + childColor[index]) % 3), newFlags, inDepth)));
@@ -928,10 +947,12 @@ internal class FractalGenerator {
 			var taskIndex = (short)(Math.Abs(stateIndex)-1);
 			var state = stateIndex < 0 ? null : tasks[stateIndex-1];
 			var task = tasks[taskIndex];
+			task.bitmapIndex = bitmapIndex;
 			var buffT = task.buffer;
-			for (var y = 0; y < selectHeight; ++y) {
+			PreviewResolution(task);
+			for (var y = 0; y < task.applyHeight; ++y) {
 				var buffY = buffT[y];
-				for (var x = 0; x < selectWidth; buffY[x++] = Vector3.Zero) ;
+				for (var x = 0; x < task.applyWidth; buffY[x++] = Vector3.Zero) ;
 			}
 
 #if CUSTOMDEBUG
@@ -1016,7 +1037,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				// TODO shift
 
 				/*var fp = f.childSize;
-				var w = Math.Max(selectWidth, selectHeight) * f.maxSize;
+				var w = Math.Max(task.applyWidth, task.applyHeight) * f.maxSize;
 
 				// Calculate how far the zoomed child is from the parent center
 				float targetX = f.childX[0] * size;  // Scale by size to get the actual offset
@@ -1032,24 +1053,24 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				float addy = shift * rotatedY;*/
 
 				if (applyMaxTasks <= 2 || applyParallelType != ParallelType.OfDepth)
-					GenerateDots_SingleTask(taskIndex, (selectWidth * .5f, selectHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
+					GenerateDots_SingleTask(taskIndex, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
 				else {
-					tuples[0] = (0, (selectWidth * .5f, selectHeight * .5f), (angle, spin > 1 ? 2 * angle : 0), color, startParam, 0);
+					tuples[0] = (0, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, spin > 1 ? 2 * angle : 0), color, startParam, 0);
 					GenerateDots_OfDepth(bitmapIndex);
 				}
 				// OfRecursion is deprecated, use OfDepth instead, it's better anyway
 				/*if (applyMaxTasks <= 2)
-					GenerateDots_SingleTask(taskIndex, (selectWidth * .5f, selectHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
+					GenerateDots_SingleTask(taskIndex, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
 				else switch (applyParallelType) {
 						default:
-							GenerateDots_SingleTask(taskIndex, (selectWidth * .5f, selectHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
+							GenerateDots_SingleTask(taskIndex, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
 							break;
 						case 1:
-							tuples[0] = (0, (selectWidth * .5f, selectHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
+							tuples[0] = (0, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
 							GenerateDots_OfDepth();
 							break;
 						case 2:
-							GenerateDots_OfRecursion(taskIndex, (selectWidth * .5f, selectHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
+							GenerateDots_OfRecursion(taskIndex, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
 							if (imageTasks == null)
 								return;
 							// Wait for image parallelism threads to complete
@@ -1069,7 +1090,8 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 								//Thread.Sleep(10);
 							}
 							break;*/
-				IncFrameParameters(ref size, ref angle, spin, ref hueAngle, applyBlur);
+				if(bitmapIndex >= previewFrames)
+					IncFrameParameters(ref size, ref angle, spin, ref hueAngle, applyBlur);
 				if (cancel.IsCancellationRequested) {
 					if (state != null)
 						state.state = TaskState.Done;
@@ -1100,11 +1122,13 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 #endif
 			// Generate the grey void areas
 			bitmapState[task.bitmapIndex] = BitmapState.Void;
+			PreviewResolution(task);
 			var voidT = task.voidDepth;
 			var buffT = task.buffer;
 			var queueT = task.voidQueue;
-			float lightNormalizer = 0.1f, voidDepthMax = 1.0f;
-			short voidYX, w1 = (short)(selectWidth - 1), h1 = (short)(selectHeight - 1);
+			task.lightNormalizer = 0.1f;
+			task.voidDepthMax = 1.0f;
+			short voidYX, w1 = (short)(task.applyWidth - 1), h1 = (short)(task.applyHeight - 1);
 			if (selectAmbient > 0) {
 				// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
 				float lightMax;
@@ -1118,7 +1142,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					var buffY = buffT[y];
 					for (short x = 1; x < w1; ++x) {
 						var buffYX = buffY[x];
-						lightNormalizer = MathF.Max(lightNormalizer, lightMax = MathF.Max(buffYX.X, MathF.Max(buffYX.Y, buffYX.Z)));
+						task.lightNormalizer = MathF.Max(task.lightNormalizer, lightMax = MathF.Max(buffYX.X, MathF.Max(buffYX.Y, buffYX.Z)));
 						if (lightMax > 0) {
 							voidY[x] = 0;
 							queueT.Enqueue((y, x));
@@ -1130,7 +1154,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				}
 				var void0 = voidT[0];
 				var voidH = voidT[h1];
-				for (short x = 0; x < selectWidth; ++x) {
+				for (short x = 0; x < task.applyWidth; ++x) {
 					void0[x] = voidH[x] = 0;
 					queueT.Enqueue((0, x));
 					queueT.Enqueue((h1, x));
@@ -1141,25 +1165,25 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					(var y, var x) = queueT.Dequeue();
 					short ym = (short)(y - 1), yp = (short)(y + 1), xm = (short)(x - 1), xp = (short)(x + 1);
 					voidMax = Math.Max(voidMax, voidYX = (short)(voidT[y][x] + 1));
-					if (xp < selectWidth && voidT[y][xp] == -1) { voidT[y][xp] = voidYX; queueT.Enqueue((y, xp)); }
-					if (yp < selectHeight && voidT[yp][x] == -1) { voidT[yp][x] = voidYX; queueT.Enqueue((yp, x)); }
+					if (xp < task.applyWidth && voidT[y][xp] == -1) { voidT[y][xp] = voidYX; queueT.Enqueue((y, xp)); }
+					if (yp < task.applyHeight && voidT[yp][x] == -1) { voidT[yp][x] = voidYX; queueT.Enqueue((yp, x)); }
 					if (xm >= 0 && voidT[y][xm] == -1) { voidT[y][xm] = voidYX; queueT.Enqueue((y, xm)); }
 					if (ym >= 0 && voidT[ym][x] == -1) { voidT[ym][x] = voidYX; queueT.Enqueue((ym, x)); }
 				}
-				voidDepthMax = voidMax;
+				task.voidDepthMax = voidMax;
 			} else
-				for (short y = 0; y < selectHeight; ++y) {
+				for (short y = 0; y < task.applyHeight; ++y) {
 					if (cancel.IsCancellationRequested) {
 						task.state = TaskState.Done;
 						return;
 					}
 					var buffY = buffT[y];
-					for (short x = 0; x < selectWidth; ++x) {
+					for (short x = 0; x < task.applyWidth; ++x) {
 						var buffYX = buffY[x];
-						lightNormalizer = MathF.Max(lightNormalizer, MathF.Max(buffYX.X, MathF.Max(buffYX.Y, buffYX.Z)));
+						task.lightNormalizer = MathF.Max(task.lightNormalizer, MathF.Max(buffYX.X, MathF.Max(buffYX.Y, buffYX.Z)));
 					}
 				}
-			lightNormalizer = selectBrightness * 2.55f / lightNormalizer;
+			task.lightNormalizer = selectBrightness * 2.55f / task.lightNormalizer;
 			if (cancel.IsCancellationRequested) {
 				task.state = TaskState.Done;
 				return;
@@ -1171,7 +1195,6 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			drawTime.Start();
 #endif
 			// Draw the generated pixel to bitmap data
-			//GenerateBitmap(bitmapIndex, buffT, voidT, lightNormalizer, voidDepthMax);
 			unsafe {
 				#region GenerateBitmap_Inline
 				Vector3 ApplyAmbientNoise(Vector3 rgb, float Amb, float Noise, Vector3 rand/*Random rand*/) {
@@ -1206,80 +1229,76 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					return lightNormalizer * max > 254.0f ? (254.0f / max) * pixel : lightNormalizer * pixel;
 				}
 				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				void NoiseSaturate(Vector3[][] voidNoise, Vector3[] buffY, short[] voidY, int y, ref byte* p, /*Random rand,*/ float lightNormalizer, float voidDepthMax) {
-
-					float fy = (float)y / selectVoid;
+				void NoiseSaturate(FractalTask task, int y, ref byte* p) {
+					var voidY = task.voidDepth[y];
+					var buffY = task.buffer[y];
+					var fy = (float)y / selectVoid;
 					int startY = (int)MathF.Floor(fy);
-					float alphaY = fy - startY;
-					//if (selectAmbient <= 0)
-					//	for (var x = 0; x < selectWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
+					var alphaY = fy - startY;
+					//if (selectAmbient <= 0) // noise is always 0 if ambient is zero, so it should't even get to this function
+					//	for (var x = 0; x < task.applyWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
 					//else 
-					for (var x = 0; x < selectWidth; ++x) {
-						var voidAmb = voidY[x] / voidDepthMax;
-
-						float fx = (float)x / selectVoid;
+					for (var x = 0; x < task.applyWidth; ++x) {
+						var voidAmb = voidY[x] / task.voidDepthMax;
+						var fx = (float)x / selectVoid;
 						int startX = (int)MathF.Floor(fx);
-						float alphaX = fx - startX;
-
-						var vy0 = voidNoise[startY];
-						var vy1 = voidNoise[startY + 1];
-
-						ApplyRGBToBytePointer(ApplyAmbientNoise(ApplySaturate(Normalize(buffY[x], lightNormalizer)), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb,
-							alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX]) + (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * voidNoise[startY][startX])), ref p);
+						var alphaX = fx - startX;
+						var vy0 = task.voidNoise[startY];
+						var vy1 = task.voidNoise[startY + 1];
+						ApplyRGBToBytePointer(ApplyAmbientNoise(ApplySaturate(Normalize(buffY[x], task.lightNormalizer)), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb,
+							alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX]) + (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * vy0[startX])), ref p);
 					}
 				}
 				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				void NoiseNoSaturate(Vector3[][] voidNoise, Vector3[] buffY, short[] voidY, int y, ref byte* p/*, Random rand*/, float lightNormalizer, float voidDepthMax) {
-
-					float fy = (float)y / selectVoid;
+				void NoiseNoSaturate(FractalTask task, int y, ref byte* p) {
+					var voidY = task.voidDepth[y];
+					var buffY = task.buffer[y];
+					var fy = (float)y / selectVoid;
 					int startY = (int)MathF.Floor(fy);
-					float alphaY = fy - startY;
-
-					//if (selectAmbient <= 0)
-					//	for (var x = 0; x < selectWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), ref p)) ;
+					var alphaY = fy - startY;
+					//if (selectAmbient <= 0) // noise is always 0 if ambient is zero, so it should't even get to this function
+					//	for (var x = 0; x < task.applyWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), ref p)) ;
 					//else 
 					for (var x = 0; x < selectWidth; ++x) {
-						var voidAmb = voidY[x] / voidDepthMax;
-						float fx = (float)x / selectVoid;
+						var voidAmb = voidY[x] / task.voidDepthMax;
+						var fx = (float)x / selectVoid;
 						int startX = (int)MathF.Floor(fx);
-						float alphaX = fx - startX;
-
-						var vy0 = voidNoise[startY];
-						var vy1 = voidNoise[startY + 1];
-
-						ApplyRGBToBytePointer(ApplyAmbientNoise(Normalize(buffY[x], lightNormalizer), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb,
-							alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX]) + (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * voidNoise[startY][startX])), ref p);
+						var alphaX = fx - startX;
+						var vy0 = task.voidNoise[startY];
+						var vy1 = task.voidNoise[startY + 1];
+						ApplyRGBToBytePointer(ApplyAmbientNoise(Normalize(buffY[x], task.lightNormalizer), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb,
+							alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX]) + (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * vy0[startX])), ref p);
 					}
 				}
 				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				void NoNoiseSaturate(Vector3[] buffY, short[] voidY, ref byte* p, float lightNormalizer, float voidDepthMax) {
-					if (selectAmbient <= 0)
-						for (var x = 0; x < selectWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
-					else for (var x = 0; x < selectWidth; ++x)
-							ApplyRGBToBytePointer(new Vector3(selectAmbient * voidY[x] / voidDepthMax) + ApplySaturate(Normalize(buffY[x], lightNormalizer)), ref p);
+				void NoNoiseSaturate(FractalTask task, int y, ref byte* p) {
+					var buffY = task.buffer[y];
+					if (selectAmbient > 0) {
+						var voidY = task.voidDepth[y];
+						for (var x = 0; x < task.applyWidth; ++x)
+							ApplyRGBToBytePointer(new Vector3(selectAmbient * voidY[x] / task.voidDepthMax) + ApplySaturate(Normalize(buffY[x], task.lightNormalizer)), ref p);
+					} else for (var x = 0; x < task.applyWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], task.lightNormalizer)), ref p)) ;
 				}
 				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				void NoNoiseNoSaturate(Vector3[] buffY, short[] voidY, ref byte* p, float lightNormalizer, float voidDepthMax) {
-					if (selectAmbient <= 0) for (var x = 0; x < selectWidth; x++)
-							ApplyRGBToBytePointer(Normalize(buffY[x], lightNormalizer), ref p);
-					else for (var x = 0; x < selectWidth; ++x)
-							ApplyRGBToBytePointer(new Vector3(selectAmbient * voidY[x] / voidDepthMax) + Normalize(buffY[x], lightNormalizer), ref p);
+				void NoNoiseNoSaturate(FractalTask task, int y, ref byte* p) {
+					var buffY = task.buffer[y];
+					if (selectAmbient > 0) {
+						var voidY = task.voidDepth[y];
+						for (var x = 0; x < task.applyWidth; ++x)
+							ApplyRGBToBytePointer(new Vector3(selectAmbient * voidY[x] / task.voidDepthMax) + Normalize(buffY[x], task.lightNormalizer), ref p);
+					} else for (var x = 0; x < task.applyWidth; x++)
+							ApplyRGBToBytePointer(Normalize(buffY[x], task.lightNormalizer), ref p);
 				}
 				#endregion
 				// Make a locked bitmap, remember the locked state
-				var p = (byte*)(void*)(bitmapData[task.bitmapIndex] = (bitmap[task.bitmapIndex] = new(selectWidth, selectHeight)).LockBits(rect,
+				var p = (byte*)(void*)(bitmapData[task.bitmapIndex] = (bitmap[task.bitmapIndex] = new(task.applyWidth, task.applyHeight)).LockBits(task.bitmapIndex < previewFrames ? new Rectangle(0,0,task.applyWidth, task.applyHeight) : rect,
 					ImageLockMode.ReadWrite,
 					System.Drawing.Imaging.PixelFormat.Format24bppRgb)).Scan0;
 				bitmapState[task.bitmapIndex] = BitmapState.Drawing;
 				// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
 				// Switch between th selected settings such as saturation, noise, image parallelism...
-				var maxGenerationTasks = (short)Math.Max(1, applyMaxTasks-1);
-
-
-				Vector3[][] voidNoise = new Vector3[selectHeight / selectVoid + 2][];
-
-				int wv = selectWidth / selectVoid + 2;
-
+				var maxGenerationTasks = (short)Math.Max(1, applyMaxTasks - 1);
+				int wv = task.applyWidth / selectVoid + 2;
 				if (applyParallelType > ParallelType.OfAnimation && maxGenerationTasks > 1) {
 					// Multi Threaded
 					var stride = 3 * selectWidth;
@@ -1287,77 +1306,61 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						MaxDegreeOfParallelism = maxGenerationTasks,
 						CancellationToken = cancel.Token
 					};
-
-
-
 					try {
 						if (ambnoise > 0 && applyGenerationType != GenerationType.HashParam) {
 							var threadRand = new ThreadLocal<Random>(() => new(Guid.NewGuid().GetHashCode()));
-
-							Parallel.For(0, selectHeight / selectVoid + 2, po, y => {
+							Parallel.For(0, task.applyHeight / selectVoid + 2, po, y => {
 								var r = threadRand.Value;
-								var v = voidNoise[y] = new Vector3[wv];
+								var v = task.voidNoise[y];// = new Vector3[wv];
 								for (int x = 0; x < wv; ++x)
 									v[x] = new Vector3(r.Next(ambnoise), r.Next(ambnoise), r.Next(ambnoise));
 							});
-
-
-							if (selectSaturate > 0.0) Parallel.For(0, selectHeight, po, y => {
+							if (selectSaturate > 0.0) Parallel.For(0, task.applyHeight, po, y => {
 								var rp = p + y * stride;
-								NoiseSaturate(voidNoise, buffT[y], voidT[y], y, ref rp, /*threadRand.Value,*/ lightNormalizer, voidDepthMax);
+								NoiseSaturate(task, y, ref rp);
 							});
-							else Parallel.For(0, selectHeight, po, y => {
+							else Parallel.For(0, task.applyHeight, po, y => {
 								var rp = p + y * stride;
-								NoiseNoSaturate(voidNoise, buffT[y], voidT[y], y, ref rp, /*threadRand.Value,*/ lightNormalizer, voidDepthMax);
+								NoiseNoSaturate(task, y, ref rp);
 							});
 						} else {
-							if (selectSaturate > 0.0) Parallel.For(0, selectHeight, po, y => {
+							if (selectSaturate > 0.0) Parallel.For(0, task.applyHeight, po, y => {
 								var rp = p + y * stride;
-								NoNoiseSaturate(buffT[y], voidT[y], ref rp, lightNormalizer, voidDepthMax);
+								NoNoiseSaturate(task, y, ref rp);
 							});
-							else Parallel.For(0, selectHeight, po, y => {
+							else Parallel.For(0, task.applyHeight, po, y => {
 								var rp = p + y * stride;
-								NoNoiseNoSaturate(buffT[y], voidT[y], ref rp, lightNormalizer, voidDepthMax);
+								NoNoiseNoSaturate(task, y, ref rp);
 							});
 						}
 					} catch (Exception) { }
 				} else {
 					// Single Threaded
 					if (ambnoise > 0 && applyGenerationType != GenerationType.HashParam) {
-
-						for(int y = 0; y < selectHeight / selectVoid + 2; ++y){
+						for (int y = 0; y < task.applyHeight / selectVoid + 2; ++y) {
 							var r = random;
-							var v = voidNoise[y] = new Vector3[wv];
+							var v = task.voidNoise[y];// = new Vector3[wv];
 							for (int x = 0; x < wv; ++x)
 								v[x] = new Vector3(r.Next(ambnoise), r.Next(ambnoise), r.Next(ambnoise));
 						};
-
-						if (selectSaturate > 0.0) for (short y = 0; y < selectHeight; ++y) {
+						if (selectSaturate > 0.0) for (short y = 0; y < task.applyHeight; NoiseSaturate(task, y++, ref p)) {
 								if (cancel.Token.IsCancellationRequested)
 									break;
-								NoiseSaturate(voidNoise, buffT[y], voidT[y], y, ref p, /*random,*/ lightNormalizer, voidDepthMax);
 							}
-						else for (short y = 0; y < selectHeight; ++y) {
+						else for (short y = 0; y < task.applyHeight; NoiseNoSaturate(task, y++, ref p))
 								if (cancel.Token.IsCancellationRequested)
 									break;
-								NoiseNoSaturate(voidNoise, buffT[y], voidT[y], y, ref p, /*random,*/ lightNormalizer, voidDepthMax);
-							}
 					} else {
-						if (selectSaturate > 0.0) for (short y = 0; y < selectHeight; ++y) {
+						if (selectSaturate > 0.0) for (short y = 0; y < task.applyHeight; NoNoiseSaturate(task, y++, ref p)) {
 								if (cancel.Token.IsCancellationRequested)
 									break;
-								NoNoiseSaturate(buffT[y], voidT[y], ref p, lightNormalizer, voidDepthMax);
 							}
-						else for (short y = 0; y < selectHeight; ++y) {
+						else for (short y = 0; y < task.applyHeight; NoNoiseNoSaturate(task, y++, ref p))
 								if (cancel.Token.IsCancellationRequested)
 									break;
-								NoNoiseNoSaturate(buffT[y], voidT[y], ref p, lightNormalizer, voidDepthMax);
-							}
 					}
 				}
 			}
-			
-
 			if (cancel.IsCancellationRequested) {
 				task.state = TaskState.Done;
 				return;
@@ -1365,28 +1368,47 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 #if CUSTOMDEBUG
 			drawTime.Stop();
 			Log(ref threadString, "Draw:" + task.bitmapIndex + " time = " + drawTime.Elapsed.TotalMilliseconds + " ms.");
+			Monitor.Enter(taskLock);
+			try {
+				voidTimes += voidTime.Elapsed.TotalMilliseconds;
+				drawTimes += drawTime.Elapsed.TotalMilliseconds;
+				Log(ref logString, threadString);
+			} finally { Monitor.Exit(taskLock); }
+#endif
+			if (task.bitmapIndex < previewFrames) {
+				bitmapState[task.bitmapIndex] = BitmapState.Finished;
+				task.state = TaskState.Done;
+			} else {
+				if (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam)
+					GenerateGif(task);
+				else {
+					bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished;
+					task.state = TaskState.Done;
+				}
+			}
+		}
+		void GenerateGif(FractalTask task) {
+#if CUSTOMDEBUG
+			var threadString = "";
 			Stopwatch gifsTime = new(); gifsTime.Start();
 #endif
-			bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished; // Start encoding Frame to a temp GIF	
-			if (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null) {
+			if (gifEncoder != null) {
 				bitmapState[task.bitmapIndex] = BitmapState.Encoding; // Start encoding Frame to a temp GIF	
 				unsafe {
-					gifEncoder.AddFrameParallel((byte*)(void*)bitmapData[task.bitmapIndex].Scan0, cancel.Token, task.bitmapIndex);
+					gifEncoder.AddFrameParallel((byte*)(void*)bitmapData[task.bitmapIndex].Scan0, cancel.Token, task.bitmapIndex - previewFrames);
 				}
-			} else bitmapState[task.bitmapIndex] = BitmapState.Finished;
+			} else {
+				StopGif();
+				bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished;
+			}
 #if CUSTOMDEBUG
 			gifsTime.Stop(); 
 			Log(ref threadString, "Gifs:" + task.bitmapIndex + " time = " + gifsTime.Elapsed.TotalMilliseconds + " ms.");
 			Monitor.Enter(taskLock);
 			try {
-				voidTimes += voidTime.Elapsed.TotalMilliseconds;
-				drawTimes += drawTime.Elapsed.TotalMilliseconds;
 				gifsTimes += gifsTime.Elapsed.TotalMilliseconds;
 				Log(ref logString, threadString);
 			} finally { Monitor.Exit(taskLock); }
-#endif
-#if CUSTOMDEBUG
-			Stopwatch gifsTime = new(); gifsTime.Start();
 #endif
 			task.state = TaskState.Done;
 		}
@@ -1399,68 +1421,95 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			FractalTask task;
 			for(int i = 3; i > 0; --i) {
 				for (var tasksRemaining = true; tasksRemaining; MakeDebugString()) {
+					tasksRemaining = false;
 					if (!cancel.IsCancellationRequested) {
 						Thread.Sleep(50); // let's make this thread to so CPU intense
-						TryFinishBitmaps();
-						while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam ? BitmapState.Finished : BitmapState.Finished)) {
-							bitmapState[bitmapsFinished] = BitmapState.Unlocked;
-							if (applyGenerationType == GenerationType.HashParam) {
-								using SHA256 sha256 = SHA256.Create();
-								unchecked {
-									unsafe {
-										int bytenum = bitmapData[bitmapsFinished].Stride * selectHeight;
-										byte[] pixelData = new byte[bytenum];
-
-										// Copy the raw pixel data from Scan0 to the byte array
-										fixed (byte* dest = pixelData) {
-											Buffer.MemoryCopy((void*)bitmapData[bitmapsFinished].Scan0, dest, bytenum, bytenum);
-										}
-										string key = BitConverter.ToString(sha256.ComputeHash(pixelData));
-										if (!hash.ContainsKey(key))
-											hash.Add(key, bitmapsFinished);
-									}
-								}
-							}
-							bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
-							++bitmapsFinished;
-						}
+						TryWriteBitmaps();
 					}
-					tasksRemaining = false;
 					for (short t = applyMaxTasks; 0 <= --t;)
 						tasksRemaining |= (task = tasks[t]).IsStillRunning()
 							? includingAnimation || bitmapState[task.bitmapIndex] <= BitmapState.Dots
-							: !cancel.Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks && lambda(t);
+							: !cancel.Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks && selectGenerationType == applyGenerationType && (TryFinishBitmap(task) || lambda(t));
 					//if ((task = tasks[t]).IsStillRunning()) tasksRemaining |= includingAnimation || bitmapState[task.bitmapIndex] <= BitmapState.Dots; // Task not finished yet
 					//else if (!cancel.Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks) { if (TryGif(task)) tasksRemaining |= lambda(t); else if (includingAnimation) tasksRemaining = true; }
 					if (tasksRemaining)
 						i = 3;
 				}
+				ApplyGenerationType();
 			}
 		}
-		void TryFinishBitmaps() {
+		void TryWriteBitmaps() {
 			while (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam) {
 				int unlock = gifEncoder.FinishedFrame();
 				// Try to finalize the previous encoder tasks
 				switch (gifEncoder.TryWrite()) {
 					case TryWrite.Failed:
 						// fallback to only display animation without encoding
-						applyGenerationType = GenerationType.AnimationRAM;
-
-						foreach (var t in tasks) {
-							if (bitmapState[t.bitmapIndex] == BitmapState.Encoding)
-								t.Join();
-						}
-
+						StopGif();
 						return;
 					case TryWrite.FinishedFrame:
 						// mark the bitmap state as fully finished
-						bitmapState[unlock] = BitmapState.Finished;
+						bitmapState[unlock + previewFrames] = BitmapState.Finished;
 						break;
 					default:
 						// waiting or finished animation
 						return;
 				}
 			}
+		}
+		void StopGif() {
+			applyGenerationType = GenerationType.AnimationRAM;
+			foreach (var t in tasks) {
+				if (bitmapState[t.bitmapIndex] == BitmapState.Encoding) {
+					t.Join();
+					bitmapState[t.bitmapIndex] = BitmapState.DrawingFinished;
+				}
+			}
+		}
+		bool TryFinishBitmap(FractalTask task) {
+			if (cancel.IsCancellationRequested)
+				return false;
+			bool gif = applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam;
+
+
+			if (gif && bitmapsFinished < bitmap.Length && bitmapsFinished >= previewFrames) {
+
+				int tryEncode = bitmapsFinished;
+				int maxTry = Math.Min(bitmap.Length, bitmapsFinished + applyMaxTasks);
+				while(tryEncode < maxTry) {
+					if (bitmapState[tryEncode] is >= BitmapState.DrawingFinished and <= BitmapState.UnlockedRAM) {
+						if (bitmapState[tryEncode] == BitmapState.UnlockedRAM)
+							bitmapData[tryEncode] = bitmap[tryEncode].LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+						bitmapState[tryEncode] = BitmapState.Encoding;
+						task.Start(tryEncode, () => GenerateGif(task));
+						return true;
+					}
+					++tryEncode;
+				}
+			}
+			while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (gif ? BitmapState.Finished : BitmapState.DrawingFinished)) {
+				bitmapState[bitmapsFinished] = gif || bitmapsFinished < previewFrames ? BitmapState.Unlocked : BitmapState.UnlockedRAM;
+				if (applyGenerationType == GenerationType.HashParam) {
+					using SHA256 sha256 = SHA256.Create();
+					unchecked {
+						unsafe {
+							int bytenum = bitmapData[bitmapsFinished].Stride * selectHeight;
+							byte[] pixelData = new byte[bytenum];
+
+							// Copy the raw pixel data from Scan0 to the byte array
+							fixed (byte* dest = pixelData) {
+								Buffer.MemoryCopy((void*)bitmapData[bitmapsFinished].Scan0, dest, bytenum, bytenum);
+							}
+							string key = BitConverter.ToString(sha256.ComputeHash(pixelData));
+							if (!hash.ContainsKey(key))
+								hash.Add(key, bitmapsFinished);
+						}
+					}
+				}
+				bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
+				++bitmapsFinished;
+			}
+			return false;
 		}
 
 #endregion
@@ -1520,46 +1569,20 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 		startTime = new();
 		startTime.Start();
 #endif
-		// Open a temp file to presave GIF to - Use AnimatedGifEncoder
-		gifSuccess = 0;
-		gifEncoder = null;
-		hash.Clear();
-		if (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam) {
-			gifEncoder = new();
-			gifEncoder.SetDelay(selectDelay); // Framerate
-			gifEncoder.SetRepeat(0);    // Loop
-			gifEncoder.SetQuality(1);   // Highest quality
-			gifEncoder.SetTransparent(selectAmbient < 0 ? Color.Black : Color.Empty);
-			byte gifIndex = 0;
-			while (gifIndex < 255) {
-				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
-				if (!gifEncoder.Start(selectWidth, selectHeight, gifTempPath, 
-					applyGenerationType == GenerationType.GlobalGIF ? Gif.Components.ColorTable.GlobalSingle : Gif.Components.ColorTable.Local)
-				) {
-#if CUSTOMDEBUG
-					Log(ref logString, "Error opening gif file.");
-#endif
-					++gifIndex;
-					continue;
-				} else break;
-			}
-			if (gifIndex == 255)
-				gifEncoder = null;
-		}
+		StartGif();
 		// Initialize the starting default animation values
 		float size = 2400, angle = selectDefaultAngle * (float)Math.PI / 180.0f, hueAngle = selectDefaultHue / 120.0f;
 		byte color = 0;
-		widthBorder = (short)(selectWidth - 2);
-		heightBorder = (short)(selectHeight - 2);
+		
 		bloom1 = selectBloom + 1;
 		upleftStart = -selectBloom;
-		rightEnd = widthBorder + bloom1;
-		downEnd = heightBorder + bloom1;
+
 		ambnoise = (short)(selectAmbient * selectNoise);
 		var spin = selectSpin < -1 ? (short)random.Next(-2, 2) : selectSpin;
 		ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 		applyBlur = (short)(selectBlur + 1);
-		applyVoid = (short)(selectVoid + 1);
+		
+		bool toFinishAnimation = true;
 		for (var i = selectDefaultZoom < 0 ? random.Next(0, selectPeriod * finalPeriodMultiplier) : (selectDefaultZoom % (selectPeriod * finalPeriodMultiplier)); 0 <= --i; IncFrameSize(ref size, selectPeriod)) ;
 
 		// Pregenerate color blends
@@ -1571,127 +1594,96 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 		selectDetail = 2.0f;
 #endif
 		// Generate the images
-		while (!cancel.Token.IsCancellationRequested && bitmapsFinished < bitmap.Length) {
-			// Initialize buffers (delete and reset if size changed)
-			if ((applyMaxTasks = Math.Max((short)2, selectMaxTasks)) != allocatedTasks) {
-				if (allocatedTasks >= 0)
-					for (var t = 0; t < allocatedTasks; ++t) {
-						var task = tasks[t];
-						if (task.taskStarted)
-							task.Join();
+		while (!cancel.Token.IsCancellationRequested) {
+
+			toFinishAnimation |= ApplyGenerationType();
+			if (restartGif) {
+				restartGif = false;
+				toFinishAnimation = true;
+				// wait for all tasks to finish to preserve integrity, especially including gifs, and only return true if it tries to start new ones, so they actually finish:
+				FinishTasks(true, (short taskIndex) => true);
+				FinishGif();
+				StartGif();
+			}
+			if (bitmapsFinished < bitmap.Length) {
+
+				// Initialize buffers (delete and reset if size changed)
+				if ((applyMaxTasks = Math.Max((short)2, selectMaxTasks)) != allocatedTasks) {
+					if (allocatedTasks >= 0)
+						for (var t = 0; t < allocatedTasks; ++t) {
+							var task = tasks[t];
+							if (task.taskStarted)
+								task.Join();
+						}
+					rect = new(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
+					tasks = new FractalTask[allocatedTasks = applyMaxTasks];
+					tuples = new (short, (float, float), (float, float), byte, long, byte)[applyMaxTasks * 8];
+					int vw = selectWidth / selectVoid + 2, vh = selectHeight / selectVoid + 2;
+					for (short t = applyMaxTasks; 0 <= --t;) {
+						var task = tasks[t] = new FractalTask();
+						task.taskIndex = t;
+						NewBuffer(task, vw, vh);
 					}
-				rect = new(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
-				tasks = new FractalTask[allocatedTasks = applyMaxTasks];
-				tuples = new (short, (float, float), (float, float), byte, long, byte)[applyMaxTasks * 8];
-				for (short t = applyMaxTasks; 0 <= --t;) {
-					var task = tasks[t] = new FractalTask();
-					task.voidDepth = new short[applyMaxTasks][];
-					task.buffer = new Vector3[applyMaxTasks][];
-					task.taskIndex = t;
-					NewBuffer(task);
+					SetMaxIterations(true);
+					applyVoid = (short)(selectVoid + 1); // already reallocated the noise buffer
 				}
-				SetMaxIterations(true);
-			}
-			if (selectHeight != allocatedHeight) {
-				for (short t = 0; t < applyMaxTasks; NewBuffer(tasks[t++])) ;
-				rect = new(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
-			}
-			if (selectWidth != allocatedWidth) {
-				for (short t = 0; t < applyMaxTasks; ++t) {
-					var task = tasks[t];
-					var buffT = task.buffer;
-					var voidT = task.voidDepth;
-					for (short y = 0; y < selectHeight; voidT[y++] = new short[selectWidth]) 
-						buffT[y] = new Vector3[selectWidth];	
+				if (selectHeight != allocatedHeight) {
+					int vw = selectWidth / selectVoid + 2, vh = selectHeight / selectVoid + 2;
+					for (short t = 0; t < applyMaxTasks; NewBuffer(tasks[t++], vw, vh)) ;
+					rect = new(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
+					applyVoid = (short)(selectVoid + 1); // already reallocated the noise buffer
 				}
-				rect = new(0, 0, allocatedWidth = selectWidth, selectHeight);
-			}
-			var generateLength = applyGenerationType > GenerationType.OnlyImage ? bitmap.Length : 1;
-			// Wait if no more frames to generate
-			if (bitmapsFinished >= generateLength)
-				continue;
-			// Use the selected ParallelType, or OfDepth if OnlyImage (if you want a GenerateDots_SingleTask like OfAnimation with OnlyImage, set the maxTasks to <= 2)
-			applyParallelType = applyGenerationType == GenerationType.OnlyImage ? ParallelType.OfDepth : selectParallelType;
-			// Image parallelism
-			//imageTasks = applyParallelType == 2 ? [] : null;
-			FinishTasks(true, applyParallelType > 0 || applyMaxTasks <= 2 
-				? (short taskIndex) => {
+				if (selectWidth != allocatedWidth) {
+					int vw = selectWidth / selectVoid + 2, vh = selectHeight / selectVoid + 2;
+					for (short t = 0; t < applyMaxTasks; ++t) {
+						var task = tasks[t];
+						var buffT = task.buffer;
+						var voidT = task.voidDepth;
+						var noiseT = task.voidNoise;
+						for (short y = 0; y < selectHeight; voidT[y++] = new short[selectWidth])
+							buffT[y] = new Vector3[selectWidth];
+						for (short y = 0; y < vh; noiseT[y++] = new Vector3[vw]) ;
+					}
+					rect = new(0, 0, allocatedWidth = selectWidth, selectHeight);
+					applyVoid = (short)(selectVoid + 1); // already reallocated the noise buffer
+				}
+				// reallocate noise buffer if the noise resolution has changed
+				if (applyVoid != selectVoid + 1) {
+					int vw = selectWidth / selectVoid + 2, vh = selectHeight / selectVoid + 2;
+					for (short t = 0; t < applyMaxTasks; t++) {
+						var noiseT = tasks[t].voidNoise = new Vector3[vh][];
+						for (var y = 0; y < vh; noiseT[y++] = new Vector3[vw]) ;
+					}
+					applyVoid = (short)(selectVoid + 1); // already reallocated the noise buffer
+				}
+				var generateLength = applyGenerationType > GenerationType.OnlyImage ? bitmap.Length : 1;
+				// Wait if no more frames to generate
+				if (bitmapsFinished >= generateLength)
+					continue;
+				// Use the selected ParallelType, or OfDepth if OnlyImage (if you want a GenerateDots_SingleTask like OfAnimation with OnlyImage, set the maxTasks to <= 2)
+				applyParallelType = applyGenerationType == GenerationType.OnlyImage ? ParallelType.OfDepth : selectParallelType;
+				// Image parallelism
+				//imageTasks = applyParallelType == 2 ? [] : null;
+				FinishTasks(true, (short taskIndex) => {
 					if (nextBitmap >= generateLength)
 						return false;// The task is finished, no need to wait for this one
-					ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
-					//bitmapState[nextBitmap] = BitmapState.Dots; // i was getting queued state tasks, this solved that, so that just means they take a while to get started, not an error
-					GenerateDots(nextBitmap++, (short)(-taskIndex-1), size, angle, spin, hueAngle, color);
-					IncFrameParameters(ref size, ref angle, spin, ref hueAngle, 1);
-					return true; // A task finished, but started another one - keep checking before new master loop
-				} : (short taskIndex) => {
-					if (nextBitmap >= generateLength)
-						return false;// The task is finished, no need to wait for this one
-					var task = tasks[taskIndex];
 					ModFrameParameters(ref size, ref angle, ref spin, ref hueAngle, ref color);
 					var bmp = nextBitmap++;
-					float _size = size, _angle = angle, _hueAngle = hueAngle; 
-					var _spin = spin; 
+					float _size = bmp < previewFrames ? size / (1 << (previewFrames - bmp)) : size, _angle = angle, _hueAngle = hueAngle;
+					var _spin = spin;
 					var _color = color;
-					//bitmapState[bmp] = BitmapState.Dots; // i was getting queued state tasks, this solved that, so that just means they take a while to get started, not an error
-					task.Start(bmp, () => GenerateDots(bmp, (short)(taskIndex+1), _size, _angle, _spin, _hueAngle, _color));
-					IncFrameParameters(ref size, ref angle, spin, ref hueAngle, 1);
+					//bitmapState[nextBitmap] = BitmapState.Dots; // i was getting queued state tasks, this solved that, so that just means they take a while to get started, not an error
+					if (applyParallelType > 0 || applyMaxTasks <= 2)
+						GenerateDots(bmp, (short)(-taskIndex - 1), _size, _angle, _spin, _hueAngle, _color);
+					else tasks[taskIndex].Start(bmp, () => GenerateDots(bmp, (short)(taskIndex + 1), _size, _angle, _spin, _hueAngle, _color));
+					if (nextBitmap > previewFrames)
+						IncFrameParameters(ref size, ref angle, spin, ref hueAngle, 1);
 					return true; // A task finished, but started another one - keep checking before new master loop
-				});
-		}
-		// Wait for threads to finish
-		bool tasksRunning = true;
-		while (tasksRunning) {
-			for (var t = allocatedTasks; 0 <= --t; tasks[t].Join()) ;
-			tasksRunning = false;
-			for (var t = allocatedTasks; 0 <= --t;) 
-				if (tasks[t].taskStarted)
-					tasksRunning = true;
-		}
-		// Unlock unfinished bitmaps:
-		for (var b = 0; b < bitmap.Length; ++b)
-			if (bitmapState[b] is >= BitmapState.Drawing and < BitmapState.Unlocked) {
-				try {
-					//bitmapState[bitmapsFinished] = BitmapState.Finished;
-					bitmap[b]?.UnlockBits(bitmapData[b]);
-				} catch (Exception) { }
-			}
-		// Save the temp GIF file
-		gifSuccess = 0;
-		if (!cancel.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null && gifEncoder.Finish()) {
-			while (/*!cancel.Token.IsCancellationRequested && */gifEncoder != null) {
-
-				switch (gifEncoder.TryWrite()) {
-					case TryWrite.Failed:
-						// we alrady unlocked the bitmaps above
-						//for (gifEncoder = null; bitmapsFinished < bitmap.Length; ++bitmapsFinished) {
-						//if (bitmapState[bitmapsFinished] is > BitmapState.Dots and < BitmapState.Finished)
-						//	bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
-						//bitmapState[bitmapsFinished] = BitmapState.Finished;
-						//}
-						gifEncoder = null;
-						return;
-					case TryWrite.Waiting:
-						// This should never be hit, because the coe reches this loop only after getting cancelled or every frame finished
-						Thread.Sleep(100);
-						break;
-					case TryWrite.FinishedFrame:
-					// This should never be hit, because the coe reches this loop only after getting cancelled or every frame finished
-					// we alrady unlocked the bitmaps above
-					//int unlock = gifEncoder.FinishedFrame() - 1;
-					//bitmap[unlock].UnlockBits(bitmapData[unlock]);
-					//bitmapState[unlock] = BitmapState.Finished;
-					//while (bitmapState[bitmapsFinished] == BitmapState.Finished)
-					//	++bitmapsFinished;
-					break;
-					case TryWrite.FinishedAnimation:
-						gifSuccess = Math.Max(selectWidth, selectHeight);
-						// This will follow with gifEncoder.IsFinished()
-						break;
 				}
-				if (gifEncoder.IsFinished())
-					break;
-			}
-		}
+				);
+			} else if (toFinishAnimation) {
+				toFinishAnimation = false;
+				FinishAnimation();
 #if CUSTOMDEBUG
 		else Log(ref logString, "Error closing gif file.");
 		generateTime.Stop();
@@ -1706,17 +1698,106 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			+ "\n" + logString;
 		File.WriteAllText("log.txt", logString);
 #endif
-		MakeDebugString();
-		cancel.Cancel(); // If the gifEncoder failed and got nulled but is still running some tasks
-		gifEncoder = null;
+			}
+		}
 		mainTask = null;
-
+	}
+	bool ApplyGenerationType() {
+		if (applyGenerationType == selectGenerationType)
+			return false;
+		if (applyGenerationType is >= GenerationType.OnlyImage and <= GenerationType.AnimationRAM && selectGenerationType is >= GenerationType.EncodeGIF) {
+			bitmapsFinished = Math.Min(previewFrames, bitmapsFinished);
+			if (gifEncoder == null)
+				StartGif();
+		}
+		applyGenerationType = selectGenerationType;
+		return true;
+	}
+	void FinishAnimation() {
+		// Wait for threads to finish
+		bool tasksRunning = true;
+		while (tasksRunning) {
+			for (var t = allocatedTasks; 0 <= --t; tasks[t].Join()) ;
+			tasksRunning = false;
+			for (var t = allocatedTasks; 0 <= --t;)
+				if (tasks[t].taskStarted)
+					tasksRunning = true;
+		}
+		// Unlock unfinished bitmaps:
+		for (var b = 0; b < bitmap.Length; ++b)
+			if (bitmapState[b] is >= BitmapState.Drawing and < BitmapState.UnlockedRAM) {
+				try {
+					//bitmapState[bitmapsFinished] = BitmapState.Finished;
+					bitmap[b]?.UnlockBits(bitmapData[b]);
+				} catch (Exception) { }
+			}
+		FinishGif();
+		MakeDebugString();
+		//cancel.Cancel(); // If the gifEncoder failed and got nulled but is still running some tasks
 		if (applyGenerationType == GenerationType.HashParam) {
 			string output = "";
-			foreach (var i in hash) 
+			foreach (var i in hash)
 				output += "," + i.Value;
 			File.WriteAllText("hash.txt", output);
 		}
+	}
+	void StartGif() {
+		// Open a temp file to presave GIF to - Use AnimatedGifEncoder
+		gifSuccess = 0;
+		gifEncoder = null;
+		hash.Clear();
+		if (selectGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam) {
+			gifEncoder = new();
+			gifEncoder.SetDelay(selectDelay); // Framerate
+			gifEncoder.SetRepeat(0);    // Loop
+			gifEncoder.SetQuality(1);   // Highest quality
+			gifEncoder.SetTransparent(selectAmbient < 0 ? Color.Black : Color.Empty);
+			byte gifIndex = 0;
+			while (gifIndex < 255) {
+				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
+				if (!gifEncoder.Start(selectWidth, selectHeight, gifTempPath,
+					applyGenerationType == GenerationType.GlobalGIF ? Gif.Components.ColorTable.GlobalSingle : Gif.Components.ColorTable.Local)
+				) {
+					++gifIndex;
+					continue;
+				} else break;
+			}
+			if (gifIndex == 255)
+				gifEncoder = null;
+		}
+		// Flag the already encoded bitmaps to be encoded again;
+		for (int b = previewFrames; b < bitmap.Length; ++b)
+			if (bitmapState[b] >= BitmapState.Encoding) {
+				if (bitmapState[b] == BitmapState.Unlocked)
+					bitmapData[b] = bitmap[b].LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+				bitmapState[b] = BitmapState.DrawingFinished;
+			}
+	}
+	void FinishGif() {
+		// Save the temp GIF file
+		gifSuccess = 0;
+		if (!cancel.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null && gifEncoder.Finish()) {
+			while (gifEncoder != null) {
+				switch (gifEncoder.TryWrite()) {
+					case TryWrite.Failed:
+						gifEncoder = null;
+						return;
+					case TryWrite.Waiting:
+						// This should never be hit, because the coe reches this loop only after getting cancelled or every frame finished
+						Thread.Sleep(100);
+						break;
+					case TryWrite.FinishedFrame:
+						break;
+					case TryWrite.FinishedAnimation:
+						gifSuccess = Math.Max(selectWidth, selectHeight);
+						// This will follow with gifEncoder.IsFinished()
+						break;
+				}
+				if (gifEncoder.IsFinished())
+					break;
+			}
+		}
+		gifEncoder = null;
 	}
 #endregion
 
@@ -1724,6 +1805,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 	// start the generator in a separate main thread so that the form can continue being responsive
 	internal void StartGenerate() => mainTask = Task.Run(GenerateAnimation, (cancel = new()).Token);
 	internal void ResetGenerator() {
+		restartGif = false;
 		applyZoom = (short)(selectZoom != 0 ? selectZoom : random.NextDouble() < .5f ? -1 : 1);
 		applyCutparam = selectCutparam < 0 ? random.Next(0, GetMaxCutparam()) : selectCutparam;
 		SetupColor();
@@ -1746,6 +1828,9 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			_ => (short)(debug > 0 ? debug : selectPeriod * finalPeriodMultiplier),
 		};
 
+		previewFrames = (int)Math.Log2(Math.Min(selectWidth, selectHeight)) - 1;
+
+		frames += previewFrames;
 		if (frames != allocatedFrames) {
 			bitmap = new Bitmap[allocatedFrames = frames];
 			bitmapData = new BitmapData[frames];
@@ -1802,6 +1887,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			BitmapState.DrawingFinished => "DRAWING FINISHED (LOCKED)",
 			BitmapState.Encoding => "ENCODING (LOCKED)",
 			BitmapState.Finished => "FINISHED (LOCKED)",
+			BitmapState.UnlockedRAM => "UNLOCKED_RAM",
 			BitmapState.Unlocked => "UNLOCKED",
 			_ => "ERROR! (SHOULDN'T HAPPEN)",
 		};
@@ -1830,7 +1916,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			}
 		}
 		BitmapState state, laststate = BitmapState.Error;
-		for (var c = i = 0; c < 9; counter[c++] = 0) ;
+		for (var c = i = 0; c < 10; counter[c++] = 0) ;
 		for (_debugString += "\n\nIMAGES:"; i < bitmap.Length; ++i)
 			++counter[(int)bitmapState[i]];
 		string _memoryString = "\n";
@@ -1840,7 +1926,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				li = i;
 			}
 		_memoryString += (li == i - 1 ? li + ": " : li + "-" + (i - 1) + ": ") + GetBitmapState(laststate);
-		for (int c = 0; c < 9; ++c) 
+		for (int c = 0; c < 10; ++c) 
 			_debugString += "\n" + counter[c] +"x: "+ GetBitmapState((BitmapState)c);
 		_debugString += "\n\nANIMATION:" + _memoryString;
 		debugString = i < bitmap.Length ? _debugString + "\n" + i + "+: " + "QUEUED" : _debugString;
@@ -1949,11 +2035,13 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Fractal GetFractal() => fractals[selectFractal];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal Bitmap GetBitmap(int index) => bitmap == null || bitmap.Length <= index ? null : bitmap[index];
+	internal Bitmap GetBitmap(int index) => bitmap == null || bitmap.Length <= index ? null : bitmap[index + previewFrames];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal int GetFrames() => bitmap == null ? 0 : bitmap.Length;
+	internal Bitmap GetPreviewBitmap() => bitmapsFinished < 1 ? null : bitmap[bitmapsFinished-1];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal int GetBitmapsFinished() => bitmapsFinished;
+	internal int GetFrames() => bitmap == null ? 0 : bitmap.Length - previewFrames;
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal int GetBitmapsFinished() => bitmapsFinished - previewFrames;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal int IsGifReady() => gifSuccess;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

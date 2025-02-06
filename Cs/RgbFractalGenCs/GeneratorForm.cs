@@ -375,19 +375,14 @@ public partial class GeneratorForm : Form {
 			gifButton.Enabled = true;
 			gifButton.Text = "Cancel Saving GIF";
 		}
-		// Handle currentBitmap
-		if (bitmapsFinished > 0) {
-			// Fetch bitmap, make sure the index is is range
-			currentBitmapIndex %= bitmapsFinished;
-			var bitmap = generator.GetBitmap(currentBitmapIndex);
-			// Update the display with it if necessary
-			if (currentBitmap != bitmap) {
-				currentBitmap = bitmap;
-				screenPanel.Invalidate();
-			}
-			// Animate the frame index
-			if (animated)
-				currentBitmapIndex = (currentBitmapIndex + 1) % bitmapsFinished;
+		// Fetch a bitmap to display
+		var bitmap = bitmapsFinished > 0 
+			? generator.GetBitmap(currentBitmapIndex = (animated ? currentBitmapIndex + 1 : currentBitmapIndex) % bitmapsFinished) // Make sure the index is is range
+			: generator.GetPreviewBitmap(); // Try preview bitmap if none of the main ones are generated yet
+		// Update the display with it if necessary
+		if (currentBitmap != bitmap) {
+			currentBitmap = bitmap;
+			screenPanel.Invalidate();
 		}
 		// Info text refresh
 		string infoText = " / " + bitmapsTotal.ToString();
@@ -728,8 +723,9 @@ public partial class GeneratorForm : Form {
 		var fpsrate = 100 / generator.selectDelay;
 		timer.Interval = generator.selectDelay * 10;
 		delayLabel.Text = "Abort / FPS: " + fpsrate.ToString();
-		if (generator.selectGenerationType >= FractalGenerator.GenerationType.EncodeGIF)
-			QueueReset();
+		if (generator.selectGenerationType is >= FractalGenerator.GenerationType.EncodeGIF and <= FractalGenerator.GenerationType.AllParam)
+			generator.restartGif = true;
+			//QueueReset();
 	}
 	private void MoveFrame(int move) { animated = false; var b = generator.GetBitmapsFinished(); currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b; }
 	private void PrevButton_Click(object sender, EventArgs e) => MoveFrame(-1);
@@ -752,9 +748,9 @@ public partial class GeneratorForm : Form {
 	}
 	private void EncodeSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		var prev = generator.selectGenerationType;
-		if ((generator.selectGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex)) >= FractalGenerator.GenerationType.EncodeGIF
-			&& (0 == (isGifReady = generator.IsGifReady()) || prev != generator.selectGenerationType)
-		) QueueReset();
+		var now = generator.selectGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex);
+		if ((now is >= FractalGenerator.GenerationType.OnlyImage and <= FractalGenerator.GenerationType.GlobalGIF) != (prev is >= FractalGenerator.GenerationType.OnlyImage and <= FractalGenerator.GenerationType.GlobalGIF))
+			QueueReset();
 	}
 	private void HelpButton_Click(object sender, EventArgs e) {
 		helpPanel.Visible = screenPanel.Visible;
@@ -1251,7 +1247,7 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 30 + i * butsize);
 				case "edit": if(p) generatorPanel.Visible = !(editorPanel.Visible = n > 0); break;
 				case "angle": angleSelect.SelectedIndex = n; break;
 				case "color": colorSelect.SelectedIndex = n; break;
-				case "cut": cutSelect.SelectedIndex = n;	break;
+				case "cut": if(cutSelect.Items.Count < n) cutSelect.SelectedIndex = n;	break;
 				case "seed": cutparamBox.Text = v; break;
 				case "w": width = (short)n; break;
 				case "h": height = (short)n; break;

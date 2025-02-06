@@ -1,3 +1,14 @@
+1.9
+- fractal editor
+- improved color seamlessness to account for predicting cutfunctions split color mixing
+- NoBackDiag seeded cutfunction
+- all seeds now yield a unique fractal (i hashed the images and skip the duplicates)
+- a bunch of bugfixes
+- void scaling paramater
+- parameter savefile
+- a bunch of warnings to warn and let you save your gifs or editer fractals before closing them
+- if you select to encode a gif, the generator will not rstart anymore, it will catch up with the encoding.
+
 1.84
 - bugfixes
 - Encode GIF => Local GIF

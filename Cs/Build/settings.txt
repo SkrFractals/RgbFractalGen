@@ -1,1 +1,0 @@
-fractal|Void|path||edit|0|angle|0|color|0|cut|-1|seed|0|w|1920|h|1080|res|0|period|120|periodmul|1|zoom|1|defaultzoom|0|spin|1|spinmul||defaultangle|0|hue|1|huemul||defaulthue|0|amb|20|noise|20|saturate|5|detail|5|bloom||blur||brightness|100|parallel|0|threads|22|abort|500|delay|5|ani|1|gen|1
