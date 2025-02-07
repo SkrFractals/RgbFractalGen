@@ -170,7 +170,7 @@ internal class FractalGenerator {
 	// Threading
 	private FractalTask[] tasks;
 	private ParallelType 
-		applyParallelType;	// Safely copy parallelType in here so it doesn't change in the middle of generation
+		applyParallelType;			// Safely copy parallelType in here so it doesn't change in the middle of generation
 	private short applyMaxTasks;	// Safely copy maxTasks in here so it doesn't change in the middle of generation
 	
 	private short maxDepth;			// Maximum depth for Recusrion parallelism
@@ -236,6 +236,8 @@ internal class FractalGenerator {
 	public readonly Dictionary<string, int> hash = [];
 	private readonly Dictionary<long, Vector3[]> colorBlends = [];
 	private int startCutParam;
+
+	private const int depthdiv = 4;
 
 	#region Init
 	internal FractalGenerator() {
@@ -788,7 +790,7 @@ internal class FractalGenerator {
 		void GenerateDots(int bitmapIndex, short stateIndex, float size, float angle, short spin, float hueAngle, byte color) {
 			#region GenerateDots_Inline
 			//[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			void ApplyDot(long key, FractalTask task, float inX, float inY, float inDetail, byte inColor) {
+			void ApplyDot(FractalTask task, long key,  float inX, float inY, float inDetail, byte inColor) {
 				//Vector3 GetDotColor() => Vector3.Lerp(task.H, task.I, inDetail);
 				//var dotColor = inColor switch { 1 => Y(GetDotColor()), 2 => Z(GetDotColor()), _ => GetDotColor() };
 				var colorindex = (inColor + task.huemod) % 3;
@@ -819,12 +821,8 @@ internal class FractalGenerator {
 			) {
 				var task = tasks[taskIndex];
 				var preIterated = task.preIterate[inDepth];
-				//if (ApplyDot(preIterated.Item1 >= selectDetail, task, inXY.Item1, inXY.Item2, preIterated.Item2, inColor))
-				//	return;
-				// Split Iteration Deeper
 				var newPreIterated = task.preIterate[++inDepth];
-				//var i = f.childCount;
-				//while (0 <= --i) {
+				// Draw Dots
 				if (newPreIterated.Item1 < selectDetail) {
 					for (int i = 0; i < f.childCount; ++i) {
 						var newFlags = CalculateFlags(i, inFlags);
@@ -833,9 +831,55 @@ internal class FractalGenerator {
 						var XY = preIterated.Item3[i];
 						var newXY = NewXY(inXY, XY, inAngle.Item1);
 						if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1))
-							ApplyDot(i + f.childCount * (newFlags & ((1 << f.childCount) - 1)),task,newXY.Item1,newXY.Item2,newPreIterated.Item2, (byte)((inColor + childColor[i]) % 3));
+							ApplyDot(task, i + f.childCount * (newFlags & ((1 << f.childCount) - 1)), newXY.Item1, newXY.Item2, newPreIterated.Item2, (byte)((inColor + childColor[i]) % 3));
 					}
-				} else {
+					return;
+				}
+				// Split Iteration Deeper
+				for (int i = 0; i < f.childCount; ++i) {
+					if (cancel.Token.IsCancellationRequested)
+						return;
+					// Special Cutoff
+					var newFlags = CalculateFlags(i, inFlags);
+					if (newFlags < 0)
+						continue;
+					// Outside View
+					var XY = preIterated.Item3[i];
+					var newXY = NewXY(inXY, XY, inAngle.Item1);
+					if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1))
+						GenerateDots_SingleTask(taskIndex, newXY,
+							i == 0
+							? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2)
+							: (inAngle.Item1 + childAngle[i], inAngle.Item2),
+							(byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
+				}
+			}
+			void GenerateDots_OfDepth(int bitmapIndex) {
+				int index = 0, insertTo = 1,
+					max = applyMaxTasks * depthdiv,
+					maxcount = max - f.childCount - 1,
+					count = (max + insertTo - index) % max;
+				while (count > 0 && count < maxcount) {
+					var (taskIndex, inXY, inAngle, inColor, inFlags, inDepth) = tuples[index++];
+					index %= max;
+					var task = tasks[taskIndex];
+					var preIterated = task.preIterate[inDepth];
+					var newPreIterated = task.preIterate[++inDepth];
+					// Draw Dots
+					if (newPreIterated.Item1 < selectDetail) {
+						for (int i = 0; i < f.childCount; ++i) {
+							var newFlags = CalculateFlags(i, inFlags);
+							if (newFlags < 0)
+								continue;
+							var XY = preIterated.Item3[i];
+							var newXY = NewXY(inXY, XY, inAngle.Item1);
+							if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1))
+								ApplyDot(task, i + f.childCount * (newFlags & ((1 << f.childCount) - 1)), newXY.Item1, newXY.Item2, newPreIterated.Item2, (byte)((inColor + childColor[i]) % 3));
+						}
+						count = (max + insertTo - index) % max;
+						continue;
+					}
+					// Split Iteration Deeper
 					for (int i = 0; i < f.childCount; ++i) {
 						if (cancel.Token.IsCancellationRequested)
 							return;
@@ -847,47 +891,10 @@ internal class FractalGenerator {
 						var XY = preIterated.Item3[i];
 						var newXY = NewXY(inXY, XY, inAngle.Item1);
 						if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1))
-							GenerateDots_SingleTask(taskIndex, newXY,
-								i == 0
-								? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2)
-								: (inAngle.Item1 + childAngle[i], inAngle.Item2),
+							tuples[insertTo++] = 
+								(taskIndex, newXY, 
+								i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), 
 								(byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
-
-					}
-				}
-			}
-			void GenerateDots_OfDepth(int bitmapIndex) {
-
-				// TODO update color blends, and also fix overall
-
-				/*int index = 0, insertTo = 1,
-					max = applyMaxTasks * 8,
-					maxcount = max - f.childCount - 1,
-					count = (max + insertTo - index) % max;
-				while (count > 0 && count < maxcount) {
-					var (taskIndex, inXY, inAngle, inColor, inFlags, inDepth) = tuples[index++];
-					index %= max;
-					var task = tasks[taskIndex];
-					var preIterated = task.preIterate[inDepth];
-					if (ApplyDot(preIterated.Item1 >= selectDetail, task, inXY.Item1, inXY.Item2, preIterated.Item2, inColor)) {
-						count = (max + insertTo - index) % max;
-						continue;
-					}
-					// Split Iteration Deeper
-					var newPreIterated = task.preIterate[++inDepth];
-					var i = f.childCount;
-					while (0 <= --i) {
-						if (cancel.Token.IsCancellationRequested)
-							return;
-						// Special Cutoff
-						var newFlags = CalculateFlags(i, inFlags);
-						if (newFlags < 0)
-							continue;
-						// Outside View
-						var XY = preIterated.Item3[i];
-						var newXY = NewXY(inXY, XY, inAngle.Item1);
-						if (TestSize(task, newXY.Item1, newXY.Item2, preIterated.Item1))
-							tuples[insertTo++] = (taskIndex, newXY, i == 0 ? (inAngle.Item1 + childAngle[i] - inAngle.Item2, -inAngle.Item2) : (inAngle.Item1 + childAngle[i], inAngle.Item2), (byte)((inColor + childColor[i]) % 3), newFlags, inDepth);
 						insertTo %= max;
 					}
 					count = (max + insertTo - index) % max;
@@ -904,7 +911,7 @@ internal class FractalGenerator {
 					index %= max;
 					count = (max + insertTo - index) % max;
 					return true;
-				});*/
+				});
 			}
 			// OfRecursion is deprecated, use OfDepth instead, it's better anyway
 			/*void GenerateDots_OfRecursion(short taskIndex,
@@ -1053,10 +1060,10 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				float addx = shift * rotatedX;
 				float addy = shift * rotatedY;*/
 
-				if (applyMaxTasks <= 2 || applyParallelType != ParallelType.OfDepth)
+				if (applyMaxTasks <= 2 || applyParallelType != ParallelType.OfDepth && bitmapIndex > previewFrames)
 					GenerateDots_SingleTask(taskIndex, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, Math.Abs(spin) > 1 ? 2 * angle : 0), color, startParam, 0);
 				else {
-					tuples[0] = (0, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, spin > 1 ? 2 * angle : 0), color, startParam, 0);
+					tuples[0] = (task.taskIndex, (task.applyWidth * .5f, task.applyHeight * .5f), (angle, spin > 1 ? 2 * angle : 0), color, startParam, 0);
 					GenerateDots_OfDepth(bitmapIndex);
 				}
 				// OfRecursion is deprecated, use OfDepth instead, it's better anyway
@@ -1301,7 +1308,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				var maxGenerationTasks = (short)Math.Max(1, applyMaxTasks - 1);
 				int wv = task.applyWidth / applyVoid + 2;
 				var stride = bitmapData[task.bitmapIndex].Stride;//3 * selectWidth;
-				if (applyParallelType > ParallelType.OfAnimation && maxGenerationTasks > 1) {
+				if ((applyParallelType > ParallelType.OfAnimation || task.bitmapIndex <= previewFrames) && maxGenerationTasks > 1) {
 					// Multi Threaded
 					var po = new ParallelOptions {
 						MaxDegreeOfParallelism = maxGenerationTasks,
@@ -1431,13 +1438,13 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				for (var tasksRemaining = true; tasksRemaining; MakeDebugString()) {
 					tasksRemaining = false;
 					if (!cancel.IsCancellationRequested) {
-						Thread.Sleep(50); // let's make this thread to so CPU intense
+						//Thread.Sleep(50); // let's make this thread to so CPU intense
 						TryWriteBitmaps();
 					}
 					for (short t = applyMaxTasks; 0 <= --t;)
 						tasksRemaining |= (task = tasks[t]).IsStillRunning()
 							? includingAnimation || bitmapState[task.bitmapIndex] <= BitmapState.Dots
-							: !cancel.Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks && selectGenerationType == applyGenerationType && (TryFinishBitmap(task) || lambda(t));
+							: !cancel.Token.IsCancellationRequested && (!includingAnimation || selectMaxTasks == applyMaxTasks && applyParallelType == selectParallelType && selectGenerationType == applyGenerationType) && (TryFinishBitmap(task) || lambda(t));
 					//if ((task = tasks[t]).IsStillRunning()) tasksRemaining |= includingAnimation || bitmapState[task.bitmapIndex] <= BitmapState.Dots; // Task not finished yet
 					//else if (!cancel.Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks) { if (TryGif(task)) tasksRemaining |= lambda(t); else if (includingAnimation) tasksRemaining = true; }
 					if (tasksRemaining)
@@ -1625,7 +1632,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						}
 					rect = new(0, 0, allocatedWidth = selectWidth, allocatedHeight = selectHeight);
 					tasks = new FractalTask[allocatedTasks = applyMaxTasks];
-					tuples = new (short, (float, float), (float, float), byte, long, byte)[applyMaxTasks * 8];
+					tuples = new (short, (float, float), (float, float), byte, long, byte)[applyMaxTasks * depthdiv];
 					int vw = selectWidth / selectVoid + 2, vh = selectHeight / selectVoid + 2;
 					for (short t = applyMaxTasks; 0 <= --t;) {
 						var task = tasks[t] = new FractalTask();
@@ -1681,7 +1688,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					var _spin = spin;
 					var _color = color;
 					//bitmapState[nextBitmap] = BitmapState.Dots; // i was getting queued state tasks, this solved that, so that just means they take a while to get started, not an error
-					if (applyParallelType > 0 || applyMaxTasks <= 2)
+					if (applyParallelType > ParallelType.OfAnimation || applyMaxTasks <= 2 || bmp <= previewFrames)
 						GenerateDots(bmp, (short)(-taskIndex - 1), _size, _angle, _spin, _hueAngle, _color);
 					else tasks[taskIndex].Start(bmp, () => GenerateDots(bmp, (short)(taskIndex + 1), _size, _angle, _spin, _hueAngle, _color));
 					if (nextBitmap > previewFrames)

@@ -92,6 +92,7 @@
 			voidBox = new System.Windows.Forms.TextBox();
 			modeButton = new System.Windows.Forms.Button();
 			editorPanel = new System.Windows.Forms.Panel();
+			pointLabel = new System.Windows.Forms.Label();
 			sizeLabel = new System.Windows.Forms.Label();
 			colorBox = new System.Windows.Forms.TextBox();
 			angleBox = new System.Windows.Forms.TextBox();
@@ -99,7 +100,6 @@
 			maxBox = new System.Windows.Forms.TextBox();
 			addCut = new System.Windows.Forms.ComboBox();
 			pointPanel = new System.Windows.Forms.Panel();
-			pointLabel = new System.Windows.Forms.Label();
 			addPoint = new System.Windows.Forms.Button();
 			minBox = new System.Windows.Forms.TextBox();
 			saveButton = new System.Windows.Forms.Button();
@@ -806,6 +806,7 @@
 			// 
 			// editorPanel
 			// 
+			editorPanel.Controls.Add(pointLabel);
 			editorPanel.Controls.Add(sizeLabel);
 			editorPanel.Controls.Add(colorBox);
 			editorPanel.Controls.Add(angleBox);
@@ -826,6 +827,17 @@
 			editorPanel.Name = "editorPanel";
 			editorPanel.Size = new System.Drawing.Size(286, 441);
 			editorPanel.TabIndex = 56;
+			// 
+			// pointLabel
+			// 
+			pointLabel.AutoSize = true;
+			pointLabel.ForeColor = System.Drawing.Color.White;
+			pointLabel.Location = new System.Drawing.Point(29, 13);
+			pointLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			pointLabel.Name = "pointLabel";
+			pointLabel.Size = new System.Drawing.Size(145, 15);
+			pointLabel.TabIndex = 52;
+			pointLabel.Text = "    X              Y             Angle";
 			// 
 			// sizeLabel
 			// 
@@ -887,31 +899,19 @@
 			// pointPanel
 			// 
 			pointPanel.AutoScroll = true;
-			pointPanel.Controls.Add(pointLabel);
 			pointPanel.Controls.Add(addPoint);
-			pointPanel.Location = new System.Drawing.Point(14, 16);
+			pointPanel.Location = new System.Drawing.Point(14, 31);
 			pointPanel.Name = "pointPanel";
-			pointPanel.Size = new System.Drawing.Size(256, 255);
+			pointPanel.Size = new System.Drawing.Size(256, 240);
 			pointPanel.TabIndex = 59;
-			// 
-			// pointLabel
-			// 
-			pointLabel.AutoSize = true;
-			pointLabel.ForeColor = System.Drawing.Color.White;
-			pointLabel.Location = new System.Drawing.Point(10, 10);
-			pointLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-			pointLabel.Name = "pointLabel";
-			pointLabel.Size = new System.Drawing.Size(154, 15);
-			pointLabel.TabIndex = 52;
-			pointLabel.Text = "       X              Y             Angle";
 			// 
 			// addPoint
 			// 
-			addPoint.Location = new System.Drawing.Point(15, 33);
+			addPoint.Location = new System.Drawing.Point(15, 11);
 			addPoint.Name = "addPoint";
-			addPoint.Size = new System.Drawing.Size(100, 23);
+			addPoint.Size = new System.Drawing.Size(205, 23);
 			addPoint.TabIndex = 64;
-			addPoint.Text = "ADD POINT";
+			addPoint.Text = "ADD CHILD";
 			addPoint.UseVisualStyleBackColor = true;
 			addPoint.Click += AddPoint_Click;
 			// 
@@ -1035,7 +1035,6 @@
 			editorPanel.ResumeLayout(false);
 			editorPanel.PerformLayout();
 			pointPanel.ResumeLayout(false);
-			pointPanel.PerformLayout();
 			ResumeLayout(false);
 			PerformLayout();
 		}

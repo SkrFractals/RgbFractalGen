@@ -6,8 +6,9 @@
 - a bunch of bugfixes
 - void scaling paramater
 - parameter savefile
-- a bunch of warnings to warn and let you save your gifs or editer fractals before closing them
-- if you select to encode a gif, the generator will not rstart anymore, it will catch up with the encoding.
+- a bunch of warnings to warn and let you save your gifs or editor fractals before closing them
+- if you select to encode a gif, the generator will not restart anymore, it will catch up with the encoding.
+- faster preview image (first fast lower resolution, and the first image in the animation is using OfDepth even if you have selected OfAnimation)
 
 1.84
 - bugfixes

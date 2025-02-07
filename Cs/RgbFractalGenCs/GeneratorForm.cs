@@ -73,11 +73,10 @@ public partial class GeneratorForm : Form {
 		)> editorPoint = [];
 	private readonly List<System.Windows.Forms.Button>
 		editorSwitch = [];
-	private FractalGenerator.ParallelType mem_parallel;
 	private FractalGenerator.GenerationType mem_generate;
-	private short mem_defaulthue, mem_hue;
+	private short mem_blur, mem_defaulthue, mem_hue, mem_abort;
+	private float mem_bloom;
 	private bool performHash = false;
-
 	#endregion
 
 	#region Core
@@ -197,20 +196,15 @@ public partial class GeneratorForm : Form {
 			SetupFractal();
 			threadsBox.Text = maxTasks.ToString();
 
-			// try to restory the last closed settings
-			LoadSettings();
-
-			bInit = modifySettings = helpPanel.Visible = false;
-			pointTabIndex = controlTabIndex;
-
-			// Init the editor:
-			editorPanel.Location = generatorPanel.Location;
+			// try to restory the last closed settings and init the editor
 			editorPanel.Visible = false;
+			pointTabIndex = controlTabIndex;
+			editorPanel.Location = generatorPanel.Location;
+			LoadSettings();
 			FillEditor();
 
-			
-
 			// Start the generator
+			bInit = modifySettings = helpPanel.Visible = false;
 			TryResize();
 			ResizeAll();
 			aTask = gTask = null;
@@ -541,7 +535,7 @@ public partial class GeneratorForm : Form {
 	private static float ParseFloat(System.Windows.Forms.TextBox BOX) { Clean(BOX); return float.TryParse(BOX.Text, out var v) ? v : 0.0f; }
 	private static T Clamp<T>(T NEW, T MIN, T MAX) where T : struct, IComparable<T> => NEW.CompareTo(MIN) < 0 ? MIN : NEW.CompareTo(MAX) > 0 ? MAX : NEW;
 	private static float Retext(System.Windows.Forms.TextBox BOX, float NEW) {
-		BOX.Text = NEW == 0.0f ? (float.TryParse(BOX.Text, out _) ? "" : BOX.Text) : NEW.ToString("G6"); return NEW;
+		BOX.Text = NEW == 0.0f ? (float.TryParse(BOX.Text, out _) ? "" : BOX.Text) : NEW.ToString("F6"); return NEW;
 	}
 	private static short Retext(System.Windows.Forms.TextBox BOX, short NEW) {
 		BOX.Text = NEW == 0 ? (short.TryParse(BOX.Text, out _) ? "" : BOX.Text) : NEW.ToString(); return NEW;
@@ -560,7 +554,7 @@ public partial class GeneratorForm : Form {
 	private bool ClampDiffApply<T>(T NEW, ref T GEN, T MIN, T MAX) where T : struct, IComparable<T> => DiffApply(Clamp(NEW, MIN, MAX), ref GEN);
 	private bool ParseDiffApply(System.Windows.Forms.TextBox BOX, ref short GEN) => DiffApply(ParseShort(BOX), ref GEN);
 	private bool ParseModDiffApply(System.Windows.Forms.TextBox BOX, ref short GEN, short MIN, short MAX) => DiffApply(Mod(ParseShort(BOX), MIN, MAX), ref GEN);
-	private bool ParseRetextDiffApply(System.Windows.Forms.TextBox BOX, ref float GEN) => DiffApply(Retext(BOX, ParseFloat(BOX)), ref GEN);
+	private bool ParseDiffApply(System.Windows.Forms.TextBox BOX, ref float GEN) => DiffApply(ParseFloat(BOX), ref GEN);
 	private bool ParseClampRetextDiffApply(System.Windows.Forms.TextBox BOX, ref short GEN, short MIN, short MAX) => DiffApply(ParseClampRetext(BOX, MIN, MAX), ref GEN);
 	private bool ParseClampRetextDiffApply(System.Windows.Forms.TextBox BOX, ref int GEN, int MIN, int MAX) => DiffApply(ParseClampRetext(BOX, MIN, MAX), ref GEN);
 	private bool ParseClampRetextMulDiffApply(System.Windows.Forms.TextBox BOX, ref short GEN, short MIN, short MAX, short MUL) => DiffApply((short)(ParseClampRetext(BOX, MIN, MAX) * MUL), ref GEN);
@@ -703,14 +697,14 @@ public partial class GeneratorForm : Form {
 		SetupParallel(ParseClampRetext(threadsBox, (short)2, (short)maxTasks));
 	}
 	private void ParallelTypeSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if ((FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex == FractalGenerator.ParallelType.OfDepth) {
+		/*if ((FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex == FractalGenerator.ParallelType.OfDepth) {
 			MessageBox.Show(
 				"Sorry but this parallelism mode is currently broken and unavailable, try again in a later release.",
 				"Unavailable",
 				MessageBoxButtons.OK,
 				MessageBoxIcon.Error);
 			return;
-		}
+		}*/
 		generator.selectParallelType = (FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex;
 	}
 	private void AbortBox_TextChanged(object sender, EventArgs e) => abortDelay = ParseClampRetext(abortBox, (short)0, (short)10000);
@@ -902,19 +896,23 @@ public partial class GeneratorForm : Form {
 	private void ModeButton_Click(object sender, EventArgs e) {
 		if (editorPanel.Visible) {
 			// SelectParallelMode();
-			generator.selectParallelType = mem_parallel;
+			generator.selectBlur = mem_blur;
+			generator.selectBloom = mem_bloom;
 			generator.selectGenerationType = mem_generate;
 			generator.selectHue = mem_hue;
 			generator.selectDefaultHue = mem_defaulthue;
+			abortDelay = mem_abort;
 		} else {
-			// TODO set this after OfDepth mode is fixed
-			mem_parallel = generator.selectParallelType;
+			mem_blur = generator.selectBlur;
+			mem_bloom = generator.selectBloom;
 			mem_generate = generator.selectGenerationType;
 			mem_hue = generator.selectHue;
 			mem_defaulthue = generator.selectDefaultHue;
-			//generator.selectParallelType = FractalGenerator.ParallelType.OfDepth;
+			mem_abort = abortDelay;
+			abortDelay = 10;
+			generator.selectParallelType = FractalGenerator.ParallelType.OfDepth;
 			generator.selectGenerationType = FractalGenerator.GenerationType.AnimationRAM;
-			generator.selectHue = 0;
+			generator.selectBloom = generator.selectBlur = generator.selectHue = 0;
 		}
 		editorPanel.Visible = !(generatorPanel.Visible = editorPanel.Visible);
 	}
@@ -950,7 +948,8 @@ public partial class GeneratorForm : Form {
 			editorSwitch.Add(new());
 			var s = editorSwitch[^1];
 			s.Text = "⇕";
-			s.Location = new System.Drawing.Point(10 + 3 * textsize + 2 * butsize, 30 + (i * 2 - 1) * butsize / 2);
+			s.Font = new System.Drawing.Font("Segoe UI", 7F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 238);
+			s.Location = new System.Drawing.Point(10 + 3 * textsize + 2 * butsize, 10 + (i * 2 - 1) * butsize / 2);
 			s.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			s.Name = "switch" + i;
 			s.Size = new System.Drawing.Size(butsize, butsize);
@@ -1008,38 +1007,41 @@ public partial class GeneratorForm : Form {
 			pointPanel.ResumeLayout(false);
 			pointPanel.PerformLayout();
 		}
-		x.Location = new System.Drawing.Point(10, 30 + i * butsize);
+		x.Location = new System.Drawing.Point(10, 10 + i * butsize);
 		x.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 		x.Name = "x" + i;
+		x.Font = new System.Drawing.Font("Segoe UI", 7F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 238);
 		x.Size = new System.Drawing.Size(textsize, butsize);
 		//x.TabIndex = ++pointTabIndex;
 		if (x.Enabled = i > 0)
 			x.TextChanged += (object sender, EventArgs e)
 				=> { 
-					if (ParseRetextDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childX[i])) return; 
+					if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childX[i])) return; 
 					generator.GetFractal().edit = true; 
 				};
 
-		y.Location = new System.Drawing.Point(10 + textsize, 30 + i * butsize);
+		y.Location = new System.Drawing.Point(10 + textsize, 10 + i * butsize);
 		y.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 		y.Name = "y" + y;
+		y.Font = new System.Drawing.Font("Segoe UI", 7F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 238);
 		y.Size = new System.Drawing.Size(textsize, butsize);
 		//y.TabIndex = ++pointTabIndex;
 		if (y.Enabled = i > 0)
-			y.TextChanged += (object sender, EventArgs e) => { if (ParseRetextDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childY[i])) return;
+			y.TextChanged += (object sender, EventArgs e) => { if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childY[i])) return;
 				generator.GetFractal().edit = true; 
 			};
 
-	a.Location = new System.Drawing.Point(10 + 2 * textsize, 30 + i * butsize);
+	a.Location = new System.Drawing.Point(10 + 2 * textsize, 10 + i * butsize);
 		a.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 		a.Name = "a" + i;
+		a.Font = new System.Drawing.Font("Segoe UI", 7F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 238);
 		a.Size = new System.Drawing.Size(textsize, butsize);
 		//a.TabIndex = ++pointTabIndex;
-		a.TextChanged += (object sender, EventArgs e) => { if (ParseRetextDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childAngle[generator.selectChildAngle].Item2[i])) return;
+		a.TextChanged += (object sender, EventArgs e) => { if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childAngle[generator.selectChildAngle].Item2[i])) return;
 			generator.GetFractal().edit = true;
 		};
 
-c.Location = new System.Drawing.Point(10 + 3 * textsize, 30 + i * butsize);
+c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
 		c.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 		c.Name = "c" + i;
 		c.Size = new System.Drawing.Size(butsize, butsize);
@@ -1055,9 +1057,10 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 30 + i * butsize);
 			generator.GetFractal().edit = true;
 			QueueReset();
 		};
-		d.Location = new System.Drawing.Point(10 + 3 * textsize + butsize, 30 + i * butsize);
+		d.Location = new System.Drawing.Point(10 + 3 * textsize + butsize, 10 + i * butsize);
 		d.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 		d.Name = "d" + i;
+		d.Font = new System.Drawing.Font("Segoe UI", 7F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 238);
 		d.Size = new System.Drawing.Size(23, 23);
 		//d.TabIndex = ++pointTabIndex;
 		if (d.Enabled = i > 0)
@@ -1101,7 +1104,7 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 30 + i * butsize);
 				f.edit = true;
 				QueueReset();
 			};
-		addPoint.Location = new(10, 30 + (i + 1) * butsize);
+		addPoint.Location = new(10, 10 + (i + 1) * butsize);
 	}
 	private void AddPoint_Click(object sender, EventArgs e) {
 		int i = editorPoint.Count;
@@ -1226,7 +1229,7 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 30 + i * butsize);
 		f.edit = false;
 	}
 	private void SaveSettings() {
-		var f = generator.GetFractal();
+	var f = generator.GetFractal();
 		File.WriteAllText("settings.txt", "fractal|" + fractalSelect.Text + "|path|" + f.path + "|edit|" + (editorPanel.Visible ? 1 : 0) + "|angle|" + angleSelect.SelectedIndex + "|color|" + colorSelect.SelectedIndex + "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
 			+ "|w|" + resX.Text + "|h|" + resY.Text + "|res|" + resSelect.SelectedIndex + "|period|" + periodBox.Text + "|periodmul|" + periodMultiplierBox.Text + "|zoom|" + zoomSelect.SelectedIndex + "|defaultzoom|" + defaultZoom.Text
 			+ "|spin|" + spinSelect.SelectedIndex + "|spinmul|" + spinSpeedBox.Text + "|defaultangle|" + defaultAngle.Text + "|hue|" + hueSelect.SelectedIndex + "|huemul|" + hueSpeedBox.Text + "|defaulthue|" + defaultHue.Text + "|amb|" + ambBox.Text
@@ -1245,21 +1248,21 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 30 + i * butsize);
 				case "path": if (v != "" && File.Exists(v)) _ = LoadFractal(v, true); break;
 				case "fractal": fractalSelect.SelectedItem = v; break;
 				case "edit": if(p) generatorPanel.Visible = !(editorPanel.Visible = n > 0); break;
-				case "angle": angleSelect.SelectedIndex = n; break;
-				case "color": colorSelect.SelectedIndex = n; break;
-				case "cut": if(cutSelect.Items.Count < n) cutSelect.SelectedIndex = n;	break;
+				case "angle": if (p) angleSelect.SelectedIndex = n; break;
+				case "color": if (p) colorSelect.SelectedIndex = n; break;
+				case "cut": if (p && cutSelect.Items.Count < n) cutSelect.SelectedIndex = n;	break;
 				case "seed": cutparamBox.Text = v; break;
-				case "w": width = (short)n; break;
-				case "h": height = (short)n; break;
-				case "res": resSelect.SelectedIndex = n; break;
+				case "w": if (p) width = (short)n; break;
+				case "h": if (p) height = (short)n; break;
+				case "res": if (p) resSelect.SelectedIndex = n; break;
 				case "period": periodBox.Text = v; break;
 				case "periodmul": periodMultiplierBox.Text = v; break;
-				case "zoom": zoomSelect.SelectedIndex = n; break;
+				case "zoom": if (p) zoomSelect.SelectedIndex = n; break;
 				case "defaultzoom": defaultZoom.Text = v; break;
-				case "spin": spinSelect.SelectedIndex = n; break;
+				case "spin": if (p) spinSelect.SelectedIndex = n; break;
 				case "spinmul": spinSpeedBox.Text = v; break;
 				case "defaultangle": defaultAngle.Text = v; break;
-				case "hue": hueSelect.SelectedIndex = n; break;
+				case "hue": if (p) hueSelect.SelectedIndex = n; break;
 				case "huemul": hueSpeedBox.Text = v; break;
 				case "defaulthue": defaultHue.Text = v; break;
 				case "amb": ambBox.Text = v; break;
@@ -1274,8 +1277,22 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 30 + i * butsize);
 				case "abort": abortBox.Text = v; break;
 				case "delay": delayBox.Text = v; break;
 				case "ani": if (p) animated = i <= 0; AnimateButton_Click(null, null); break;
-				case "gen": encodeSelect.SelectedIndex = n; break;
+				case "gen": if (p) encodeSelect.SelectedIndex = n;break;
 			}
+		}
+		if (editorPanel.Visible) { 
+			generator.selectGenerationType = FractalGenerator.GenerationType.AnimationRAM;
+			mem_generate = (FractalGenerator.GenerationType)encodeSelect.SelectedIndex;
+			mem_blur = generator.selectBlur;
+			mem_bloom = generator.selectBloom;
+			generator.selectBloom = generator.selectBlur = 0;
+			generator.selectHue = generator.selectDefaultHue = 0;
+			mem_hue = (short)hueSelect.SelectedIndex;
+			if (short.TryParse(defaultHue.Text, out var n))
+				mem_defaulthue = n;
+			abortDelay = 10;
+			if (short.TryParse(abortBox.Text, out n))
+				mem_abort = n;
 		}
 		SetupFractal();
 	}
@@ -1473,19 +1490,19 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 30 + i * butsize);
 		
 	}
 	private void SizeBox_TextChanged(object sender, EventArgs e) { 
-		if(ParseRetextDiffApply(sizeBox, ref generator.GetFractal().childSize))return; 
+		if(ParseDiffApply(sizeBox, ref generator.GetFractal().childSize))return; 
 		generator.GetFractal().edit = true; 
 	}
 	private void CutBox_TextChanged(object sender, EventArgs e) { 
-		if(ParseRetextDiffApply(cutBox, ref generator.GetFractal().cutSize))return; 
+		if(ParseDiffApply(cutBox, ref generator.GetFractal().cutSize))return; 
 		generator.GetFractal().edit = true; 
 	}
 	private void MinBox_TextChanged(object sender, EventArgs e) {
-		if(ParseRetextDiffApply(minBox, ref generator.GetFractal().minSize)) return; 
+		if(ParseDiffApply(minBox, ref generator.GetFractal().minSize)) return; 
 		generator.GetFractal().edit = true; 
 	}
 	private void MaxBox_TextChanged(object sender, EventArgs e) {
-		if(ParseRetextDiffApply(maxBox, ref generator.GetFractal().maxSize)) return;
+		if(ParseDiffApply(maxBox, ref generator.GetFractal().maxSize)) return;
 		generator.GetFractal().edit = true; 
 	}
 	private void Hash() {
