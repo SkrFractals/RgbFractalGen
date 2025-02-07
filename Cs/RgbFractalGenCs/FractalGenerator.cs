@@ -724,6 +724,7 @@ internal class FractalGenerator {
 				int div = 1 << (previewFrames - task.bitmapIndex);
 				task.applyWidth = (short)(selectWidth / div);
 				task.applyHeight = (short)(selectHeight / div);
+
 			} else {
 				task.applyWidth = selectWidth;
 				task.applyHeight = selectHeight;
@@ -1232,7 +1233,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				void NoiseSaturate(FractalTask task, int y, ref byte* p) {
 					var voidY = task.voidDepth[y];
 					var buffY = task.buffer[y];
-					var fy = (float)y / selectVoid;
+					var fy = (float)y / applyVoid;
 					int startY = (int)MathF.Floor(fy);
 					var alphaY = fy - startY;
 					//if (selectAmbient <= 0) // noise is always 0 if ambient is zero, so it should't even get to this function
@@ -1240,7 +1241,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					//else 
 					for (var x = 0; x < task.applyWidth; ++x) {
 						var voidAmb = voidY[x] / task.voidDepthMax;
-						var fx = (float)x / selectVoid;
+						var fx = (float)x / applyVoid;
 						int startX = (int)MathF.Floor(fx);
 						var alphaX = fx - startX;
 						var vy0 = task.voidNoise[startY];
@@ -1253,15 +1254,15 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				void NoiseNoSaturate(FractalTask task, int y, ref byte* p) {
 					var voidY = task.voidDepth[y];
 					var buffY = task.buffer[y];
-					var fy = (float)y / selectVoid;
+					var fy = (float)y / applyVoid;
 					int startY = (int)MathF.Floor(fy);
 					var alphaY = fy - startY;
 					//if (selectAmbient <= 0) // noise is always 0 if ambient is zero, so it should't even get to this function
 					//	for (var x = 0; x < task.applyWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), ref p)) ;
 					//else 
-					for (var x = 0; x < selectWidth; ++x) {
+					for (var x = 0; x < task.applyWidth; ++x) {
 						var voidAmb = voidY[x] / task.voidDepthMax;
-						var fx = (float)x / selectVoid;
+						var fx = (float)x / applyVoid;
 						int startX = (int)MathF.Floor(fx);
 						var alphaX = fx - startX;
 						var vy0 = task.voidNoise[startY];
@@ -1298,10 +1299,10 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
 				// Switch between th selected settings such as saturation, noise, image parallelism...
 				var maxGenerationTasks = (short)Math.Max(1, applyMaxTasks - 1);
-				int wv = task.applyWidth / selectVoid + 2;
+				int wv = task.applyWidth / applyVoid + 2;
+				var stride = bitmapData[task.bitmapIndex].Stride;//3 * selectWidth;
 				if (applyParallelType > ParallelType.OfAnimation && maxGenerationTasks > 1) {
 					// Multi Threaded
-					var stride = 3 * selectWidth;
 					var po = new ParallelOptions {
 						MaxDegreeOfParallelism = maxGenerationTasks,
 						CancellationToken = cancel.Token
@@ -1309,7 +1310,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					try {
 						if (ambnoise > 0 && applyGenerationType != GenerationType.HashParam) {
 							var threadRand = new ThreadLocal<Random>(() => new(Guid.NewGuid().GetHashCode()));
-							Parallel.For(0, task.applyHeight / selectVoid + 2, po, y => {
+							Parallel.For(0, task.applyHeight / applyVoid + 2, po, y => {
 								var r = threadRand.Value;
 								var v = task.voidNoise[y];// = new Vector3[wv];
 								for (int x = 0; x < wv; ++x)
@@ -1335,29 +1336,36 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						}
 					} catch (Exception) { }
 				} else {
+					byte* rp;
 					// Single Threaded
 					if (ambnoise > 0 && applyGenerationType != GenerationType.HashParam) {
-						for (int y = 0; y < task.applyHeight / selectVoid + 2; ++y) {
+						for (int y = 0; y < task.applyHeight / applyVoid + 2; ++y) {
 							var r = random;
 							var v = task.voidNoise[y];// = new Vector3[wv];
 							for (int x = 0; x < wv; ++x)
 								v[x] = new Vector3(r.Next(ambnoise), r.Next(ambnoise), r.Next(ambnoise));
 						};
-						if (selectSaturate > 0.0) for (short y = 0; y < task.applyHeight; NoiseSaturate(task, y++, ref p)) {
+						if (selectSaturate > 0.0) for (short y = 0; y < task.applyHeight; NoiseSaturate(task, y++, ref rp)) {
 								if (cancel.Token.IsCancellationRequested)
 									break;
+								rp = p + y * stride;
 							}
-						else for (short y = 0; y < task.applyHeight; NoiseNoSaturate(task, y++, ref p))
+						else for (short y = 0; y < task.applyHeight; NoiseNoSaturate(task, y++, ref rp)) {
 								if (cancel.Token.IsCancellationRequested)
 									break;
+								rp = p + y * stride;
+							}
 					} else {
-						if (selectSaturate > 0.0) for (short y = 0; y < task.applyHeight; NoNoiseSaturate(task, y++, ref p)) {
+						if (selectSaturate > 0.0) for (short y = 0; y < task.applyHeight; NoNoiseSaturate(task, y++, ref rp)) {
 								if (cancel.Token.IsCancellationRequested)
 									break;
+								rp = p + y * stride;
 							}
-						else for (short y = 0; y < task.applyHeight; NoNoiseNoSaturate(task, y++, ref p))
+						else for (short y = 0; y < task.applyHeight; NoNoiseNoSaturate(task, y++, ref rp)) {
 								if (cancel.Token.IsCancellationRequested)
 									break;
+								rp = p + y * stride;
+							}
 					}
 				}
 			}
@@ -1828,7 +1836,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			_ => (short)(debug > 0 ? debug : selectPeriod * finalPeriodMultiplier),
 		};
 
-		previewFrames = (int)Math.Log2(Math.Min(selectWidth, selectHeight)) - 1;
+		previewFrames = Math.Max(0, (int)Math.Log2(Math.Min(selectWidth, selectHeight)) - 2);
 
 		frames += previewFrames;
 		if (frames != allocatedFrames) {
