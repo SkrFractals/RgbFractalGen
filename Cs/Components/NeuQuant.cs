@@ -45,6 +45,7 @@ using System.Threading.Tasks;
 using static Gif.Components.AnimatedGifEncoder;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Gif.Components {
 
@@ -55,10 +56,12 @@ namespace Gif.Components {
 		public byte[] colorTab;         // RGB palette
 		public unsafe byte*
 			pixelsPtr = null;           // BGR bytes (pointer array) from frame
+		public int stride;				// Number of bytes per scanline if using pixelsPtr
+										// (usually 3 * width, but some widths can have few empty bytes at the end of each line, so you should request BitmapData.stride instead)
 		public byte[] pixelsArr;        // BGR bytes (classic array) from frame
 		public bool finished = false;   // Is this task finished? Will let TryWriteFrameIntoFile to write this frame, and release the data
 		public bool failed = false;     // Has something failed in this task?
-		public NeuQuant nq = null;
+		public NeuQuant nq = null;		// This task's instance of NeuQuant
 		public Task thisTask = null;    // If you add task referrence in AddFrame, it will crate its own task, and save it for both that reference and this
 		public int frameIndex;          // Frame index within the animation
 		public BitmapData
@@ -130,6 +133,7 @@ namespace Gif.Components {
 
 		protected EncoderTaskData encode = null;
 		unsafe protected byte* pixelsPtr = null; /* the input image itself as a byte pointer array */
+		protected int thestride;
 		protected byte[] pixelsArr; /* the input image itself as a byte classic array */
 
 		protected int lengthcount; /* lengthcount = H*W*3 */
@@ -137,6 +141,7 @@ namespace Gif.Components {
 		protected int samplefac; /* sampling factor 1..30 */
 
 		protected int factor;
+		protected int w3;
 
 		//   typedef int pixel[4];                /* BGRc */
 		protected int[][] network; /* the network itself - [netsize][4] */
@@ -152,9 +157,10 @@ namespace Gif.Components {
 
 		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 		   ----------------------------------------------------------------------- */
-		unsafe public NeuQuant(EncoderTaskData encode, int len, int sample) {
-			this.encode = encode;
-			lengthcount = len;
+		unsafe public NeuQuant(EncoderTaskData encodeTask, int frameBytes, int sample, int width3) {
+			encode = encodeTask;
+			w3 = width3;
+			lengthcount = frameBytes;
 			samplefac = sample;
 			network = new int[netsize][];
 			for (int i = 0; i < netsize; ++i)
@@ -163,10 +169,11 @@ namespace Gif.Components {
 
 		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 		   ----------------------------------------------------------------------- */
-		unsafe public NeuQuant(byte[] thepic, int len, int sample) {
+		unsafe public NeuQuant(byte[] thepic, int frameBytes, int sample, int width3) {
 			pixelsArr = thepic;
-			lengthcount = len;
+			lengthcount = frameBytes;
 			samplefac = sample;
+			w3 = width3;
 			network = new int[netsize][];
 			for (int i = 0; i < netsize; ++i)
 				InitNetwork(i);
@@ -174,10 +181,11 @@ namespace Gif.Components {
 
 		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters - cancellable
 		   ----------------------------------------------------------------------- */
-		unsafe public NeuQuant(byte[] thepic, int len, int sample, CancellationToken token) {
+		unsafe public NeuQuant(byte[] thepic, int frameBytes, int sample, int width3, CancellationToken token) {
 			pixelsArr = thepic;
-			lengthcount = len;
+			lengthcount = frameBytes;
 			samplefac = sample;
+			w3 = width3;
 			network = new int[netsize][];
 			for (int i = 0; i < netsize; ++i) {
 				if (token.IsCancellationRequested)
@@ -189,10 +197,12 @@ namespace Gif.Components {
 
 		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 		   ----------------------------------------------------------------------- */
-		unsafe public NeuQuant(byte* thepic, int len, int sample) {
+		unsafe public NeuQuant(byte* thepic, int stride, int frameBytes, int sample, int width3) {
 			pixelsPtr = thepic;
-			lengthcount = len;
+			lengthcount = frameBytes;
 			samplefac = sample;
+			w3 = width3;
+			thestride = stride;
 			network = new int[netsize][];
 			for (int i = 0; i < netsize; ++i) 
 				InitNetwork(i);
@@ -200,10 +210,12 @@ namespace Gif.Components {
 
 		/* Initialise network in range (0,0,0) to (255,255,255) and set parameters - cancellable
 		   ----------------------------------------------------------------------- */
-		unsafe public NeuQuant(byte* thepic, int len, int sample, CancellationToken token) {
+		unsafe public NeuQuant(byte* thepic, int stride, int len, int sample, int width3, CancellationToken token) {
 			pixelsPtr = thepic;
 			lengthcount = len;
 			samplefac = sample;
+			thestride = stride;
+			w3 = width3;
 			network = new int[netsize][];
 			for (int i = 0; i < netsize; ++i) {
 				if (token.IsCancellationRequested)
@@ -331,9 +343,11 @@ namespace Gif.Components {
 		protected struct PixelsFrame {
 			internal byte[] arr;
 			unsafe internal byte* ptr;
-			internal unsafe PixelsFrame(byte* ptr, byte[] arr) {
+			internal int stride;
+			internal unsafe PixelsFrame(byte* ptr, byte[] arr, int stride) {
 				this.ptr = ptr;
 				this.arr = arr;
+				this.stride = stride;
 			}
 		}
 
@@ -341,7 +355,7 @@ namespace Gif.Components {
 		   ------------------ */
 		unsafe public bool Learn() {
 
-			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim, modpix;
+			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim, modpix, scanPtr, scanMod;
 			int len = 0;
 			PixelsFrame f;
 			List<PixelsFrame> ani = [];
@@ -350,12 +364,12 @@ namespace Gif.Components {
 				var e = encode;
 				while (e.nextTask != null) {
 					len += lengthcount;
-					ani.Add(new PixelsFrame(e.pixelsPtr, e.pixelsArr));
+					ani.Add(new PixelsFrame(e.pixelsPtr, e.pixelsArr, e.stride));
 					e = e.nextTask;
 				}
 			} else { 
 				len = lengthcount;
-				ani.Add(new PixelsFrame(pixelsPtr, pixelsArr)); 
+				ani.Add(new PixelsFrame(pixelsPtr, pixelsArr, thestride)); 
 			}
 
 			if (len < minpicturebytes)
@@ -381,9 +395,19 @@ namespace Gif.Components {
 
 				// we don't need & 0xff for bytes
 				if (f.ptr != null) {
-					r = (f.ptr[modpix + 0] /*& 0xff*/) << netbiasshift;
-					g = (f.ptr[modpix + 1] /*& 0xff*/) << netbiasshift;
-					b = (f.ptr[modpix + 2] /*& 0xff*/) << netbiasshift;
+					// Calculate the byte offset from the beginning of the row
+					scanMod = modpix % w3;  // modpix is the pixel index (modpix / w3 is the row), w3 = 3 * width (bytes per row)
+					scanPtr = (modpix / w3) * f.stride;  // Find the row in memory (stride accounts for padding)
+
+					// Access the color channels in the correct order (BGR) using the scanMod for the column
+					b = (f.ptr[scanPtr + scanMod]) << netbiasshift;       // Blue channel (first byte)
+					g = (f.ptr[scanPtr + scanMod + 1]) << netbiasshift;   // Green channel (second byte)
+					r = (f.ptr[scanPtr + scanMod + 2]) << netbiasshift;   // Red channel (third byte)
+
+					// original variant not accounting for padding bytes in stride:
+					//r = (f.ptr[modpix + 0] /*& 0xff*/) << netbiasshift;
+					//g = (f.ptr[modpix + 1] /*& 0xff*/) << netbiasshift;
+					//b = (f.ptr[modpix + 2] /*& 0xff*/) << netbiasshift;
 				} else {
 					r = (f.arr[modpix + 0] /*& 0xff*/) << netbiasshift;
 					g = (f.arr[modpix + 1] /*& 0xff*/) << netbiasshift;
@@ -411,7 +435,7 @@ namespace Gif.Components {
 		   ------------------ */
 		unsafe public bool Learn(CancellationToken token) {
 
-			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim, modpix;
+			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim, modpix, scanPtr, scanMod;
 			int len = 0;
 			PixelsFrame f;
 			List<PixelsFrame> ani = [];
@@ -420,14 +444,14 @@ namespace Gif.Components {
 				var e = encode;
 				while (e.nextTask != null) {
 					len += lengthcount;
-					ani.Add(new PixelsFrame(e.pixelsPtr, e.pixelsArr));
+					ani.Add(new PixelsFrame(e.pixelsPtr, e.pixelsArr, e.stride));
 					e = e.nextTask;
 				}
 				delta = (samplepixels = len / (3 * samplefac)) / ncycles;
 				FactorizeLength(token, len);
 			} else {
 				len = lengthcount;
-				ani.Add(new PixelsFrame(pixelsPtr, pixelsArr));
+				ani.Add(new PixelsFrame(pixelsPtr, pixelsArr, thestride));
 				delta = (samplepixels = len / (3 * samplefac)) / ncycles;
 			}
 
@@ -459,9 +483,19 @@ namespace Gif.Components {
 
 						// we don't need & 0xff for bytes
 						if (f.ptr != null) {
-							r = (f.ptr[modpix + 0] /*& 0xff*/) << netbiasshift;
-							g = (f.ptr[modpix + 1] /*& 0xff*/) << netbiasshift;
-							b = (f.ptr[modpix + 2] /*& 0xff*/) << netbiasshift;
+							// Calculate the byte offset from the beginning of the row
+							scanMod = modpix % w3;  // modpix is the pixel index (modpix / w3 is the row), w3 = 3 * width (bytes per row)
+							scanPtr = (modpix / w3) * f.stride;  // Find the row in memory (stride accounts for padding)
+
+							// Access the color channels in the correct order (BGR) using the scanMod for the column
+							b = (f.ptr[scanPtr + scanMod]) << netbiasshift;       // Blue channel (first byte)
+							g = (f.ptr[scanPtr + scanMod + 1]) << netbiasshift;   // Green channel (second byte)
+							r = (f.ptr[scanPtr + scanMod + 2]) << netbiasshift;   // Red channel (third byte)
+
+							// original variant not accounting for padding bytes in stride:
+							//r = (f.ptr[modpix + 0] /*& 0xff*/) << netbiasshift;
+							//g = (f.ptr[modpix + 1] /*& 0xff*/) << netbiasshift;
+							//b = (f.ptr[modpix + 2] /*& 0xff*/) << netbiasshift;
 						} else {
 							r = (f.arr[modpix + 0] /*& 0xff*/) << netbiasshift;
 							g = (f.arr[modpix + 1] /*& 0xff*/) << netbiasshift;

@@ -24,10 +24,14 @@
     <ProjectReference Include="..\Components\Components.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
+    <Reference Include="AForge.Video.FFMPEG">
+      <HintPath>AForge.Video.FFMPEG.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <None Update="ffmpeg.exe">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="README.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

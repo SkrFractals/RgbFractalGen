@@ -162,8 +162,11 @@ RESTART
 Generation Options:
 - Only Image: Will only render one still image
 - Animation RAM: Will render the animation without encoding a GIF, about 2x faster, but can't export the file afterwards
-- Encode GIF: Wil lencode a GIF during the generation, so you could save it when finished.
-
+- Local GIF: Will encode a GIF during the generation, so you could save it when finished.
+- Global GIF: Will encode a GIF while only analyzing the first frame's colors. Not recommended when shifting hues.
+- Mp4: Will encode an Mp4. (not currently available)
+- All Param: Will generate all the CutFunction seeds instead of a zoom.
+- Hash Param: Like All param, but it's used to export all the unique seeds into a file.
 
 Help:
 - Displays this text, you might already know this though...
@@ -175,6 +178,14 @@ Save GIF:
 - Save the finished animation into a GIF
 - Must have selected "Encode GIF" Generation Option above
 - Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
+
+Debug Log:
+- Will show a state list of CPU threads and images.
+
+Save Mp4:
+- Will use the included ffmpeg.exe to save your animation as mp4.
+- It converts the encoded GIF, so you have to run Local GIf, Global GIF or AllParam generation mode to be able to Save Mp4.
+- You can use it before of after saving the GIF.
 
 ---------------------------------------------------------------------------------------------------------
 

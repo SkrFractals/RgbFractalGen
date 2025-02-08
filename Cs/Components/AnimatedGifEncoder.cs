@@ -5,6 +5,8 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+
 
 #region .NET Disclaimer/Info
 //===============================================================================
@@ -389,29 +391,33 @@ namespace Gif.Components {
 		 * Adds next GIF frame.
 		 * 
 		 * @param byte* pixels - a byte pointer array of image pixels containing frame to write.
+		 * @param int stride - the number of bytes per scan line (usually 3 * width for BGR, but some widths have few unused bytes at the end, so you should ask BitmapData.Stride)
 		 * @param frameIndex - leave empty -1 if you are adding frames sequentially, or input the frameIndex (from 0 to images-1) if you are adding out of order. DO NOT MIX -1 and out of order for the same gif! 
 		 * @return true if successful.
 		 */
-		public unsafe bool AddFrame(byte* pixels, int frameIndex = -1) {
+		public unsafe bool AddFrame(byte* pixels, int stride, int frameIndex = -1) {
 			var encodeData = NextEncodeData(frameIndex, out var first);
 			if (encodeData == null)
 				return Abort();
 			encodeData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
+			encodeData.stride = stride;
 			return UntaskedFrame(encodeData, first);
 		}
 		/**
 		 * Adds next GIF frame - cancellable.
 		 * 
 		 * @param byte* pixels - a byte pointer array of image pixels containing frame to write.
+		 * @param int stride - the number of bytes per scan line (usually 3 * width for BGR, but some widths have few unused bytes at the end, so you should ask BitmapData.Stride)
 		 * @param CancellationToken token - a token that can trigger a cancell from outside.
 		 * @param frameIndex - leave empty -1 if you are adding frames sequentially, or input the frameIndex (from 0 to images-1) if you are adding out of order. DO NOT MIX -1 and out of order for the same gif! 
 		 * @return true if successful.
 		 */
-		public unsafe bool AddFrame(byte* pixels, CancellationToken token, int frameIndex = -1) {
+		public unsafe bool AddFrame(byte* pixels, int stride, CancellationToken token, int frameIndex = -1) {
 			var encodeData = NextEncodeData(frameIndex, out var first);
 			if (encodeData == null)
 				return Abort();
 			encodeData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
+			encodeData.stride = stride;
 			return UntaskedFrame(encodeData, first, token);
 		}
 		/**
@@ -523,15 +529,17 @@ namespace Gif.Components {
 		 * Make sure to finish writing the animation with TryWriteFrameIntoFile after
 		 * 
 		 * @param byte* pixels - a byte array of image pixels containing frame to write. (from LockBits)
+		 * @param int stride - the number of bytes per scan line (usually 3 * width for BGR, but some widths have few unused bytes at the end, so you should ask BitmapData.Stride)
 		 * @param CancellationToken token - a token that can trigger a cancell from outside.
 		 * @param frameIndex - leave empty -1 if you are adding frames sequentially, or input the frameIndex (from 0 to images-1) if you are adding out of order. DO NOT MIX -1 and out of order for the same gif! 
 		 * @return true if successful.
 		 */
-		unsafe public bool AddFrameParallel(byte* pixels, CancellationToken token, int frameIndex = -1) {
+		unsafe public bool AddFrameParallel(byte* pixels, int stride, CancellationToken token, int frameIndex = -1) {
 			var encodeData = NextEncodeData(frameIndex, out var first);
 			if (encodeData == null)
 				return Abort();
 			encodeData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
+			encodeData.stride = stride;
 			return AddFrameTask(encodeData, first, token); // here it normally continued with the code for writing to file, but i have moved that to TryWriteFrameIntoFile where it will wait for the first next task to complete
 		}
 		/**
@@ -540,16 +548,18 @@ namespace Gif.Components {
 		 * Make sure to finish writing the animation with TryWriteFrameIntoFile after
 		 *
 		 * @param byte* pixels - a byte pointer array of image pixels containing frame to write. (from LockBits)
+		 * @param int stride - the number of bytes per scan line (usually 3 * width for BGR, but some widths have few unused bytes at the end, so you should ask BitmapData.Stride)
 		 * @param Task task - if not null, it will start its own task and write it into the reference, otherwise it should be already ran in parallel task from the program above
 		 * @param CancellationToken token - a token that can trigger a cancell from outside.
 		 * @param frameIndex - leave empty -1 if you are adding frames sequentially, or input the frameIndex (from 0 to images-1) if you are adding out of order. DO NOT MIX -1 and out of order for the same gif! 
 		 * @return true if successful.
 		 */
-		unsafe public bool AddFrameParallel(byte* pixels, ref Task task, CancellationToken token, int frameIndex = -1) {
+		unsafe public bool AddFrameParallel(byte* pixels, int stride, ref Task task, CancellationToken token, int frameIndex = -1) {
 			var encodeData = NextEncodeData(frameIndex, out var first);
 			if (encodeData == null)
 				return Abort();
 			encodeData.pixelsPtr = pixels; // was this.pixels, moved that into the taskData
+			encodeData.stride = stride;
 			return MakeFrameTask(encodeData, first, ref task, token);
 		}
 		#endregion
@@ -564,8 +574,8 @@ namespace Gif.Components {
 			// each instance of NeuQuant will write the data into its own EncoderTaskData
 			// so it can be remembered for the later sequential write
 			encodeData.nq = encodeData.pixelsPtr == null
-				? new NeuQuant(encodeData.pixelsArr, len, sample)
-				: new NeuQuant(encodeData.pixelsPtr, len, sample);
+				? new NeuQuant(encodeData.pixelsArr, len, sample, width * 3)
+				: new NeuQuant(encodeData.pixelsPtr, encodeData.stride, len, sample, width * 3);
 			encodeData.colorTab = encodeData.nq.Process(); // create reduced palette
 			return false;
 		}
@@ -578,7 +588,7 @@ namespace Gif.Components {
 			// initialize quantizer
 			// each instance of NeuQuant will write the data into its own EncoderTaskData
 			// so it can be remembered for the later sequential write
-			encodeData.nq = new NeuQuant(encodeData, len, sample);
+			encodeData.nq = new NeuQuant(encodeData, len, sample, width * 3);
 			encodeData.colorTab = encodeData.nq.Process(); // create reduced palette
 			return false;
 		}
@@ -591,17 +601,22 @@ namespace Gif.Components {
 			// I didn't find any use of this usedEntry variable anywhere else in the code
 			// it only gets set here, and never set or read anywhere else, so I think I could just get rid of it...?
 			byte* p = encodeData.pixelsPtr;
+
 			if (p == null) {
 				byte[] pa = encodeData.pixelsArr;
 				for (int x = width * height, i = 0, pi = 0; x > 0; --x)
 					//usedEntry[
 					encodeData.indexedPixels[i++] = (byte)nq.Map(pa[pi++], pa[pi++], pa[pi++]);
-				//] = true;
-			} else
-				for (int x = width * height, i = 0; x > 0; --x, p += 3)
-					//usedEntry[
-					encodeData.indexedPixels[i++] = (byte)nq.Map(p[0], p[1], p[2]);
-			//] = true;
+					//] = true;
+			} else {
+				for (int y = 0, i = 0; y < height; ++y) {
+					byte* pi = p + encodeData.stride * y;
+					for (int x = 0; x < width; ++x, pi += 3)
+						//usedEntry[
+						encodeData.indexedPixels[i++] = (byte)nq.Map(pi[0], pi[1], pi[2]);
+					//] = true;
+				}
+			}
 
 			//colorDepth = 8; // Thiso only gets set to 8 here, never to anythign else, so I guess I could just this out and set it in constructor and not worry about paralellizing this, and could delte it here
 			//palSize = 7; // This one as well, I will also just set it in constructor, and delete this line here
@@ -625,8 +640,8 @@ namespace Gif.Components {
 			// each instance of NeuQuant will then write the data into its own EncoderTaskData
 			// so it can be remembered for the later sequential write
 			encodeData.nq = encodeData.pixelsPtr == null
-				? new NeuQuant(encodeData.pixelsArr, len, sample, token)
-				: new NeuQuant(encodeData.pixelsPtr, len, sample, token);
+				? new NeuQuant(encodeData.pixelsArr, len, sample, width * 3, token)
+				: new NeuQuant(encodeData.pixelsPtr, encodeData.stride, len, sample, width * 3, token);
 			encodeData.colorTab = encodeData.nq.Process(token); // create reduced palette
 			return token.IsCancellationRequested;
 		}
@@ -637,7 +652,7 @@ namespace Gif.Components {
 			// initialize quantizer
 			// each instance of NeuQuant will write the data into its own EncoderTaskData
 			// so it can be remembered for the later sequential write
-			encodeData.nq = new NeuQuant(encodeData, len, sample);
+			encodeData.nq = new NeuQuant(encodeData, len, sample, width * 3);
 			encodeData.colorTab = encodeData.nq.Process(token); // create reduced palette
 			return token.IsCancellationRequested;
 		}
@@ -651,22 +666,22 @@ namespace Gif.Components {
 			byte* p = encodeData.pixelsPtr;
 			if (p == null) {
 				byte[] pa = encodeData.pixelsArr;
-
-				for (int x = 0, i = 0, pi = 0; x < width; ++x) {
+				for (int y = 0, i = 0, pi = 0; y < height; ++y) {
 					if (token.IsCancellationRequested)
 						return true;
-					for (int y = 0; y < height; ++y)
+					for (int x = 0; x < width; ++x)
 						//usedEntry[
 						encodeData.indexedPixels[i++] = (byte)nq.Map(pa[pi++], pa[pi++], pa[pi++]);
 					//] = true;
 				}
 			} else {
-				for (int x = 0, i = 0; x < width; ++x) {
+				for (int y = 0, i = 0; y < height; ++y) {
 					if (token.IsCancellationRequested)
 						return true;
-					for (int y = 0; y < height; ++y, p += 3)
+					byte* pi = p + encodeData.stride * y;
+					for (int x = 0; x < width; ++x, pi += 3)
 						//usedEntry[
-						encodeData.indexedPixels[i++] = (byte)nq.Map(p[0], p[1], p[2]);
+						encodeData.indexedPixels[i++] = (byte)nq.Map(pi[0], pi[1], pi[2]);
 					//] = true;
 				}
 			}

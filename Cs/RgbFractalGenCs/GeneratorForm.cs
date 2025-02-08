@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Collections.Generic;
 
+//using FFmpeg.AutoGen;
+
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public partial class GeneratorForm : Form {
@@ -51,7 +53,8 @@ public partial class GeneratorForm : Form {
 	protected int maxTasks = 0;                 // Maximum tasks available
 	protected short abortDelay = 500;           // Set time to restart generator
 	protected short restartTimer = 0;
-	private string gifPath;                     // Gif export path name
+	private string gifPath = "";                // Gif export path name
+	private string mp4Path = "";				// Mp4 export path name
 	private Fractal tosave = null;
 
 	// Display Variables
@@ -101,6 +104,7 @@ public partial class GeneratorForm : Form {
 				control.TabIndex = ++controlTabIndex;
 				MyControls.Add(control);
 			}
+			bInit = false;
 
 			// Init the generator
 			foreach (var i in generator.GetFractals())
@@ -122,8 +126,6 @@ public partial class GeneratorForm : Form {
 			SetupControl(addCut, "Add a CutFunction (so far only the precoded are avaiable)");
 			SetupControl(loadButton, "Load a fractal definition from a file.");
 			SetupControl(saveButton, "Save the selected fractal definiton to a file.");
-
-
 			SetupControl(fractalSelect, "Select the type of fractal to generate");
 			SetupControl(modeButton, "Toggle between editor and generator.");
 			SetupControl(angleSelect, "Select the children angles definition.");
@@ -176,6 +178,7 @@ public partial class GeneratorForm : Form {
 			PeriodMultiplierBox_TextChanged(null, null);
 			ParallelTypeSelect_SelectedIndexChanged(null, null);
 			DelayBox_TextChanged(null, null);
+			FpsBox_TextChanged(null, null);
 			DefaultZoom_TextChanged(null, null);
 			SpinSpeedBox_TextChanged(null, null);
 			HueSpeedBox_TextChanged(null, null);
@@ -204,10 +207,11 @@ public partial class GeneratorForm : Form {
 			FillEditor();
 
 			// Start the generator
-			bInit = modifySettings = helpPanel.Visible = false;
+			modifySettings = helpPanel.Visible = false;
 			TryResize();
 			ResizeAll();
 			aTask = gTask = null;
+			generator.restartGif = false;
 			generator.StartGenerate();
 
 			// Load all extra fractal files
@@ -324,7 +328,7 @@ public partial class GeneratorForm : Form {
 				ResizeAll();
 				restartButton.Enabled = true;
 				ResetRestart();
-
+				generator.restartGif = false;
 				generator.StartGenerate();
 				// Wait until finished
 				while (generator.GetBitmapsFinished() < generator.GetFrames()) ;
@@ -352,6 +356,7 @@ public partial class GeneratorForm : Form {
 				ResizeAll();
 				restartButton.Enabled = true;
 				ResetRestart();
+				generator.restartGif = false;
 				generator.StartGenerate();
 			}
 		}
@@ -362,18 +367,19 @@ public partial class GeneratorForm : Form {
 		if (bitmapsTotal <= 0)
 			return;
 		// Only Allow GIF Export when generation is finished
+		string v = generator.selectGenerationType == FractalGenerator.GenerationType.Mp4 ? "Mp4" : "Gif";
 		if (gTask == null) {
-			gifButton.Enabled = aTask == null && (isGifReady = generator.IsGifReady()) > 0;
-			gifButton.Text = "Save GIF";
-		} else if (gifButton.Text != "Cancel Saving GIF") {
+			gifButton.Enabled = aTask == null && (isGifReady = generator.IsGifReady()) != 0;
+			gifButton.Text = "Save " + v;
+		} else if (gifButton.Text != "Cancel Saving " + v) {
 			gifButton.Enabled = true;
-			gifButton.Text = "Cancel Saving GIF";
+			gifButton.Text = "Cancel Saving " + v;
 		}
 		// Fetch a bitmap to display
-		var bitmap = bitmapsFinished > 0 
+		var bitmap = bitmapsFinished > 0
 			? generator.GetBitmap(currentBitmapIndex = (animated ? currentBitmapIndex + 1 : currentBitmapIndex) % bitmapsFinished) // Make sure the index is is range
 			: generator.GetPreviewBitmap(); // Try preview bitmap if none of the main ones are generated yet
-		// Update the display with it if necessary
+											// Update the display with it if necessary
 		if (currentBitmap != bitmap) {
 			currentBitmap = bitmap;
 			screenPanel.Invalidate();
@@ -446,7 +452,7 @@ public partial class GeneratorForm : Form {
 				e.Cancel = true;
 				return;
 			}
-			
+
 		}
 		bool saved = false;
 		foreach (var f in generator.GetFractals()) {
@@ -477,7 +483,7 @@ public partial class GeneratorForm : Form {
 			e.Cancel = true;
 			return;
 		}
-		
+
 		cancel?.Cancel();
 		gTask?.Wait();
 		aTask?.Wait();
@@ -503,7 +509,7 @@ public partial class GeneratorForm : Form {
 
 			if (isGifReady > 80) {
 				var result = MessageBox.Show(
-					"You have encoded gif available to save.\nDo you want to save it?\nCacenl will turn off gif encoding so you won't keep getting this warning again.",
+					"You have encoded gif available to save.\nDo you want to save it?\nCancel will turn off gif encoding so you won't keep getting this warning again.",
 					"Saave GIF",
 					MessageBoxButtons.YesNoCancel,
 					MessageBoxIcon.Question);
@@ -529,8 +535,8 @@ public partial class GeneratorForm : Form {
 		restartButton.Text = "! RESTART !";
 	}
 	private bool TasksNotRunning() => aTask == null && gTask == null;
-	private static bool Clean(System.Windows.Forms.TextBox BOX) { string s = BOX.Text; s.Replace(';', ' '); s.Replace('|', ' '); s.Replace(':', ' ');  if (s != BOX.Text) { BOX.Text = s; return true; }; return false; }
-	private static short ParseShort(System.Windows.Forms.TextBox BOX) { Clean(BOX);  return short.TryParse(BOX.Text, out var v) ? v : (short)0; }
+	private static bool Clean(System.Windows.Forms.TextBox BOX) { string s = BOX.Text; s.Replace(';', ' '); s.Replace('|', ' '); s.Replace(':', ' '); if (s != BOX.Text) { BOX.Text = s; return true; }; return false; }
+	private static short ParseShort(System.Windows.Forms.TextBox BOX) { Clean(BOX); return short.TryParse(BOX.Text, out var v) ? v : (short)0; }
 	private static int ParseInt(System.Windows.Forms.TextBox BOX) { Clean(BOX); return int.TryParse(BOX.Text, out var v) ? v : 0; }
 	private static float ParseFloat(System.Windows.Forms.TextBox BOX) { Clean(BOX); return float.TryParse(BOX.Text, out var v) ? v : 0.0f; }
 	private static T Clamp<T>(T NEW, T MIN, T MAX) where T : struct, IComparable<T> => NEW.CompareTo(MIN) < 0 ? MIN : NEW.CompareTo(MAX) > 0 ? MAX : NEW;
@@ -656,7 +662,7 @@ public partial class GeneratorForm : Form {
 	/// <summary>
 	/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
 	/// </summary>
-	private void FillCutParams() { 
+	private void FillCutParams() {
 		CutParamBoxEnabled(generator.GetCutFunction());
 		cutparamBox.Text = "0";
 	}
@@ -714,12 +720,21 @@ public partial class GeneratorForm : Form {
 			return;
 		// Delay is diffenret, change it, and restart the generation if ou were encoding a gif
 		generator.selectDelay = newDelay;
-		var fpsrate = 100 / generator.selectDelay;
+		if (100 / generator.selectFps != generator.selectDelay)
+			generator.selectFps = (short)(100 / generator.selectDelay);
 		timer.Interval = generator.selectDelay * 10;
-		delayLabel.Text = "Abort / FPS: " + fpsrate.ToString();
+		delayLabel.Text = "Abort / FPS: " + generator.selectFps.ToString();
 		if (generator.selectGenerationType is >= FractalGenerator.GenerationType.EncodeGIF and <= FractalGenerator.GenerationType.AllParam)
 			generator.restartGif = true;
-			//QueueReset();
+		//QueueReset();
+	}
+	private void FpsBox_TextChanged(object sender, EventArgs e) {
+		var newFps = ParseClampRetext(fpsBox, (short)1, (short)120);
+		if (generator.selectFps == newFps)
+			return;
+		generator.selectFps = newFps;
+		delayBox.Text = (100 / newFps).ToString();
+		timer.Interval = 1000 / generator.selectFps;
 	}
 	private void MoveFrame(int move) { animated = false; var b = generator.GetBitmapsFinished(); currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b; }
 	private void PrevButton_Click(object sender, EventArgs e) => MoveFrame(-1);
@@ -741,9 +756,19 @@ public partial class GeneratorForm : Form {
 		QueueReset(true);
 	}
 	private void EncodeSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		if ((FractalGenerator.GenerationType)encodeSelect.SelectedIndex == FractalGenerator.GenerationType.Mp4) {
+			encodeSelect.SelectedIndex = 2;
+			MessageBox.Show(
+				"Sorry but direct Mp4 encoding is currently broken and unavailable, try again in a later release.\nFor now you can use Local GIF and then press the GIF -> Mp4 button instead.",
+				"Unavailable",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+			return;
+		}
+
 		var prev = generator.selectGenerationType;
 		var now = generator.selectGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex);
-		if ((now is >= FractalGenerator.GenerationType.OnlyImage and <= FractalGenerator.GenerationType.GlobalGIF) != (prev is >= FractalGenerator.GenerationType.OnlyImage and <= FractalGenerator.GenerationType.GlobalGIF))
+		if ((now is >= FractalGenerator.GenerationType.OnlyImage and <= FractalGenerator.GenerationType.Mp4) != (prev is >= FractalGenerator.GenerationType.OnlyImage and <= FractalGenerator.GenerationType.Mp4))
 			QueueReset();
 	}
 	private void HelpButton_Click(object sender, EventArgs e) {
@@ -751,7 +776,7 @@ public partial class GeneratorForm : Form {
 		screenPanel.Visible = !screenPanel.Visible;
 	}
 	private void PngButton_Click(object sender, EventArgs e) => savePng.ShowDialog();
-	private void GifButton_Click(object sender, EventArgs e) => saveGif.ShowDialog();
+
 	private void DebugBox_CheckedChanged(object sender, EventArgs e) {
 		if (!(generator.debugmode = debugBox.Checked))
 			debugLabel.Text = "";
@@ -782,6 +807,36 @@ public partial class GeneratorForm : Form {
 			}
 		}
 	}
+	private void SaveVideoButton_Click(object sender, EventArgs e) => SaveVideo();
+	private DialogResult SaveVideo() => generator.selectGenerationType == FractalGenerator.GenerationType.Mp4 ? saveMp4.ShowDialog() : saveGif.ShowDialog();
+
+	private void Mp4Button_Click(object sender, EventArgs e) {
+		string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+		if (!File.Exists(ffmpegPath)) {
+			MessageBox.Show(
+				"ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
+				"Unavailable",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+			return;
+		}
+		if (gTask != null) {
+			MessageBox.Show(
+				"GIF or Mp4 is still saving, either wait until it's finished, or click this button before saving the GIF.",
+				"Unavailable",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+			return;
+		}
+		if (gifButton.Enabled) {
+			convertMp4.ShowDialog();
+			return;
+		}
+		if (gifPath != "") {
+			convertMp4.ShowDialog();
+			return;
+		}
+	}
 	/// <summary>
 	/// User inputed the path and name for saving PNG
 	/// </summary>
@@ -796,12 +851,12 @@ public partial class GeneratorForm : Form {
 		}
 	}
 	/// <summary>
-	/// User inputed the path and name for saving GIF
+	/// User inputed the path and name for saving GIF/Mp4
 	/// </summary>
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
 	/// <returns></returns>
-	private void SaveGif_FileOk(object sender, CancelEventArgs e) {
+	private void SaveVideo_FileOk(object sender, CancelEventArgs e) {
 		gifButton.Enabled = false;
 		if (gTask != null) {
 			cancel?.Cancel();
@@ -813,6 +868,44 @@ public partial class GeneratorForm : Form {
 		gTask = Task.Run(ExportGif, (cancel = new()).Token);
 	}
 	/// <summary>
+	/// User inputed the path and name for converting GIF -> Mp4
+	/// </summary>
+	/// <param name="sender"></param>
+	/// <param name="e"></param>
+	/// <returns></returns>
+	private void ConvertMp4_FileOk(object sender, CancelEventArgs e) {
+		string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+		if (!File.Exists(ffmpegPath)) {
+			MessageBox.Show(
+				"ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
+				"Unavailable",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+			return;
+		}
+		if (gTask != null) {
+			MessageBox.Show(
+				"GIF or Mp4 is still saving, either wait until it's finished, or click this button before saving the GIF.",
+				"Unavailable",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+			encodeSelect.SelectedIndex = 2;
+			return;
+		}
+		if (gifButton.Enabled) {
+			gifButton.Enabled = false;
+			gifPath = generator.gifTempPath;
+			mp4Path = ((SaveFileDialog)sender).FileName;
+			gTask = Task.Run(ExportMp4, (cancel = new()).Token);
+			return;
+		}
+		if (gifPath != "") {
+			mp4Path = ((SaveFileDialog)sender).FileName;
+			gTask = Task.Run(ExportMp4, (cancel = new()).Token);
+			return;
+		}
+	}
+	/// <summary>
 	/// Exports the animation into a GIF file
 	/// Ackchyually - it just moves the already exported gifX.tmp to you desired location and name
 	/// </summary>
@@ -821,6 +914,14 @@ public partial class GeneratorForm : Form {
 		var attempt = 0;
 		while (++attempt <= 10 && !cancel.Token.IsCancellationRequested && generator.SaveGif(gifPath) > 0)
 			Thread.Sleep(1000);
+		gTask = null;
+	}
+	private void ExportMp4() {
+		var attempt = 0;
+		while (++attempt <= 10 && !cancel.Token.IsCancellationRequested && generator.SaveMp4(gifPath, mp4Path) > 0)
+			Thread.Sleep(1000);
+		gifPath = "";
+		mp4Path = "";
 		gTask = null;
 	}
 	#endregion
@@ -1015,9 +1116,9 @@ public partial class GeneratorForm : Form {
 		//x.TabIndex = ++pointTabIndex;
 		if (x.Enabled = i > 0)
 			x.TextChanged += (object sender, EventArgs e)
-				=> { 
-					if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childX[i])) return; 
-					generator.GetFractal().edit = true; 
+				=> {
+					if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childX[i])) return;
+					generator.GetFractal().edit = true;
 				};
 
 		y.Location = new System.Drawing.Point(10 + textsize, 10 + i * butsize);
@@ -1027,21 +1128,23 @@ public partial class GeneratorForm : Form {
 		y.Size = new System.Drawing.Size(textsize, butsize);
 		//y.TabIndex = ++pointTabIndex;
 		if (y.Enabled = i > 0)
-			y.TextChanged += (object sender, EventArgs e) => { if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childY[i])) return;
-				generator.GetFractal().edit = true; 
+			y.TextChanged += (object sender, EventArgs e) => {
+				if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childY[i])) return;
+				generator.GetFractal().edit = true;
 			};
 
-	a.Location = new System.Drawing.Point(10 + 2 * textsize, 10 + i * butsize);
+		a.Location = new System.Drawing.Point(10 + 2 * textsize, 10 + i * butsize);
 		a.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 		a.Name = "a" + i;
 		a.Font = new System.Drawing.Font("Segoe UI", 7F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 238);
 		a.Size = new System.Drawing.Size(textsize, butsize);
 		//a.TabIndex = ++pointTabIndex;
-		a.TextChanged += (object sender, EventArgs e) => { if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childAngle[generator.selectChildAngle].Item2[i])) return;
+		a.TextChanged += (object sender, EventArgs e) => {
+			if (ParseDiffApply((System.Windows.Forms.TextBox)sender, ref generator.GetFractal().childAngle[generator.selectChildAngle].Item2[i])) return;
 			generator.GetFractal().edit = true;
 		};
 
-c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
+		c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
 		c.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 		c.Name = "c" + i;
 		c.Size = new System.Drawing.Size(butsize, butsize);
@@ -1077,7 +1180,7 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
 				var ca = ca2.Item2;
 				var cc2 = f.childColor[generator.selectChildColor];
 				var cc = cc2.Item2;
-				
+
 				pointPanel.SuspendLayout();
 				UnfillEditor();
 				pointPanel.ResumeLayout(false);
@@ -1229,7 +1332,7 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
 		f.edit = false;
 	}
 	private void SaveSettings() {
-	var f = generator.GetFractal();
+		var f = generator.GetFractal();
 		File.WriteAllText("settings.txt", "fractal|" + fractalSelect.Text + "|path|" + f.path + "|edit|" + (editorPanel.Visible ? 1 : 0) + "|angle|" + angleSelect.SelectedIndex + "|color|" + colorSelect.SelectedIndex + "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
 			+ "|w|" + resX.Text + "|h|" + resY.Text + "|res|" + resSelect.SelectedIndex + "|period|" + periodBox.Text + "|periodmul|" + periodMultiplierBox.Text + "|zoom|" + zoomSelect.SelectedIndex + "|defaultzoom|" + defaultZoom.Text
 			+ "|spin|" + spinSelect.SelectedIndex + "|spinmul|" + spinSpeedBox.Text + "|defaultangle|" + defaultAngle.Text + "|hue|" + hueSelect.SelectedIndex + "|huemul|" + hueSpeedBox.Text + "|defaulthue|" + defaultHue.Text + "|amb|" + ambBox.Text
@@ -1242,24 +1345,24 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
 			return;
 		var s = File.ReadAllText("settings.txt").Split('|');
 		for (int i = 0; i < s.Length - 1; i += 2) {
-			string v = s[i+1];
+			string v = s[i + 1];
 			bool p = int.TryParse(v, out int n);
 			switch (s[i]) {
 				case "path": if (v != "" && File.Exists(v)) _ = LoadFractal(v, true); break;
-				case "fractal": fractalSelect.SelectedItem = v; break;
-				case "edit": if(p) generatorPanel.Visible = !(editorPanel.Visible = n > 0); break;
-				case "angle": if (p) angleSelect.SelectedIndex = n; break;
-				case "color": if (p) colorSelect.SelectedIndex = n; break;
-				case "cut": if (p && cutSelect.Items.Count < n) cutSelect.SelectedIndex = n;	break;
+				case "fractal": if(fractalSelect.Items.Contains(v)) fractalSelect.SelectedItem = v; break;
+				case "edit": if (p) generatorPanel.Visible = !(editorPanel.Visible = n > 0); break;
+				case "angle": if (p) angleSelect.SelectedIndex = Math.Min(angleSelect.Items.Count - 1, n); break;
+				case "color": if (p) colorSelect.SelectedIndex = Math.Min(colorSelect.Items.Count - 1, n); break;
+				case "cut": if (p) cutSelect.SelectedIndex = Math.Min(cutSelect.Items.Count - 1, n); break;
 				case "seed": cutparamBox.Text = v; break;
 				case "w": if (p) width = (short)n; break;
 				case "h": if (p) height = (short)n; break;
-				case "res": if (p) resSelect.SelectedIndex = n; break;
+				case "res": if (p) resSelect.SelectedIndex = Math.Min(resSelect.Items.Count - 1, n); break;
 				case "period": periodBox.Text = v; break;
 				case "periodmul": periodMultiplierBox.Text = v; break;
-				case "zoom": if (p) zoomSelect.SelectedIndex = n; break;
+				case "zoom": if (p) zoomSelect.SelectedIndex = Math.Min(zoomSelect.Items.Count - 1, n); break;
 				case "defaultzoom": defaultZoom.Text = v; break;
-				case "spin": if (p) spinSelect.SelectedIndex = n; break;
+				case "spin": if (p) spinSelect.SelectedIndex = Math.Min(spinSelect.Items.Count - 1, n); break;
 				case "spinmul": spinSpeedBox.Text = v; break;
 				case "defaultangle": defaultAngle.Text = v; break;
 				case "hue": if (p) hueSelect.SelectedIndex = n; break;
@@ -1269,18 +1372,18 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
 				case "noise": noiseBox.Text = v; break;
 				case "saturate": saturateBox.Text = v; break;
 				case "detail": detailBox.Text = v; break;
-				case "bloom": bloomBox.Text = v; break;	
+				case "bloom": bloomBox.Text = v; break;
 				case "blur": blurBox.Text = v; break;
 				case "brightness": brightnessBox.Text = v; break;
-				case "parallel": parallelTypeSelect.SelectedIndex = n; break;
+				case "parallel": parallelTypeSelect.SelectedIndex = Math.Min(parallelTypeSelect.Items.Count - 1, n); break;
 				case "threads": threadsBox.Text = v; break;
 				case "abort": abortBox.Text = v; break;
 				case "delay": delayBox.Text = v; break;
 				case "ani": if (p) animated = i <= 0; AnimateButton_Click(null, null); break;
-				case "gen": if (p) encodeSelect.SelectedIndex = n;break;
+				case "gen": if (p) encodeSelect.SelectedIndex = Math.Min(encodeSelect.Items.Count - 1, n); break;
 			}
 		}
-		if (editorPanel.Visible) { 
+		if (editorPanel.Visible) {
 			generator.selectGenerationType = FractalGenerator.GenerationType.AnimationRAM;
 			mem_generate = (FractalGenerator.GenerationType)encodeSelect.SelectedIndex;
 			mem_blur = generator.selectBlur;
@@ -1467,7 +1570,7 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
 	private void AddCut_SelectedIndexChanged(object sender, EventArgs e) {
 		if (addCut.SelectedIndex < 1)
 			return;
-		int n = addCut.SelectedIndex-1;
+		int n = addCut.SelectedIndex - 1;
 		foreach (var c in generator.GetFractal().cutFunction)
 			if (c.Item1 == n)
 				return;
@@ -1487,28 +1590,26 @@ c.Location = new System.Drawing.Point(10 + 3 * textsize, 10 + i * butsize);
 		performHash = true;
 		QueueReset();
 
-		
+
 	}
-	private void SizeBox_TextChanged(object sender, EventArgs e) { 
-		if(ParseDiffApply(sizeBox, ref generator.GetFractal().childSize))return; 
-		generator.GetFractal().edit = true; 
+	private void SizeBox_TextChanged(object sender, EventArgs e) {
+		if (ParseDiffApply(sizeBox, ref generator.GetFractal().childSize)) return;
+		generator.GetFractal().edit = true;
 	}
-	private void CutBox_TextChanged(object sender, EventArgs e) { 
-		if(ParseDiffApply(cutBox, ref generator.GetFractal().cutSize))return; 
-		generator.GetFractal().edit = true; 
+	private void CutBox_TextChanged(object sender, EventArgs e) {
+		if (ParseDiffApply(cutBox, ref generator.GetFractal().cutSize)) return;
+		generator.GetFractal().edit = true;
 	}
 	private void MinBox_TextChanged(object sender, EventArgs e) {
-		if(ParseDiffApply(minBox, ref generator.GetFractal().minSize)) return; 
-		generator.GetFractal().edit = true; 
+		if (ParseDiffApply(minBox, ref generator.GetFractal().minSize)) return;
+		generator.GetFractal().edit = true;
 	}
 	private void MaxBox_TextChanged(object sender, EventArgs e) {
-		if(ParseDiffApply(maxBox, ref generator.GetFractal().maxSize)) return;
-		generator.GetFractal().edit = true; 
+		if (ParseDiffApply(maxBox, ref generator.GetFractal().maxSize)) return;
+		generator.GetFractal().edit = true;
 	}
 	private void Hash() {
-		
+
 	}
 	#endregion
-
-
 }

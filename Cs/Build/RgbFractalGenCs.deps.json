@@ -9,15 +9,12 @@
       "RgbFractalGenCs/1.0.0": {
         "dependencies": {
           "Gif.Components": "1.0.0",
-          "Microsoft.CSharp": "4.7.0",
-          "System.Data.DataSetExtensions": "4.5.0",
           "Gif.Components.Reference": "0.0.0.0"
         },
         "runtime": {
           "RgbFractalGenCs.dll": {}
         }
       },
-      "Microsoft.CSharp/4.7.0": {},
       "Microsoft.Win32.SystemEvents/9.0.1": {
         "runtime": {
           "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
@@ -34,7 +31,6 @@
           }
         }
       },
-      "System.Data.DataSetExtensions/4.5.0": {},
       "System.Drawing.Common/9.0.1": {
         "dependencies": {
           "Microsoft.Win32.SystemEvents": "9.0.1"
@@ -77,26 +73,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "Microsoft.CSharp/4.7.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-pTj+D3uJWyN3My70i2Hqo+OXixq3Os2D1nJ2x92FFo6sk8fYS1m1WLNTs0Dc1uPaViH0YvEEwvzddQ7y4rhXmA==",
-      "path": "microsoft.csharp/4.7.0",
-      "hashPath": "microsoft.csharp.4.7.0.nupkg.sha512"
-    },
     "Microsoft.Win32.SystemEvents/9.0.1": {
       "type": "package",
       "serviceable": true,
       "sha512": "sha512-OxjcwJqBW/5A1111+vL9d+5KYTvOzeCTJY9zHZ0kpQI4wX075p6L7inHPSYuf0MGakVjUvaShvw9e9pfbInU2Q==",
       "path": "microsoft.win32.systemevents/9.0.1",
       "hashPath": "microsoft.win32.systemevents.9.0.1.nupkg.sha512"
-    },
-    "System.Data.DataSetExtensions/4.5.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-221clPs1445HkTBZPL+K9sDBdJRB8UN8rgjO3ztB0CQ26z//fmJXtlsr6whGatscsKGBrhJl5bwJuKSA8mwFOw==",
-      "path": "system.data.datasetextensions/4.5.0",
-      "hashPath": "system.data.datasetextensions.4.5.0.nupkg.sha512"
     },
     "System.Drawing.Common/9.0.1": {
       "type": "package",

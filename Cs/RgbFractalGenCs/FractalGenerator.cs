@@ -20,7 +20,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
-using System.Reflection.Metadata;
+using System.Diagnostics;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -53,8 +53,9 @@ internal class FractalGenerator {
 		AnimationRAM = 1,   // Will only generate the animation for preview, faster than encoding GIF, but cannot save the GIF when finished.
 		EncodeGIF = 2,      // Will encode a GIF while generating the animation, will be slower than generating the animation without GIF.
 		GlobalGIF = 3,      // Will encode a gif but only analyze the first frame for a color map, much faster, but not recommended for shifting hues or if you want the highest possible quality
-		AllParam = 4,
-		HashParam = 5
+		Mp4 = 4,				// Will encode an mp4
+		AllParam = 5,
+		HashParam = 6
 
 	}
 
@@ -75,7 +76,12 @@ internal class FractalGenerator {
 		internal int bitmapIndex;       // The bitmapIndex of which the task is working on
 		internal short applyWidth, applyHeight; // can be smaller for previews
 		internal short widthBorder, heightBorder; // slightly below the width and height
-		internal float rightEnd, downEnd;	// slightly beyond width and depth, to ensure even bloomed pixels don't cutoff too early
+		internal float rightEnd, downEnd;   // slightly beyond width and depth, to ensure even bloomed pixels don't cutoff too early
+
+		internal float bloom0;
+		internal float bloom1; // = selectBloom + 1;
+		internal float upleftStart; // = -selectBloom;
+
 		internal float lightNormalizer;	// maximum brightness found in the buffer, for normalizing the final image brightness
 		internal float voidDepthMax;	// maximum reached void depth during the dijkstra search, for normalizing the void intensity
 
@@ -139,7 +145,7 @@ internal class FractalGenerator {
 	// Resolution
 	private short allocatedWidth;	// How much buffer width is currently allocated?
 	private short allocatedHeight;	// How much buffer height is currently allocated?
-	private float upleftStart;		// Precomputed minimum x/y for dot iteration/application
+	//private float upleftStart;		// Precomputed minimum x/y for dot iteration/application
 
 	// Frames
 	private Bitmap[] bitmap;            // Prerender as an array of bitmaps
@@ -157,15 +163,16 @@ internal class FractalGenerator {
 
 	// Color
 	private short applyBlur;
-	private short applyColorPalette;    // RGB or BGR? (0/1)
-	private short applyHueCycle;		// Hue Cycling Direction (-1,0,1)
-	private byte hueCycleMultiplier;	// How fast should the hue shift to loop seamlessly?
+	private short applyColorPalette;// RGB or BGR? (0/1)
+	private short applyHueCycle;	// Hue Cycling Direction (-1,0,1)
+	private byte hueCycleMultiplier;// How fast should the hue shift to loop seamlessly?
 
 	// Void
-	private short ambnoise;                 // Normalizer for maximum void depth - Precomputed amb * noise
-	private float bloom1;                   // Precomputed bloom+1
+	private short ambnoise; // Normalizer for maximum void depth - Precomputed amb * noise
+	//private float bloom1;   // Precomputed bloom+1
 	private short applyVoid;
-	private readonly Random random = new(); // Random generator
+	private readonly Random 
+		random = new();		// Random generator
 
 	// Threading
 	private FractalTask[] tasks;
@@ -189,9 +196,11 @@ internal class FractalGenerator {
 
 	// Export
 	private AnimatedGifEncoder 
-		gifEncoder;					// Export GIF encoder
+		gifEncoder;                 // Export GIF encoder
+	private Mp4Encoder mp4Encoder;
 	private int gifSuccess;        // Temp GIF file "gif.tmp" successfuly created
-	private string gifTempPath;		// Temporary GIF file name
+	private bool gifThread = false;
+	internal string gifTempPath;		// Temporary GIF file name
 	private System.Drawing.Rectangle 
 		rect;                       // Bitmap rectangle TODO implement
 
@@ -224,11 +233,13 @@ internal class FractalGenerator {
 	internal ParallelType 
 		selectParallelType;				// 0 = Animation, 1 = Depth, 2 = Recursion
 	internal short selectMaxTasks,		// Maximum allowed total tasks
-		selectDelay;					// Animation frame delay
+		selectDelay,					// Animation frame delay
+		selectFps = 1;
 	internal GenerationType 
 		selectGenerationType;			// 0 = Only Image, 1 = Animation, 2 = Animation + GIF
 	internal int cutparamMaximum;		// Maximum seed for the selected CutFunction
-	internal bool restartGif = false;	// Makes me restart the gif encoder (called when delay is changed, which should restart the encoder, but not toss the finished bitmaps)
+	internal bool 
+		restartGif = false;	// Makes me restart the gif encoder (called when delay is changed, which should restart the encoder, but not toss the finished bitmaps)
 
 	internal bool debugmode = false;
 	internal string debugString = "";
@@ -257,17 +268,17 @@ internal class FractalGenerator {
 			cosc = MathF.Cos(.4f * pi) / pfs,
 			sinc = MathF.Sin(.4f * pi) / pfs,
 			v = 2 * (sinc * sinc + cosc * (cosc + pfs)) / (2 * sinc),
-			s0 = (2 + MathF.Sqrt(2)) / MathF.Sqrt(2),
-			sx = 2 + MathF.Sqrt(2),
-			r = (1 / s0 + 1 / sx) / (1 / s0 + 1 / (2 * sx)),
+			//s0 = (2 + MathF.Sqrt(2)) / MathF.Sqrt(2),
+			//sx = 2 + MathF.Sqrt(2),
+			//r = (1 / s0 + 1 / sx) / (1 / s0 + 1 / (2 * sx)),
 			diag = MathF.Sqrt(2) / 3;
 
 		// X, Y
-		float[] cx = new float[9], cy = new float[9], pfx = new float[6], pfy = new float[6], tfx = new float[4], tfy = new float[4], tfxE = new float[3], tfyE = new float[3], ttfx = new float[16], ttfy = new float[16], ofx = new float[9], ofy = new float[9];
+		float[] cx = new float[9], cy = new float[9], pfx = new float[6], pfy = new float[6], tfx = new float[4], tfy = new float[4], tfxE = new float[3], tfyE = new float[3], ttfx = new float[16], ttfy = new float[16];//, ofx = new float[9], ofy = new float[9];
 		// Carpets
 		cx[0] = cy[0] = 0;
 		for (var i = 0; i < 4; ++i) {
-			float ipi = i * pi / 2, icos = diag * MathF.Cos(i * pi / 2), isin = diag * MathF.Sin(i * pi / 2);
+			float ipi = i * pi / 2, icos = diag * MathF.Cos(ipi), isin = diag * MathF.Sin(ipi);
 			cx[i * 2 + 1] = -icos + isin;
 			cy[i * 2 + 1] = -isin - icos;
 			cx[i * 2 + 2] = isin;
@@ -370,13 +381,13 @@ internal class FractalGenerator {
 			[0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt],
 			[0, -1.5f, 0, 1.5f, 1.5f, 3, 1.5f, -1.5f, -3, -1.5f],
 			[
-				("RingTree",[SYMMETRIC + pi23, pi, pi + pi23, pi + 2 * pi23, 0, 0, pi23, pi23, 2 * pi23, 2 * pi23]),
+				("RingTree",[SYMMETRIC + pi23, pi, pi + pi23, pi + pi43, 0, 0, pi23, pi23, pi43, pi43]),
 				("BeamTree_Beams", [pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43]),
 				("BeamTree_OuterJoint", [pi / 3, 0, pi23, pi43, pi + pi23, pi + pi23, pi, pi, pi + pi43, pi + pi43]),
 				("BeamTree_InnerJoint", [pi / 3, 0, pi23, pi43, pi, pi, pi, pi, pi, pi])
 			], [
 				("Center", [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("CenterNeighbors", [0, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+				("Y", [0, 1, 1, 1, 0, 0, 0, 0, 0, 0])
 			], [
 				(1, [-1534]),	// NoChildComplex
 				(8, []),		// NoBeam
@@ -384,6 +395,19 @@ internal class FractalGenerator {
 				(10, [])		// InnerJoint
 				]
 			),
+
+			new("FlakeTree", 13, 4, .2f, .1f, .9f,
+			[0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, stt, -2 * stt, stt],
+			[0, -1.5f, 0, 1.5f, 1.5f, 3, 1.5f, -1.5f, -3, -1.5f, 1.5f, 0, -1.5f],
+			[
+				("FlakeTree", [pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, 0, pi23, pi43]),
+			], [
+				("Center", [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y", [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Corners", [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0])
+			], null
+			),
+
 			new("TriComb", 13, 5, .2f, .1f, .9f,
 			[0, 2 * stt, -stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, 2 * stt, -4 * stt, 2 * stt],
 			[0, 0, 1.5f, -1.5f, 1.5f, 3, 1.5f, -1.5f, -3, -1.5f, 3, 0, -3],
@@ -394,6 +418,7 @@ internal class FractalGenerator {
 			],
 			[(3, [])] // TriComb_Seeds
 			),
+
 			new("Triflake", 4, 2, 1.5f, .25f, .8f, tfx, tfy,
 			[
 				("NoAngles", [pi / 3, 0, 0, 0]),
@@ -405,6 +430,7 @@ internal class FractalGenerator {
 				(2, [0,3])	// NoBackDiag
 			]
 			),
+
 			/*new("Sierpinski triangle", 3, 2, 1.5f, .25f, .8f, tfxE, tfyE,
 			[
 				("NoAngles", [2*pi, 0, 0]),
@@ -415,6 +441,7 @@ internal class FractalGenerator {
 				(1, []),	// NoChildComplex
 			]
 			),*/
+
 			new("TetraTriflake", 16, 4, 1.5f, .15f, .8f, ttfx, ttfy,
 			[
 				("Angles", [SYMMETRIC + pi23, pi, pi + pi23, pi + pi43, 0, pi23, pi43, 0, pi23, pi43, 0, pi23, pi43, pi, pi + pi23, pi + pi43]),
@@ -451,6 +478,7 @@ internal class FractalGenerator {
 				(12,[-98303]) // NoChildComplex
 				]
 			),
+
 			new("SierpinskiCarpet", 9, 3, 1.0f, .25f, .9f, cx, cy,
 			[
 			("Classic", [SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -650,6 +678,7 @@ internal class FractalGenerator {
 					65513,65514,65515,65516,65517,65518,65519,65520,65521,65522,65523,65524,65525,65526,65527,65528,65529,65530,65531,65532,65533,65534,65535]),//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...)
 				(11, []) // Symmetric
 			]),
+
 			new("Pentaflake", 6, pfs, .2f * pfs, .25f, .9f, pfx, pfy,
 			[
 				("Classic", [2 * pi / 10, 0, 0, 0, 0, 0]),
@@ -662,6 +691,7 @@ internal class FractalGenerator {
 				(2, [0,17,18,19,36,40,44,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63])
 			]
 			),
+
 			new("Hexaflake", 7, 3, .5f, .2f, 1,
 			[0, 0, 2 * stt, 2 * stt, 0, -2 * stt, -2 * stt],
 			[0, -2, -1, 1, 2, 1, -1],
@@ -678,6 +708,7 @@ internal class FractalGenerator {
 				(2, [0, 66, 129, 132, 133, 136, 137, 140, 141, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 272, 288, 304, 322, 336, 338, 352, 354, 368, 370, 385, 388, 389, 392, 393, 396, 397, 400, 401, 404, 405, 408, 409, 412, 413, 416, 417, 420, 421, 424, 425, 428, 429, 432, 433, 436, 437, 440, 441, 444, 445, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510])
 			]
 			),
+
 			new("HexaCircular", 19, 5, .3f, .05f, .9f,
 			[0, 2 * stt, stt, -stt, -2 * stt, -stt, stt, 4 * stt, 3 * stt, stt, -stt, -3 * stt, -4 * stt, -4 * stt, -3 * stt, -stt, stt, 3 * stt, 4 * stt],
 			[0, 0, 1.5f, 1.5f, 0, -1.5f, -1.5f, 1, 2.5f, 3.5f, 3.5f, 2.5f, 1, -1, -2.5f, -3.5f, -3.5f, -2.5f, -1],
@@ -722,19 +753,23 @@ internal class FractalGenerator {
 		#endregion
 		#region GenerateTasks
 		void PreviewResolution(FractalTask task) {
+			int div;
 			if (task.bitmapIndex < previewFrames) {
-				int div = 1 << (previewFrames - task.bitmapIndex);
+				div = 1 << (previewFrames - task.bitmapIndex);
 				task.applyWidth = (short)(selectWidth / div);
 				task.applyHeight = (short)(selectHeight / div);
-
 			} else {
+				div = 1;
 				task.applyWidth = selectWidth;
 				task.applyHeight = selectHeight;
 			}
 			task.widthBorder = (short)(task.applyWidth - 2);
 			task.heightBorder = (short)(task.applyHeight - 2);
-			task.rightEnd = task.widthBorder + bloom1;
-			task.downEnd = task.heightBorder + bloom1;
+			task.bloom0 = selectBloom / div;
+			task.bloom1 = task.bloom0 + 1;
+			task.upleftStart = -task.bloom1;
+			task.rightEnd = task.widthBorder + task.bloom1;
+			task.downEnd = task.heightBorder + task.bloom1;
 		}
 		void PregenerateParam(int bitmapIndex, Dictionary<long, Vector3[]> blends, ref int startParam) {
 			int[] m;
@@ -797,19 +832,21 @@ internal class FractalGenerator {
 				var dotColor = Vector3.Lerp(task.H[key][colorindex], task.I[colorindex], inDetail);
 				var buffT = task.buffer;
 				// Iterated deep into a single point - Interpolate inbetween 4 pixels and Stop
-				int startX = Math.Max(1, (int)MathF.Floor(inX - selectBloom)), endX = Math.Min(task.widthBorder, (int)MathF.Ceiling(inX + selectBloom)), endY = Math.Min(task.heightBorder, (int)MathF.Ceiling(inY + selectBloom));
-				for (int x, y = Math.Max(1, (int)MathF.Floor(inY - selectBloom)); y <= endY; ++y) {
-					var yd = bloom1 - MathF.Abs(y - inY);
+				int startX = Math.Max(1, (int)MathF.Floor(inX - task.bloom0)), 
+					endX = Math.Min(task.widthBorder, (int)MathF.Ceiling(inX + task.bloom0)), 
+					endY = Math.Min(task.heightBorder, (int)MathF.Ceiling(inY + task.bloom0));
+				for (int x, y = Math.Max(1, (int)MathF.Floor(inY - task.bloom0)); y <= endY; ++y) {
+					var yd = task.bloom1 - MathF.Abs(y - inY);
 					var buffY = buffT[y];
 					for (x = startX; x <= endX; ++x)
-						buffY[x] += (yd * (bloom1 - MathF.Abs(x - inX))) * dotColor;
+						buffY[x] += (yd * (task.bloom1 - MathF.Abs(x - inX))) * dotColor;
 				}
 			}
 			
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
 			bool TestSize(FractalTask task, float newX, float newY, float inSize) {
 				var testSize = inSize * f.cutSize;
-				return Math.Min(newX, newY) + testSize > upleftStart && newX - testSize < task.rightEnd && newY - testSize < task.downEnd;
+				return Math.Min(newX, newY) + testSize > task.upleftStart && newX - testSize < task.rightEnd && newY - testSize < task.downEnd;
 			}
 			#endregion
 			#region GenerateDots
@@ -1394,7 +1431,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				bitmapState[task.bitmapIndex] = BitmapState.Finished;
 				task.state = TaskState.Done;
 			} else {
-				if (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam)
+				if (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam and not GenerationType.Mp4)
 					GenerateGif(task);
 				else {
 					bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished;
@@ -1407,14 +1444,30 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			var threadString = "";
 			Stopwatch gifsTime = new(); gifsTime.Start();
 #endif
-			if (gifEncoder != null) {
-				bitmapState[task.bitmapIndex] = BitmapState.Encoding; // Start encoding Frame to a temp GIF	
-				unsafe {
-					gifEncoder.AddFrameParallel((byte*)(void*)bitmapData[task.bitmapIndex].Scan0, cancel.Token, task.bitmapIndex - previewFrames);
+			if (applyGenerationType == GenerationType.Mp4) {
+				if (mp4Encoder != null) {
+					bitmapState[task.bitmapIndex] = BitmapState.Encoding; // Start encoding Frame to a temp GIF	
+					unsafe {
+						var d = bitmapData[task.bitmapIndex];
+						byte* ptr = (byte*)(void*)d.Scan0;
+						mp4Encoder.AddFrame(ptr, d.Stride);
+					}
+				} else {
+					StopGif();
+					bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished;
 				}
 			} else {
-				StopGif();
-				bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished;
+				if (gifEncoder != null) {
+					bitmapState[task.bitmapIndex] = BitmapState.Encoding; // Start encoding Frame to a temp GIF	
+					unsafe {
+						var d = bitmapData[task.bitmapIndex];
+						byte* ptr = (byte*)(void*)d.Scan0;
+						gifEncoder.AddFrameParallel(ptr, d.Stride, cancel.Token, task.bitmapIndex - previewFrames);
+					}
+				} else {
+					StopGif();
+					bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished;
+				}
 			}
 #if CUSTOMDEBUG
 			gifsTime.Stop(); 
@@ -1425,6 +1478,9 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				Log(ref logString, threadString);
 			} finally { Monitor.Exit(taskLock); }
 #endif
+			if(applyGenerationType == GenerationType.Mp4)
+				bitmapState[task.bitmapIndex] = BitmapState.Finished;
+			gifThread = false;
 			task.state = TaskState.Done;
 		}
 		/** Parallel threading management - will keep creating new threads unless cancelled and return when all threads are finished
@@ -1454,7 +1510,9 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			}
 		}
 		void TryWriteBitmaps() {
-			while (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam) {
+			while (gifEncoder != null && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam and not GenerationType.Mp4) {
+				//if (applyGenerationType == GenerationType.Mp4) {
+				//} else {
 				int unlock = gifEncoder.FinishedFrame();
 				// Try to finalize the previous encoder tasks
 				switch (gifEncoder.TryWrite()) {
@@ -1470,6 +1528,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						// waiting or finished animation
 						return;
 				}
+				//}
 			}
 		}
 		void StopGif() {
@@ -1487,7 +1546,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			bool gif = applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam;
 
 
-			if (gif && bitmapsFinished < bitmap.Length && bitmapsFinished >= previewFrames) {
+			if (gif && bitmapsFinished < bitmap.Length && bitmapsFinished >= previewFrames && !gifThread) {
 
 				int tryEncode = bitmapsFinished;
 				int maxTry = Math.Min(bitmap.Length, bitmapsFinished + applyMaxTasks);
@@ -1496,6 +1555,8 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						if (bitmapState[tryEncode] == BitmapState.UnlockedRAM)
 							bitmapData[tryEncode] = bitmap[tryEncode].LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
 						bitmapState[tryEncode] = BitmapState.Encoding;
+						gifThread = applyGenerationType == GenerationType.Mp4;
+						
 						task.Start(tryEncode, () => GenerateGif(task));
 						return true;
 					}
@@ -1539,13 +1600,13 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			IncFrameSize(ref size, blurPeriod);
 		}
 		void ModFrameParameters(ref float size, ref float angle, ref short spin, ref float hueAngle, ref byte color) {
-			void SwitchParentChild(ref float angle, ref short spin, ref byte color) {
+			void SwitchParentChild(ref float angle, ref short spin, ref byte color, short z) {
 				if (Math.Abs(spin) > 1) {
 					// reverse angle and spin when antispinning, or else the direction would change when parent and child switches
 					angle = -angle;
 					spin = (short)-spin;
 				}
-				color = (byte)((3 + color + applyZoom * childColor[0]) % 3);
+				color = (byte)((3 + color + z * childColor[0]) % 3);
 			}
 			var fp = f.childSize;
 			var w = Math.Max(selectWidth, selectHeight) * f.maxSize;
@@ -1563,12 +1624,12 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			while (size >= w * fp) {
 				size /= fp;
 				angle += childAngle[0];
-				SwitchParentChild(ref angle, ref spin, ref color);
+				SwitchParentChild(ref angle, ref spin, ref color, 1);
 			}
 			while (size < w) {
 				size *= fp;
 				angle -= childAngle[0];
-				SwitchParentChild(ref angle, ref spin, ref color);
+				SwitchParentChild(ref angle, ref spin, ref color, -1);
 			}
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1589,8 +1650,8 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 		float size = 2400, angle = selectDefaultAngle * (float)Math.PI / 180.0f, hueAngle = selectDefaultHue / 120.0f;
 		byte color = 0;
 		
-		bloom1 = selectBloom + 1;
-		upleftStart = -selectBloom;
+		//bloom1 = selectBloom + 1;
+		//upleftStart = -selectBloom;
 
 		ambnoise = (short)(selectAmbient * selectNoise);
 		var spin = selectSpin < -1 ? (short)random.Next(-2, 2) : selectSpin;
@@ -1616,7 +1677,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				restartGif = false;
 				toFinishAnimation = true;
 				// wait for all tasks to finish to preserve integrity, especially including gifs, and only return true if it tries to start new ones, so they actually finish:
-				FinishTasks(true, (short taskIndex) => true);
+				FinishTasks(true, (short taskIndex) => false);
 				FinishGif();
 				StartGif();
 			}
@@ -1761,13 +1822,18 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 		gifSuccess = 0;
 		gifEncoder = null;
 		hash.Clear();
-		if (selectGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam) {
+		byte gifIndex = 0;
+		switch (selectGenerationType) {
+			case GenerationType.EncodeGIF:
+			case GenerationType.GlobalGIF:
+			case GenerationType.AllParam:
+
 			gifEncoder = new();
 			gifEncoder.SetDelay(selectDelay); // Framerate
 			gifEncoder.SetRepeat(0);    // Loop
 			gifEncoder.SetQuality(1);   // Highest quality
 			gifEncoder.SetTransparent(selectAmbient < 0 ? Color.Black : Color.Empty);
-			byte gifIndex = 0;
+			
 			while (gifIndex < 255) {
 				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
 				if (!gifEncoder.Start(selectWidth, selectHeight, gifTempPath,
@@ -1779,6 +1845,19 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			}
 			if (gifIndex == 255)
 				gifEncoder = null;
+				break;
+			case GenerationType.Mp4:
+				mp4Encoder = new();
+				while (gifIndex < 255) {
+					gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
+					if (!mp4Encoder.Start(selectWidth, selectHeight, gifTempPath, selectFps)) {
+						++gifIndex;
+						continue;
+					} else break;
+				}
+				if (gifIndex == 255)
+					gifEncoder = null;
+				break;
 		}
 		// Flag the already encoded bitmaps to be encoded again;
 		for (int b = previewFrames; b < bitmap.Length; ++b)
@@ -1787,11 +1866,12 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					bitmapData[b] = bitmap[b].LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
 				bitmapState[b] = BitmapState.DrawingFinished;
 			}
+		bitmapsFinished = Math.Min(previewFrames, bitmapsFinished);
 	}
 	void FinishGif() {
 		// Save the temp GIF file
 		gifSuccess = 0;
-		if (!cancel.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null && gifEncoder.Finish()) {
+		if (!cancel.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null && (applyGenerationType == GenerationType.Mp4 ? mp4Encoder.Finish() : gifEncoder.Finish())) {
 			while (gifEncoder != null) {
 				switch (gifEncoder.TryWrite()) {
 					case TryWrite.Failed:
@@ -1811,8 +1891,11 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				if (gifEncoder.IsFinished())
 					break;
 			}
+			if (mp4Encoder != null)
+				gifSuccess = -1;
 		}
 		gifEncoder = null;
+		mp4Encoder = null;
 	}
 #endregion
 
@@ -1862,7 +1945,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 	internal int SaveGif(string gifPath) {
 		try {
 			// Try to save (move the temp) the gif file
-			gifEncoder?.Finish();
+			//gifEncoder?.Finish();
 			//gifEncoder.Output(gifPath);
 			File.Delete(gifPath);
 			File.Move(gifTempPath, gifPath);
@@ -1887,6 +1970,51 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 		}
 		return gifSuccess = 0;
 	}
+	internal int SaveMp4(string gifPath, string mp4Path) {
+		try {
+			File.Delete(mp4Path);
+			string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+			if (!File.Exists(ffmpegPath))
+				return gifSuccess = 0;
+			double gifFps = 1000.0 / (10 * selectDelay); // Convert to frames per second
+			string arguments = $"-y -i \"{gifPath}\" -vf \"fps={selectFps},setpts=PTS*({gifFps}/{selectFps})\" -c:v libx264 -crf 0 -preset veryslow \"{mp4Path}\"";
+			using Process ffmpeg = new Process();
+			ffmpeg.StartInfo.FileName = ffmpegPath;
+			ffmpeg.StartInfo.Arguments = arguments;
+			ffmpeg.StartInfo.UseShellExecute = false;
+			ffmpeg.StartInfo.RedirectStandardError = true;
+			ffmpeg.StartInfo.RedirectStandardOutput = true;
+			ffmpeg.StartInfo.CreateNoWindow = true;
+			//ffmpeg.ErrorDataReceived += (sender, e) =>{if (!string.IsNullOrEmpty(e.Data)) {Console.WriteLine("FFmpeg error: " + e.Data);}};
+			ffmpeg.Start();
+			// Begin reading error asynchronously
+			ffmpeg.BeginErrorReadLine();
+			// Wait for the process to exit
+			ffmpeg.WaitForExit();
+			//File.Delete(gifTempPath); // do not delete the gif.tmp so the user could save the gif too if they wanted
+		} catch (IOException ex) {
+			var exs = "SaveGif: An error occurred: " + ex.Message;
+#if CUSTOMDEBUG
+			Log(ref logString, exs);
+#endif
+			return gifSuccess;
+		} catch (UnauthorizedAccessException ex) {
+			var exs = "SaveGif: Access denied: " + ex.Message;
+#if CUSTOMDEBUG
+			Log(ref logString, exs);
+#endif
+			return gifSuccess;
+		} catch (Exception ex) {
+			var exs = "SaveGif: Unexpected error: " + ex.Message;
+#if CUSTOMDEBUG
+			Log(ref logString, exs);
+#endif
+			return gifSuccess;
+		}
+		return gifSuccess = 0;
+	}
+
+
 #if CUSTOMDEBUG
 	private void Log(ref string log, string line) {
 		Debug.WriteLine(line);

@@ -89,6 +89,7 @@
 			debugBox = new System.Windows.Forms.CheckBox();
 			debugLabel = new System.Windows.Forms.Label();
 			generatorPanel = new System.Windows.Forms.Panel();
+			fpsBox = new System.Windows.Forms.TextBox();
 			voidBox = new System.Windows.Forms.TextBox();
 			modeButton = new System.Windows.Forms.Button();
 			editorPanel = new System.Windows.Forms.Panel();
@@ -110,6 +111,9 @@
 			addcolorButton = new System.Windows.Forms.Button();
 			removeangleButton = new System.Windows.Forms.Button();
 			removecolorButton = new System.Windows.Forms.Button();
+			mp4Button = new System.Windows.Forms.Button();
+			saveMp4 = new System.Windows.Forms.SaveFileDialog();
+			convertMp4 = new System.Windows.Forms.SaveFileDialog();
 			helpPanel.SuspendLayout();
 			generatorPanel.SuspendLayout();
 			editorPanel.SuspendLayout();
@@ -265,10 +269,10 @@
 			// 
 			// delayBox
 			// 
-			delayBox.Location = new System.Drawing.Point(88, 313);
+			delayBox.Location = new System.Drawing.Point(174, 313);
 			delayBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			delayBox.Name = "delayBox";
-			delayBox.Size = new System.Drawing.Size(66, 23);
+			delayBox.Size = new System.Drawing.Size(45, 23);
 			delayBox.TabIndex = 28;
 			delayBox.Text = "5";
 			delayBox.TextChanged += DelayBox_TextChanged;
@@ -326,7 +330,7 @@
 			gifButton.TabIndex = 35;
 			gifButton.Text = "Save GIF";
 			gifButton.UseVisualStyleBackColor = true;
-			gifButton.Click += GifButton_Click;
+			gifButton.Click += SaveVideoButton_Click;
 			// 
 			// savePng
 			// 
@@ -338,7 +342,7 @@
 			// 
 			saveGif.DefaultExt = "gif";
 			saveGif.Filter = "GIF files (*.gif)|*.gif";
-			saveGif.FileOk += SaveGif_FileOk;
+			saveGif.FileOk += SaveVideo_FileOk;
 			// 
 			// loadFractal
 			// 
@@ -356,12 +360,12 @@
 			// 
 			delayLabel.AutoSize = true;
 			delayLabel.ForeColor = System.Drawing.Color.White;
-			delayLabel.Location = new System.Drawing.Point(164, 316);
+			delayLabel.Location = new System.Drawing.Point(14, 316);
 			delayLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			delayLabel.Name = "delayLabel";
-			delayLabel.Size = new System.Drawing.Size(67, 15);
+			delayLabel.Size = new System.Drawing.Size(101, 15);
 			delayLabel.TabIndex = 0;
-			delayLabel.Text = "Abort/ FPS:";
+			delayLabel.Text = "Abort/ Delay/FPS:";
 			// 
 			// voidLabel
 			// 
@@ -642,10 +646,10 @@
 			// 
 			// abortBox
 			// 
-			abortBox.Location = new System.Drawing.Point(14, 312);
+			abortBox.Location = new System.Drawing.Point(124, 313);
 			abortBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			abortBox.Name = "abortBox";
-			abortBox.Size = new System.Drawing.Size(66, 23);
+			abortBox.Size = new System.Drawing.Size(44, 23);
 			abortBox.TabIndex = 45;
 			abortBox.Text = "500";
 			abortBox.TextChanged += AbortBox_TextChanged;
@@ -706,7 +710,7 @@
 			// encodeSelect
 			// 
 			encodeSelect.FormattingEnabled = true;
-			encodeSelect.Items.AddRange(new object[] { "Only Image", "Animation RAM", "Local GIF", "Global GIF", "AllSeeds", "GetHashes" });
+			encodeSelect.Items.AddRange(new object[] { "Only Image", "Animation RAM", "Local GIF", "Global GIF", "Encode Mp4", "AllSeeds" });
 			encodeSelect.Location = new System.Drawing.Point(162, 374);
 			encodeSelect.Name = "encodeSelect";
 			encodeSelect.Size = new System.Drawing.Size(108, 23);
@@ -738,6 +742,7 @@
 			// 
 			// generatorPanel
 			// 
+			generatorPanel.Controls.Add(fpsBox);
 			generatorPanel.Controls.Add(voidBox);
 			generatorPanel.Controls.Add(zoomSelect);
 			generatorPanel.Controls.Add(gifButton);
@@ -757,8 +762,8 @@
 			generatorPanel.Controls.Add(prevButton);
 			generatorPanel.Controls.Add(threadsBox);
 			generatorPanel.Controls.Add(delayBox);
-			generatorPanel.Controls.Add(bloomBox);
 			generatorPanel.Controls.Add(delayLabel);
+			generatorPanel.Controls.Add(bloomBox);
 			generatorPanel.Controls.Add(blurBox);
 			generatorPanel.Controls.Add(periodBox);
 			generatorPanel.Controls.Add(detailBox);
@@ -784,6 +789,16 @@
 			generatorPanel.Name = "generatorPanel";
 			generatorPanel.Size = new System.Drawing.Size(286, 441);
 			generatorPanel.TabIndex = 54;
+			// 
+			// fpsBox
+			// 
+			fpsBox.Location = new System.Drawing.Point(225, 313);
+			fpsBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
+			fpsBox.Name = "fpsBox";
+			fpsBox.Size = new System.Drawing.Size(45, 23);
+			fpsBox.TabIndex = 53;
+			fpsBox.Text = "20";
+			fpsBox.TextChanged += FpsBox_TextChanged;
 			// 
 			// voidBox
 			// 
@@ -999,12 +1014,35 @@
 			removecolorButton.UseVisualStyleBackColor = true;
 			removecolorButton.Click += RemovecolorButton_Click;
 			// 
+			// mp4Button
+			// 
+			mp4Button.Location = new System.Drawing.Point(179, 606);
+			mp4Button.Name = "mp4Button";
+			mp4Button.Size = new System.Drawing.Size(108, 23);
+			mp4Button.TabIndex = 57;
+			mp4Button.Text = "GIF -> Mp4";
+			mp4Button.UseVisualStyleBackColor = true;
+			mp4Button.Click += Mp4Button_Click;
+			// 
+			// saveMp4
+			// 
+			saveMp4.DefaultExt = "mp4";
+			saveMp4.Filter = "MP4 files (*.mp4)|*.mp4";
+			saveMp4.FileOk += SaveVideo_FileOk;
+			// 
+			// convertMp4
+			// 
+			convertMp4.DefaultExt = "mp4";
+			convertMp4.Filter = "MP4 files (*.mp4)|*.mp4";
+			convertMp4.FileOk += ConvertMp4_FileOk;
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
 			ClientSize = new System.Drawing.Size(1085, 1178);
+			Controls.Add(mp4Button);
 			Controls.Add(editorPanel);
 			Controls.Add(modeButton);
 			Controls.Add(generatorPanel);
@@ -1124,6 +1162,10 @@
 		private System.Windows.Forms.Label pointLabel;
 		private System.Windows.Forms.TextBox voidBox;
 		private System.Windows.Forms.Label sizeLabel;
+		private System.Windows.Forms.Button mp4Button;
+		private System.Windows.Forms.SaveFileDialog saveMp4;
+		private System.Windows.Forms.TextBox fpsBox;
+		private System.Windows.Forms.SaveFileDialog convertMp4;
 	}
 }
 
