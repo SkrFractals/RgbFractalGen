@@ -1020,7 +1020,7 @@
 			mp4Button.Name = "mp4Button";
 			mp4Button.Size = new System.Drawing.Size(108, 23);
 			mp4Button.TabIndex = 57;
-			mp4Button.Text = "GIF -> Mp4";
+			mp4Button.Text = "Save Mp4";
 			mp4Button.UseVisualStyleBackColor = true;
 			mp4Button.Click += Mp4Button_Click;
 			// 
@@ -1064,7 +1064,7 @@
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.9";
+			Text = "RGB Fractal Zoom Generator C# v1.91";
 			FormClosing += GeneratorForm_FormClosing;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();

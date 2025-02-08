@@ -759,7 +759,7 @@ public partial class GeneratorForm : Form {
 		if ((FractalGenerator.GenerationType)encodeSelect.SelectedIndex == FractalGenerator.GenerationType.Mp4) {
 			encodeSelect.SelectedIndex = 2;
 			MessageBox.Show(
-				"Sorry but direct Mp4 encoding is currently broken and unavailable, try again in a later release.\nFor now you can use Local GIF and then press the GIF -> Mp4 button instead.",
+				"Sorry but direct Mp4 encoding is currently broken and unavailable, try again in a later release.\nFor now you can use Local GIF and then press the Save Mp4 button instead.",
 				"Unavailable",
 				MessageBoxButtons.OK,
 				MessageBoxIcon.Error);
