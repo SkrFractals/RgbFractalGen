@@ -8,6 +8,7 @@ Missing Ffmpeg.exe
 - The project now includes FFmpeg.exe for saving the animations as mp4, but the file is too large to fit on github
 - so you'll need to download it and put it into the project directory yourself (Cs/RgbFractalGenCs/ffmpeg.exe)
 - https://ffmpeg.org/download.html
+- (or don't, the projectcan compile without it, but then you will get an error message "ffmpeg.exe not found" if you click the "Save Mp4" button)
 
 General:
 - Rare unexpected crashes/halts in generation
