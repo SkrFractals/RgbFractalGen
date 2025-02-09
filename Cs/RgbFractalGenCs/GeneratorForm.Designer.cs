@@ -1082,7 +1082,7 @@
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.91";
+			Text = "RGB Fractal Zoom Generator C# v1.92";
 			FormClosing += GeneratorForm_FormClosing;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();

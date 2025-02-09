@@ -713,14 +713,14 @@ public partial class GeneratorForm : Form {
 		SetupParallel(ParseClampRetext(threadsBox, (short)2, (short)maxTasks));
 	}
 	private void ParallelTypeSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		/*if ((FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex == FractalGenerator.ParallelType.OfDepth) {
-			MessageBox.Show(
-				"Sorry but this parallelism mode is currently broken and unavailable, try again in a later release.",
-				"Unavailable",
+		if ((FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex == FractalGenerator.ParallelType.OfDepth) {
+			_ = MessageBox.Show(
+				"Warning: this parallelism mode might be fast at rendering a single image, but it messes up few pixels.\nSo if you want highest quality the OfAnimation is recommended.",
+				"Warning",
 				MessageBoxButtons.OK,
-				MessageBoxIcon.Error);
+				MessageBoxIcon.Warning);
 			return;
-		}*/
+		}
 		generator.selectParallelType = (FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex;
 	}
 	private void AbortBox_TextChanged(object sender, EventArgs e) => abortDelay = ParseClampRetext(abortBox, (short)0, (short)10000);
@@ -768,11 +768,19 @@ public partial class GeneratorForm : Form {
 	private void EncodeSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		if ((FractalGenerator.GenerationType)encodeSelect.SelectedIndex == FractalGenerator.GenerationType.Mp4) {
 			encodeSelect.SelectedIndex = 2;
-			MessageBox.Show(
+			_ = MessageBox.Show(
 				"Sorry but direct Mp4 encoding is currently broken and unavailable, try again in a later release.\nFor now you can use Local GIF and then press the Save Mp4 button instead.",
 				"Unavailable",
 				MessageBoxButtons.OK,
 				MessageBoxIcon.Error);
+			return;
+		}
+		if ((FractalGenerator.GenerationType)encodeSelect.SelectedIndex == FractalGenerator.GenerationType.HashParam) {
+			_ = MessageBox.Show(
+				"This mode is not really meant for the end user, it only generates all parameters and export a hash.txt file will all the unique ones.\nIf you actually want an animation of all seeds, AllParam is recommended instead as that doesn't waste resources doing the hashing and encodes the animation for export.",
+				"Warning",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Warning);
 			return;
 		}
 
@@ -785,8 +793,17 @@ public partial class GeneratorForm : Form {
 		helpPanel.Visible = screenPanel.Visible;
 		screenPanel.Visible = !screenPanel.Visible;
 	}
-	private void PngButton_Click(object sender, EventArgs e) => savePng.ShowDialog();
-
+	private void PngButton_Click(object sender, EventArgs e) {
+		if (generator.GetBitmapsFinished() < 1) {
+			_ = MessageBox.Show(
+				"This is only a low resolution preview image, please wait until the full resolution you have selected if finished.",
+				"Warning",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Warning);
+			return;
+		}
+		_ = savePng.ShowDialog();
+	}
 	private void DebugBox_CheckedChanged(object sender, EventArgs e) {
 		if (!(generator.debugmode = debugBox.Checked))
 			debugLabel.Text = "";

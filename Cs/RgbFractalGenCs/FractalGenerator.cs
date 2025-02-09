@@ -1768,7 +1768,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				if (bitmapsFinished >= GetGenerateLength())
 					continue;
 				// Use the selected ParallelType, or OfDepth if OnlyImage (if you want a GenerateDots_SingleTask like OfAnimation with OnlyImage, set the maxTasks to <= 2)
-				applyParallelType = applyGenerationType == GenerationType.OnlyImage ? ParallelType.OfDepth : selectParallelType;
+				applyParallelType = selectParallelType;
 				// Image parallelism
 				//imageTasks = applyParallelType == 2 ? [] : null;
 				FinishTasks(true, (short taskIndex) => {
