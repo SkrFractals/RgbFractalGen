@@ -815,12 +815,16 @@ namespace Gif.Components {
 		 * @param fail if false it will not abort and will return true
 		 * @return ok - true if not aborted, false if aborted
 		 */
-		protected bool Abort(bool fail = true) {
+		public bool Abort(bool fail = true) {
 			if (!fail)
 				return true;
 			started = false;
 			ms?.Close();
 			fs?.Close();
+			if (fs != null && filename != null && filename != "")
+				File.Delete(filename);
+			fs = null;
+			ms = null;
 			finishedAnimation = false;
 			addedFrames = finishedFrame = 0;
 			encodeTaskData = writeTaskData = null;

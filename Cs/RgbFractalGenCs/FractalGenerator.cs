@@ -1458,7 +1458,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						bitmapState[task.bitmapIndex] = BitmapState.EncodingFinished;
 					}
 				} else {
-					StopGif();
+					StopGif(task);
 					bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished;
 				}
 			} else {
@@ -1471,7 +1471,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						bitmapState[task.bitmapIndex] = BitmapState.EncodingFinished;
 					}
 				} else {
-					StopGif();
+					StopGif(task);
 					bitmapState[task.bitmapIndex] = BitmapState.DrawingFinished;
 				}
 			}
@@ -1502,13 +1502,16 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					for (short t = applyMaxTasks; 0 <= --t;)
 						tasksRemaining |= (task = tasks[t]).IsStillRunning()
 							? mainLoop || task.bitmapIndex >= 0 && bitmapState[task.bitmapIndex] <= BitmapState.Dots // Must finish all Dots threads, and if in main loop all secondary threads too (OnDepth can continu back to main loop when secondary threads are running so it could start a new OnDepth loop)
-							: !cancel.Token.IsCancellationRequested && ( // Cancel Request forbids any new threads to start
+							: !token.IsCancellationRequested && ( // Cancel Request forbids any new threads to start
 								!mainLoop || selectMaxTasks == applyMaxTasks && applyParallelType == selectParallelType && selectGenerationType == applyGenerationType // chaning these settings yout exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
 							) && (mainLoop && (TryWriteBitmaps(task) || TryFinishBitmap(task)) ||  lambda(t)); // in the main loop we try Bitmap finishing and writing secondary threads (onDepth loop would get stuck )
 					if (tasksRemaining)
 						i = 3;
 				}
 				ApplyGenerationType();
+				/*if (token.IsCancellationRequested)
+					foreach (var t in tasks) 
+						t.Join(); */
 			}
 		}
 		bool TryWriteBitmaps(FractalTask task) {
@@ -1533,7 +1536,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				switch (gifEncoder.TryWrite(true)) {
 					case TryWrite.Failed:
 						// fallback to only display animation without encoding
-						StopGif();
+						StopGif(tasks[taskIndex]);
 						isWritingBitmaps = 8;
 						tasks[taskIndex].state = TaskState.Done;
 						return;
@@ -1552,16 +1555,20 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			isWritingBitmaps = 8;
 			tasks[taskIndex].state = TaskState.Done;
 		}
-		void StopGif() {
+		void StopGif(FractalTask task) {
 			applyGenerationType = GenerationType.AnimationRAM;
 			foreach (var t in tasks) {
-				if (t.bitmapIndex < 0)
-					t.Join();
-				else if (bitmapState[t.bitmapIndex] is >= BitmapState.Encoding and <= BitmapState.EncodingFinished) {
-					t.Join();
+				if (t.bitmapIndex < 0) {
+					if(t != task)
+						t.Join();
+				} else if (bitmapState[t.bitmapIndex] is >= BitmapState.Encoding and <= BitmapState.EncodingFinished) {
+					if(t != task)
+						t.Join();
 					bitmapState[t.bitmapIndex] = BitmapState.DrawingFinished;
 				}
 			}
+			if (gifEncoder != null)
+				gifEncoder.Abort();
 		}
 		bool TryFinishBitmap(FractalTask task) {
 			if (token.IsCancellationRequested)
@@ -1778,7 +1785,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					if (applyParallelType > ParallelType.OfAnimation || applyMaxTasks <= 2 || bmp <= previewFrames)
 						GenerateDots(bmp, (short)(-taskIndex - 1), _size, _angle, _spin, _hueAngle, _color);
 					else tasks[taskIndex].Start(bmp, () => GenerateDots(bmp, (short)(taskIndex + 1), _size, _angle, _spin, _hueAngle, _color));
-					if (nextBitmap > previewFrames)
+					if (bmp >= previewFrames)
 						IncFrameParameters(ref size, ref angle, spin, ref hueAngle, 1);
 					return true; // A task finished, but started another one - keep checking before new master loop
 				}
