@@ -168,11 +168,10 @@ internal class FractalGenerator {
 	private byte hueCycleMultiplier;// How fast should the hue shift to loop seamlessly?
 
 	// Void
-	private short ambnoise; // Normalizer for maximum void depth - Precomputed amb * noise
-	//private float bloom1;   // Precomputed bloom+1
-	private short applyVoid;
+	private short ambnoise;		// Normalizer for maximum void depth - Precomputed amb * noise
+	private short applyVoid;	// applied void setting
 	private readonly Random 
-		random = new();		// Random generator
+		random = new();			// Random generator
 
 	// Threading
 	private FractalTask[] tasks;
@@ -185,24 +184,27 @@ internal class FractalGenerator {
 	private readonly object 
 		taskLock = new();			// Monitor lock
 	private CancellationTokenSource 
-		cancel;						// Cancellation Token Source
+		cancel;                     // Cancellation Token Source
+	private CancellationToken
+		token;						// Cancellation token
 	private Task mainTask;			// Main Generation Task
 	//private ConcurrentBag<Task> 
 	//	imageTasks;					// Parallel Image Tasks
 	//private readonly List<Task> 
 	//	taskSnapshot;				// Snapshot for safely checking imageTasks Wait
 	(short, (float, float), (float, float), byte, long, byte)[] 
-		tuples;						// Queue struct for GenerateDots_OfDepth ((x,y), angle, aa, color, -cutparam, depth);
+		tuples;                     // Queue struct for GenerateDots_OfDepth ((x,y), angle, aa, color, -cutparam, depth);
+	internal event Action UpdatePreview;
 
 	// Export
 	private AnimatedGifEncoder 
-		gifEncoder;                 // Export GIF encoder
+		gifEncoder;						// Export GIF encoder
 	private Mp4Encoder mp4Encoder;
-	private int gifSuccess;        // Temp GIF file "gif.tmp" successfuly created
+	private int gifSuccess;				// Temp GIF file "gif.tmp" successfuly created
 	private bool gifThread = false;
 	internal string gifTempPath;		// Temporary GIF file name
 	private System.Drawing.Rectangle 
-		rect;                       // Bitmap rectangle TODO implement
+		rect;							// Bitmap rectangle TODO implement
 
 	// Selected Settings
 	internal short selectFractal,       // Fractal definition (0-fractals.Length)
@@ -1137,7 +1139,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 							break;*/
 				if(bitmapIndex >= previewFrames)
 					IncFrameParameters(ref size, ref angle, spin, ref hueAngle, applyBlur);
-				if (cancel.IsCancellationRequested) {
+				if (token.IsCancellationRequested) {
 					if (state != null)
 						state.state = TaskState.Done;
 					return;
@@ -1178,7 +1180,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
 				float lightMax;
 				for (short y = 1; y < h1; ++y) {
-					if (cancel.IsCancellationRequested) {
+					if (token.IsCancellationRequested) {
 						queueT.Clear();
 						task.state = TaskState.Done;
 						return;
@@ -1218,7 +1220,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				task.voidDepthMax = voidMax;
 			} else
 				for (short y = 0; y < task.applyHeight; ++y) {
-					if (cancel.IsCancellationRequested) {
+					if (token.IsCancellationRequested) {
 						task.state = TaskState.Done;
 						return;
 					}
@@ -1229,7 +1231,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					}
 				}
 			task.lightNormalizer = selectBrightness * 2.55f / task.lightNormalizer;
-			if (cancel.IsCancellationRequested) {
+			if (token.IsCancellationRequested) {
 				task.state = TaskState.Done;
 				return;
 			}
@@ -1413,7 +1415,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					}
 				}
 			}
-			if (cancel.IsCancellationRequested) {
+			if (token.IsCancellationRequested) {
 				task.state = TaskState.Done;
 				return;
 			}
@@ -1493,7 +1495,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			for(int i = 3; i > 0; --i) {
 				for (var tasksRemaining = true; tasksRemaining; MakeDebugString()) {
 					tasksRemaining = false;
-					if (!cancel.IsCancellationRequested) {
+					if (!token.IsCancellationRequested) {
 						//Thread.Sleep(50); // let's make this thread to so CPU intense
 						TryWriteBitmaps();
 					}
@@ -1541,7 +1543,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			}
 		}
 		bool TryFinishBitmap(FractalTask task) {
-			if (cancel.IsCancellationRequested)
+			if (token.IsCancellationRequested)
 				return false;
 			bool gif = applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam;
 
@@ -1583,7 +1585,9 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					}
 				}
 				bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
-				++bitmapsFinished;
+				if (bitmapsFinished++ <= previewFrames && !token.IsCancellationRequested)
+					UpdatePreview?.Invoke();
+
 			}
 			return false;
 		}
@@ -1871,7 +1875,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 	void FinishGif() {
 		// Save the temp GIF file
 		gifSuccess = 0;
-		if (!cancel.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null && (applyGenerationType == GenerationType.Mp4 ? mp4Encoder.Finish() : gifEncoder.Finish())) {
+		if (!token.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null && (applyGenerationType == GenerationType.Mp4 ? mp4Encoder.Finish() : gifEncoder.Finish())) {
 			while (gifEncoder != null) {
 				switch (gifEncoder.TryWrite()) {
 					case TryWrite.Failed:
@@ -1901,7 +1905,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 
 	#region Interface_Calls
 	// start the generator in a separate main thread so that the form can continue being responsive
-	internal void StartGenerate() => mainTask = Task.Run(GenerateAnimation, (cancel = new()).Token);
+	internal void StartGenerate() => mainTask = Task.Run(GenerateAnimation, token = (cancel = new()).Token);
 	internal void ResetGenerator() {
 		restartGif = false;
 		applyZoom = (short)(selectZoom != 0 ? selectZoom : random.NextDouble() < .5f ? -1 : 1);

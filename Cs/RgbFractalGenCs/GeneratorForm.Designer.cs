@@ -359,33 +359,36 @@
 			// delayLabel
 			// 
 			delayLabel.AutoSize = true;
+			delayLabel.Font = new System.Drawing.Font("Segoe UI", 8.25F);
 			delayLabel.ForeColor = System.Drawing.Color.White;
 			delayLabel.Location = new System.Drawing.Point(14, 316);
 			delayLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			delayLabel.Name = "delayLabel";
-			delayLabel.Size = new System.Drawing.Size(101, 15);
+			delayLabel.Size = new System.Drawing.Size(105, 13);
 			delayLabel.TabIndex = 0;
-			delayLabel.Text = "Abort/ Delay/FPS:";
+			delayLabel.Text = "Abort / Delay / FPS:";
 			// 
 			// voidLabel
 			// 
 			voidLabel.AutoSize = true;
+			voidLabel.Font = new System.Drawing.Font("Segoe UI", 8.25F);
 			voidLabel.ForeColor = System.Drawing.Color.White;
 			voidLabel.Location = new System.Drawing.Point(14, 171);
 			voidLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			voidLabel.Name = "voidLabel";
-			voidLabel.Size = new System.Drawing.Size(151, 15);
+			voidLabel.Size = new System.Drawing.Size(143, 13);
 			voidLabel.TabIndex = 0;
 			voidLabel.Text = "Void Ambient/Noise (0-30):";
 			// 
 			// dotLabel
 			// 
 			dotLabel.AutoSize = true;
+			dotLabel.Font = new System.Drawing.Font("Segoe UI", 8.25F);
 			dotLabel.ForeColor = System.Drawing.Color.White;
 			dotLabel.Location = new System.Drawing.Point(14, 200);
 			dotLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			dotLabel.Name = "dotLabel";
-			dotLabel.Size = new System.Drawing.Size(122, 15);
+			dotLabel.Size = new System.Drawing.Size(118, 13);
 			dotLabel.TabIndex = 0;
 			dotLabel.Text = "Saturate/Detail (0-10):";
 			// 
@@ -415,11 +418,12 @@
 			// blurLabel
 			// 
 			blurLabel.AutoSize = true;
+			blurLabel.Font = new System.Drawing.Font("Segoe UI", 8.25F);
 			blurLabel.ForeColor = System.Drawing.Color.White;
 			blurLabel.Location = new System.Drawing.Point(14, 229);
 			blurLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			blurLabel.Name = "blurLabel";
-			blurLabel.Size = new System.Drawing.Size(147, 15);
+			blurLabel.Size = new System.Drawing.Size(138, 13);
 			blurLabel.TabIndex = 0;
 			blurLabel.Text = "Bloom/Motion Blur (0-40):";
 			// 
@@ -651,17 +655,18 @@
 			abortBox.Name = "abortBox";
 			abortBox.Size = new System.Drawing.Size(44, 23);
 			abortBox.TabIndex = 45;
-			abortBox.Text = "500";
+			abortBox.Text = "50";
 			abortBox.TextChanged += AbortBox_TextChanged;
 			// 
 			// threadsLabel
 			// 
 			threadsLabel.AutoSize = true;
+			threadsLabel.Font = new System.Drawing.Font("Segoe UI", 8.25F);
 			threadsLabel.ForeColor = System.Drawing.Color.White;
 			threadsLabel.Location = new System.Drawing.Point(14, 287);
 			threadsLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			threadsLabel.Name = "threadsLabel";
-			threadsLabel.Size = new System.Drawing.Size(92, 15);
+			threadsLabel.Size = new System.Drawing.Size(91, 13);
 			threadsLabel.TabIndex = 0;
 			threadsLabel.Text = "Parallel Threads:";
 			// 
@@ -677,13 +682,14 @@
 			// brightnessLabel
 			// 
 			brightnessLabel.AutoSize = true;
+			brightnessLabel.Font = new System.Drawing.Font("Segoe UI", 8.25F);
 			brightnessLabel.ForeColor = System.Drawing.Color.White;
 			brightnessLabel.Location = new System.Drawing.Point(14, 258);
 			brightnessLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
 			brightnessLabel.Name = "brightnessLabel";
-			brightnessLabel.Size = new System.Drawing.Size(115, 15);
+			brightnessLabel.Size = new System.Drawing.Size(160, 13);
 			brightnessLabel.TabIndex = 47;
-			brightnessLabel.Text = "Brightness (0-300%):";
+			brightnessLabel.Text = "Brightness/NoiseScale (0-300):";
 			// 
 			// zoomSelect
 			// 

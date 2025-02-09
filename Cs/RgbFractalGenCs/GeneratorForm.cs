@@ -83,6 +83,21 @@ public partial class GeneratorForm : Form {
 	#endregion
 
 	#region Core
+	public void UpdatePreview() {
+		Monitor.Enter(this);
+		try {
+			int bitmapsFinished = generator.GetBitmapsFinished();
+			// Fetch a bitmap to display
+			var bitmap = bitmapsFinished > 0
+				? generator.GetBitmap(currentBitmapIndex = (animated ? currentBitmapIndex + 1 : currentBitmapIndex) % bitmapsFinished) // Make sure the index is is range
+				: generator.GetPreviewBitmap(); // Try preview bitmap if none of the main ones are generated yet
+												// Update the display with it if necessary
+			if (currentBitmap != bitmap) {
+				currentBitmap = bitmap;
+				screenPanel.Invalidate();
+			}
+		} finally { Monitor.Exit(this); }
+	}
 	void SetupEditControl(System.Windows.Forms.Control control, string tip) {
 		// Add tooltip and set the next tabIndex
 		toolTips.SetToolTip(control, tip);
@@ -212,6 +227,7 @@ public partial class GeneratorForm : Form {
 			ResizeAll();
 			aTask = gTask = null;
 			generator.restartGif = false;
+			generator.UpdatePreview += UpdatePreview;
 			generator.StartGenerate();
 
 			// Load all extra fractal files
@@ -376,14 +392,7 @@ public partial class GeneratorForm : Form {
 			gifButton.Text = "Cancel Saving " + v;
 		}
 		// Fetch a bitmap to display
-		var bitmap = bitmapsFinished > 0
-			? generator.GetBitmap(currentBitmapIndex = (animated ? currentBitmapIndex + 1 : currentBitmapIndex) % bitmapsFinished) // Make sure the index is is range
-			: generator.GetPreviewBitmap(); // Try preview bitmap if none of the main ones are generated yet
-											// Update the display with it if necessary
-		if (currentBitmap != bitmap) {
-			currentBitmap = bitmap;
-			screenPanel.Invalidate();
-		}
+		UpdatePreview();
 		// Info text refresh
 		string infoText = " / " + bitmapsTotal.ToString();
 		if (bitmapsFinished < bitmapsTotal) {
