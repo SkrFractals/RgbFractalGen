@@ -109,7 +109,6 @@ namespace RgbFractalGenClr {
 		bool modifySettings = true;			// Allows for modifying settings without it triggering Aborts and Generates
 		int16_t width = -1, height = -1;
 		System::String^ gifPath = "";		// Gif export path name
-		uint16_t cutparamMaximum = 0;		// Maximum cutparam seed of this CutFunction
 		uint16_t maxTasks = 0;				// Maximum tasks available
 		uint16_t abortDelay = 500;			// Set time to restart generator
 		uint16_t restartTimer = 0;
@@ -309,7 +308,7 @@ namespace RgbFractalGenClr {
 		//inline bool IsTaskNotCancelled(Task^ t) { gTask != nullptr && !(gTask->IsCanceled || gTask->IsCompleted || gTask->IsFaulted) }
 
 		inline bool CutParamBoxEnabled(Fractal::CutFunction* cf) { 
-			cutparamBox->Enabled = 0 < (cutparamMaximum = cf == nullptr || (*cf)(0, -1) <= 0 ? 0 : ((*cf)(0, 1 - (1 << 16)) + 1) / (*cf)(0, -1));
+			cutparamBox->Enabled = 0 < (generator->cutparamMaximum = cf == nullptr || (*cf)(0, -1) <= 0 ? 0 : ((*cf)(0, 1 - (1 << 16)) + 1) / (*cf)(0, -1));
 			return cutparamBox->Enabled;
 		}
 

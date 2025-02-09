@@ -27,16 +27,17 @@ namespace RgbFractalGenCs;
 internal class FractalGenerator {
 
 	private enum BitmapState : byte {
-		Queued = 0,			// Hasn't even started generating the dots yet (and it might stay this way if OnlyImage)
-		Dots = 1,			// Started Generating Dots
-		Void = 2,			// Started Dijksring the Void
-		Drawing = 3,		// Started drawing
-		DrawingFinished = 4,// Finished drawing
-		UnlockedRAM = 5,    // Unlocked bitmap without encoding
-		Encoding = 6,		// Started Encoding
-		Finished = 7,		// Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
-		Unlocked = 8,		// Unlocked bitmap
-		Error = 9			// Unused, unless error obviously
+		Queued = 0,				// Hasn't even started generating the dots yet (and it might stay this way if OnlyImage)
+		Dots = 1,				// Started Generating Dots
+		Void = 2,				// Started Dijksring the Void
+		Drawing = 3,			// Started drawing
+		DrawingFinished = 4,	// Finished drawing
+		UnlockedRAM = 5,		// Unlocked bitmap without encoding
+		Encoding = 6,			// Started Encoding
+		EncodingFinished = 7,	// Finished encoding
+		FinishedBitmap = 8,		// Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
+		Unlocked = 9,			// Unlocked bitmap
+		Error = 10				// Unused, unless error obviously
 	}
 	private enum TaskState : byte {
 		Free = 0,	// The task has not been started yet, or already finished and joined and ready to be started again
@@ -246,7 +247,7 @@ internal class FractalGenerator {
 
 	internal bool debugmode = false;
 	internal string debugString = "";
-	private readonly short[] counter = new short[10];
+	private readonly short[] counter = new short[11];
 	public readonly Dictionary<string, int> hash = [];
 	private readonly Dictionary<long, Vector3[]> colorBlends = [];
 	private int startCutParam;
@@ -1431,7 +1432,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			} finally { Monitor.Exit(taskLock); }
 #endif
 			if (task.bitmapIndex < previewFrames) {
-				bitmapState[task.bitmapIndex] = BitmapState.Finished;
+				bitmapState[task.bitmapIndex] = BitmapState.FinishedBitmap;
 				task.state = TaskState.Done;
 			} else {
 				if (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam and not GenerationType.Mp4)
@@ -1454,6 +1455,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						var d = bitmapData[task.bitmapIndex];
 						byte* ptr = (byte*)(void*)d.Scan0;
 						mp4Encoder.AddFrame(ptr, d.Stride);
+						bitmapState[task.bitmapIndex] = BitmapState.EncodingFinished;
 					}
 				} else {
 					StopGif();
@@ -1466,6 +1468,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						var d = bitmapData[task.bitmapIndex];
 						byte* ptr = (byte*)(void*)d.Scan0;
 						gifEncoder.AddFrameParallel(ptr, d.Stride, cancel.Token, task.bitmapIndex - previewFrames);
+						bitmapState[task.bitmapIndex] = BitmapState.EncodingFinished;
 					}
 				} else {
 					StopGif();
@@ -1482,7 +1485,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			} finally { Monitor.Exit(taskLock); }
 #endif
 			if(applyGenerationType == GenerationType.Mp4)
-				bitmapState[task.bitmapIndex] = BitmapState.Finished;
+				bitmapState[task.bitmapIndex] = BitmapState.FinishedBitmap;
 			gifThread = false;
 			task.state = TaskState.Done;
 		}
@@ -1502,8 +1505,6 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 							: !cancel.Token.IsCancellationRequested && ( // Cancel Request forbids any new threads to start
 								!mainLoop || selectMaxTasks == applyMaxTasks && applyParallelType == selectParallelType && selectGenerationType == applyGenerationType // chaning these settings yout exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
 							) && (mainLoop && (TryWriteBitmaps(task) || TryFinishBitmap(task)) ||  lambda(t)); // in the main loop we try Bitmap finishing and writing secondary threads (onDepth loop would get stuck )
-					//if ((task = tasks[t]).IsStillRunning()) tasksRemaining |= includingAnimation || bitmapState[task.bitmapIndex] <= BitmapState.Dots; // Task not finished yet
-					//else if (!cancel.Token.IsCancellationRequested && selectMaxTasks == applyMaxTasks) { if (TryGif(task)) tasksRemaining |= lambda(t); else if (includingAnimation) tasksRemaining = true; }
 					if (tasksRemaining)
 						i = 3;
 				}
@@ -1511,18 +1512,25 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			}
 		}
 		bool TryWriteBitmaps(FractalTask task) {
-			if (isWritingBitmaps <= 0 || --isWritingBitmaps > 0)
+			if (token.IsCancellationRequested // Do not write gid frames when cancelled
+				|| gifEncoder == null // ...or if gifencoder doens't exist
+				|| gifEncoder.IsFinished() // ...or if it's finished
+				|| applyGenerationType is < GenerationType.EncodeGIF or > GenerationType.AllParam or GenerationType.Mp4 // ...or we are not supposed to encode a gif
+				|| isWritingBitmaps <= 0 // ...or this task is already running
+				|| --isWritingBitmaps > 0) // ...or we have already ran it not too long ago
 				return false;
 			task.Start(-1, () => TryWriteBitmap(task.taskIndex));
 			return true;
 		}
 		void TryWriteBitmap(int taskIndex) {
-			while (!token.IsCancellationRequested && gifEncoder != null && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam and not GenerationType.Mp4) {
+			while (!token.IsCancellationRequested) {
+				if (bitmapsFinished >= bitmap.Length && !gifEncoder.IsFinished())
+					gifEncoder.Finish();
 				//if (applyGenerationType == GenerationType.Mp4) {
 				//} else {
 				int unlock = gifEncoder.FinishedFrame();
 				// Try to finalize the previous encoder tasks
-				switch (gifEncoder.TryWrite()) {
+				switch (gifEncoder.TryWrite(true)) {
 					case TryWrite.Failed:
 						// fallback to only display animation without encoding
 						StopGif();
@@ -1531,7 +1539,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 						return;
 					case TryWrite.FinishedFrame:
 						// mark the bitmap state as fully finished
-						bitmapState[unlock + previewFrames] = BitmapState.Finished;
+						bitmapState[unlock + previewFrames] = BitmapState.FinishedBitmap;
 						break;
 					default:
 						// waiting or finished animation
@@ -1549,7 +1557,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			foreach (var t in tasks) {
 				if (t.bitmapIndex < 0)
 					t.Join();
-				else if (bitmapState[t.bitmapIndex] == BitmapState.Encoding) {
+				else if (bitmapState[t.bitmapIndex] is >= BitmapState.Encoding and <= BitmapState.EncodingFinished) {
 					t.Join();
 					bitmapState[t.bitmapIndex] = BitmapState.DrawingFinished;
 				}
@@ -1578,7 +1586,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 					++tryEncode;
 				}
 			}
-			while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (gif ? BitmapState.Finished : BitmapState.DrawingFinished)) {
+			while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (gif ? BitmapState.FinishedBitmap : BitmapState.DrawingFinished)) {
 				bitmapState[bitmapsFinished] = gif || bitmapsFinished < previewFrames ? BitmapState.Unlocked : BitmapState.UnlockedRAM;
 				if (applyGenerationType == GenerationType.HashParam) {
 					using SHA256 sha256 = SHA256.Create();
@@ -1889,28 +1897,36 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 	void FinishGif() {
 		// Save the temp GIF file
 		gifSuccess = 0;
-		if (!token.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam && gifEncoder != null && (applyGenerationType == GenerationType.Mp4 ? mp4Encoder.Finish() : gifEncoder.Finish())) {
-			while (gifEncoder != null) {
-				switch (gifEncoder.TryWrite()) {
-					case TryWrite.Failed:
-						gifEncoder = null;
-						return;
-					case TryWrite.Waiting:
-						// This should never be hit, because the coe reches this loop only after getting cancelled or every frame finished
-						Thread.Sleep(100);
-						break;
-					case TryWrite.FinishedFrame:
-						break;
-					case TryWrite.FinishedAnimation:
-						gifSuccess = Math.Max(selectWidth, selectHeight);
-						// This will follow with gifEncoder.IsFinished()
+		if (!token.IsCancellationRequested && applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam) {
+			if (gifEncoder != null) {
+
+				if (!gifEncoder.IsFinished())
+					gifEncoder.Finish();
+			
+				while (gifEncoder != null) {
+					switch (gifEncoder.TryWrite()) {
+						case TryWrite.Failed:
+							gifEncoder = null;
+							return;
+						case TryWrite.Waiting:
+							// This should never be hit, because the coe reches this loop only after getting cancelled or every frame finished
+							Thread.Sleep(100);
+							break;
+						case TryWrite.FinishedFrame:
+							break;
+						case TryWrite.FinishedAnimation:
+							gifSuccess = Math.Max(selectWidth, selectHeight);
+							// This will follow with gifEncoder.IsFinished()
+							break;
+					}
+					if (gifEncoder.IsFinished())
 						break;
 				}
-				if (gifEncoder.IsFinished())
-					break;
 			}
-			if (mp4Encoder != null)
+			if (mp4Encoder != null) {
+				mp4Encoder.Finish();
 				gifSuccess = -1;
+			}
 		}
 		gifEncoder = null;
 		mp4Encoder = null;
@@ -2045,12 +2061,13 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			BitmapState.Queued => "QUEUED (NOT SPAWNED)",
 			BitmapState.Dots => "GENERATING FRACTAL DOTS",
 			BitmapState.Void => "GENERATING DIJKSTRA VOID",
-			BitmapState.Drawing => "DRAWING (LOCKED)",
+			BitmapState.Drawing => "DRAWING BITMAP (LOCKED)",
 			BitmapState.DrawingFinished => "DRAWING FINISHED (LOCKED)",
 			BitmapState.Encoding => "ENCODING (LOCKED)",
-			BitmapState.Finished => "FINISHED (LOCKED)",
+			BitmapState.EncodingFinished => "ENCODING FINISHED (LOCKED)",
+			BitmapState.FinishedBitmap => "BITMAP FINISHED (LOCKED)",
 			BitmapState.UnlockedRAM => "UNLOCKED_RAM",
-			BitmapState.Unlocked => "UNLOCKED",
+			BitmapState.Unlocked => "UNLOCKED_ENCODED",
 			_ => "ERROR! (SHOULDN'T HAPPEN)",
 		};
 
@@ -2078,7 +2095,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			}
 		}
 		BitmapState state, laststate = BitmapState.Error;
-		for (var c = i = 0; c < 10; counter[c++] = 0) ;
+		for (var c = i = 0; c < counter.Length; counter[c++] = 0) ;
 		for (_debugString += "\n\nIMAGES:"; i < bitmap.Length; ++i)
 			++counter[(int)bitmapState[i]];
 		string _memoryString = "\n";
@@ -2088,7 +2105,7 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 				li = i;
 			}
 		_memoryString += (li == i - 1 ? li + ": " : li + "-" + (i - 1) + ": ") + GetBitmapState(laststate);
-		for (int c = 0; c < 10; ++c) 
+		for (int c = 0; c < counter.Length; ++c) 
 			_debugString += "\n" + counter[c] +"x: "+ GetBitmapState((BitmapState)c);
 		_debugString += "\n\nANIMATION:" + _memoryString;
 		debugString = i < bitmap.Length ? _debugString + "\n" + i + "+: " + "QUEUED" : _debugString;

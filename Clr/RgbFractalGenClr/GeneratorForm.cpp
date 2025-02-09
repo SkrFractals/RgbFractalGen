@@ -1247,7 +1247,7 @@ namespace RgbFractalGenClr {
 	while (NEW < MIN)NEW += (MAX-MIN); while (NEW >= MAX)NEW -= (MAX-MIN); APPLY_DIFF_PARAM(NEW, GEN)
 	*/
 	System::Void GeneratorForm::CutparamBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(cutparamBox, &generator->selectCutparam, static_cast<int16_t>(-1), generator->cutparamMaximum);
+		ParseClampRetextDiffApply(cutparamBox, &generator->selectCutparam, static_cast<int16_t>(-1), generator->GetMaxCutparam());
 	}
 	System::Void GeneratorForm::PeriodBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		ParseClampRetextDiffApply(periodBox, &generator->selectPeriod, static_cast<int16_t>(1), static_cast<int16_t>(1000));

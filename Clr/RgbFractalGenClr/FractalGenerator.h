@@ -63,7 +63,7 @@ namespace RgbFractalGenClr {
         Vector I;               // Pure parent color
         bool taskStarted;       // Additional safety, could remove if it never gets triggered for a while
         uint16_t taskIndex;     // The task index
-        uint16_t bitmapIndex;   // The bitmap index on which bitmap is this task working
+        uint32_t bitmapIndex;   // The bitmap index on which bitmap is this task working
         std::tuple<float, float, std::pair<float, float>*>*
             preIterate;
         FractalTask() {
@@ -95,7 +95,7 @@ namespace RgbFractalGenClr {
         Vector* colorBlend;     // Color blend of a selected fractal for more seamless loop (between single color to the sum of children)
         Fractal::CutFunction* 
             cutFunction;        // Selected CutFunction pointer
-        int16_t applyCutparam;	// Applied cutparam (selected or random)
+        int32_t applyCutparam;	// Applied cutparam (selected or random)
         int16_t maxIterations;  // maximum depth of iteration (dependent on fractal/detail/resolution)
         float logBase;          // Size Log Base
         float* emptyFloat;      // Preallocated empty angle array when it doesn't exist
@@ -116,9 +116,9 @@ namespace RgbFractalGenClr {
             bitmapData;	                // Locked Bits for bitmaps
         uint16_t finalPeriodMultiplier; // How much will the period get finally stretched? (calculated for seamless + user multiplier)
         uint16_t debug;				    // Debug frame count override
-        uint16_t bitmapsFinished;		// How many bitmaps are completely finished generating? (ready to display, encoded if possible)
-        uint16_t nextBitmap;			// How many bitmaps have started generating? (next task should begin with this one)
-        int16_t allocatedFrames;        // How many bitmap frames are currently allocated?
+        uint32_t bitmapsFinished;		// How many bitmaps are completely finished generating? (ready to display, encoded if possible)
+        uint32_t nextBitmap;			// How many bitmaps have started generating? (next task should begin with this one)
+        int32_t allocatedFrames;        // How many bitmap frames are currently allocated?
         int16_t applyZoom;		        // Applied zoom (selected or random)
         GenerationType 
             applyGenerationType;        // Applied generation type (for example a gif error can temporarily change it to AnimationRAM)
@@ -163,8 +163,8 @@ namespace RgbFractalGenClr {
         int16_t selectFractal,      // Fractal definition (0-fractals.Length)
             selectChildAngle,       // Child angle definition (0-childAngle.Length)
             selectChildColor,       // Child color definition (0-childColor.Length)
-            selectCut,              // Selected CutFunction index (0-cutFunction.Length)
-            selectCutparam;         // Cutparam seed (0-maxCutparam)
+            selectCut;              // Selected CutFunction index (0-cutFunction.Length)
+        uint32_t selectCutparam;    // Cutparam seed (0-maxCutparam)
         uint16_t selectWidth,       // Resolution width (1-X)
             selectHeight;           // Resolution height (1-X)
         int16_t selectPeriod,       // Parent to child frames period (1-X)
@@ -190,7 +190,7 @@ namespace RgbFractalGenClr {
             selectDelay;			// Animation frame delay
         GenerationType 
             selectGenerationType;   // 0 = Only Image, 1 = Animation, 2 = Animation + GIF
-        int16_t cutparamMaximum;    // Maximum seed for the selected CutFunction
+        int32_t cutparamMaximum;    // Maximum seed for the selected CutFunction
 
         bool debugmode = false;
         System::String^ debugString;
@@ -208,10 +208,10 @@ namespace RgbFractalGenClr {
 #pragma region Generate_Tasks
     private:
         System::Void GenerateAnimation();
-        System::Void GenerateDots(const uint16_t& bitmapIndex, const int16_t& stateIndex, float size, float angle, int8_t spin, float hueAngle, uint8_t color);
+        System::Void GenerateDots(const uint32_t& bitmapIndex, const int16_t& stateIndex, float size, float angle, int8_t spin, float hueAngle, uint8_t color);
         System::Void GenerateImage(FractalTask& task);
-        System::Void GenerateDots_SingleTask(const FractalTask& task, double inXY, double AA, const uint8_t inColor, const int inFlags, uint8_t inDepth);
-        System::Void GenerateDots_OfDepth(const uint16_t bitmapIndex);
+        System::Void GenerateDots_SingleTask(const FractalTask& task, double inXY, double AA, const uint8_t inColor, const int32_t inFlags, uint8_t inDepth);
+        System::Void GenerateDots_OfDepth(const uint32_t bitmapIndex);
         // OfRecusrion is replaced with OdDepth, which is already better
         //System::Void GenerateDots_OfRecursion(const uint16_t taskIndex, double inXY, double AA, const uint8_t inColor, const int inFlags, uint8_t inDepth);
         //FinishTasks had to be unpacked directly into the code because lambdas are not supported here in a managed class
@@ -236,7 +236,7 @@ namespace RgbFractalGenClr {
 #pragma region Generate_Inline
     private:
         bool ApplyDot(const bool apply, const FractalTask& task, const float& inX, const float& inY, const float& inDetail, const uint8_t& inColor);
-        inline int CalculateFlags(const int& index, const int& inFlags) { return cutFunction == nullptr ? inFlags : (*cutFunction)(index, inFlags); }
+        inline int32_t CalculateFlags(const int& index, const int32_t& inFlags) { return cutFunction == nullptr ? inFlags : (*cutFunction)(index, inFlags); }
         inline bool TestSize(const float& newX, const float& newY, const float& inSize) {
             const auto testSize = inSize * f->cutSize;
             return ((Math::Min(newX, newY) + testSize > upleftStart) && (newX - testSize < rightEnd) && (newY - testSize < downEnd) );
@@ -324,6 +324,20 @@ private:
 
 #pragma region Interface_Getters
     public:
+        inline uint32_t GetMaxCutparam() {
+            if (selectCut >= 0) {
+                auto c = std::get<2>(fractals[selectFractal]->cutFunction[selectCut]);
+                if (c != nullptr) {
+                    if (*c < 0)
+                        return -*c;
+                    uint32_t i = -1;
+                    while (*++c >= 0)
+                        ++i;
+                    return i;
+                }
+            }
+            return cutparamMaximum;
+        }
         inline Fractal** GetFractals() { return fractals; }
         inline Fractal* GetFractal() { return fractals[selectFractal]; }
         inline Bitmap^ GetBitmap(const int index) { 
@@ -335,7 +349,7 @@ private:
         inline Fractal::CutFunction* GetCutFunction() { 
             return fractals[selectFractal]->cutFunction == nullptr 
                 ? nullptr 
-                : &fractals[selectFractal]->cutFunction[selectCut].second; 
+                : &std::get<1>(fractals[selectFractal]->cutFunction[selectCut]);
         }
         std::string ConvertToStdString(System::String^ managedString);
 #pragma endregion

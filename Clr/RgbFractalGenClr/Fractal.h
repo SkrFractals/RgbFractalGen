@@ -9,7 +9,7 @@ namespace RgbFractalGenClr {
 
 	class Fractal {
 	public:
-		typedef int (*CutFunction)(int8_t index, int inFlags);
+		typedef int32_t (*CutFunction)(int8_t index, int32_t inFlags, const Fractal& f);
 		// Properties
 		std::string name;										// Fractal name (only for selection list)
 		int8_t childCount;										// ChildCount of Self Similars Inside (must equal the length of all the following arrays)
@@ -21,9 +21,10 @@ namespace RgbFractalGenClr {
 		float* childY;											// Y coord shifts of Self Similars Inside
 		std::pair<std::string, float*>* childAngle;	// Angle shifts of Self Similars Inside
 		std::pair<std::string, uint8_t*>* childColor;		// Color shifts of Self Similars Inside
-		std::pair<std::string, CutFunction>* cutFunction;	// Function that takes a bitarray transforms it and decides to cut some specific patterns of Self Simmilars
+		std::tuple<std::string, CutFunction, int32_t*>* cutFunction;	// Function that takes a bitarray transforms it and decides to cut some specific patterns of Self Simmilars
+		
 		// Autoproperties
-		float periodAngle;
+		uint8_t nbdbits;
 		/// <summary>
 		/// Definition contructor
 		/// </summary>
@@ -48,58 +49,32 @@ namespace RgbFractalGenClr {
 			float* childX,
 			float* childY,
 			std::pair<std::string, float*>* childAngle,
-		std::pair<std::string, uint8_t*>* childColor,
-		std::pair<std::string, CutFunction>* cutFunction
+			std::pair<std::string, uint8_t*>* childColor,
+			std::tuple<std::string, CutFunction, int32_t*>* cutFunction
 		);
 
 #pragma region CutFunctions_Param
 	private:
 		//static int FlakeTemplate(int8_t index, int inFlags, int bits);
 	public:
-		static int Trees_NoChildParam(int8_t index, int inFlags);
-		static int TriComb_Param(int8_t index, int inFlags);
+		static int32_t NoChildSimpleParam(int8_t index, int32_t inFlags, const Fractal& f);
+		static int32_t NoChildComplexParam(int8_t index, int32_t inFlags, const Fractal& f);
+		static int32_t NoBackDiag(int index, int32_t inFlags, const Fractal& f);
+		static int32_t TriComb_Param(int8_t index, int32_t inFlags, const Fractal& f);
 #pragma endregion
 
-#pragma region CutFunctions_Triflake
+#pragma region CutFunctions_Specials
 	public:
-		static int Triflake_NoCornerParam(int8_t index, int inFlags);
-		static int Triflake_NoBackDiag(int8_t index, int inFlags);
-#pragma endregion
-
-#pragma region CutFunctions_TetraTriflake
+		static int32_t Beamtree_OuterJoint(int8_t index, int32_t inFlags, const Fractal& f);
+		static int32_t Beamtree_InnerJoint(int8_t index, int32_t inFlags, const Fractal& f);
+		static int32_t Beamtree_NoBeam(int8_t index, int32_t inFlags, const Fractal& f);
 	private:
-		static int Tetraflake_CustomCornerParam(int8_t index, int inFlags, int8_t fb, int8_t fi);
+		static int32_t Tetraflake_CustomCornerParam(int8_t index, int32_t inFlags, const Fractal& f, int8_t fb, int8_t fi);
 	public:
-		static int Tetraflake_NoCornerParam(int8_t index, int inFlags);
-		static int Tetraflake_NoCornerRadHolesParam(int8_t index, int inFlags);
-		static int Tetraflake_NoCornerCornerHolesParam(int8_t index, int inFlags);
-		static int Tetraflake_NoCornerTriangleHolesParam(int8_t index, int inFlags);
-#pragma endregion
-
-#pragma region CutFunctions_Carpet
-	public:
-		static int Carpet_NoCornerParam(int8_t index, int inFlags);
-		static int Carpet_NoBackDiag(int8_t index, int inFlags);
-		static int Carpet_NoBackDiag2(int8_t index, int inFlags);
-#pragma endregion
-
-#pragma region CutFunctions_Pentaflake
-	public:
-		static int Pentaflake_NoCornerParam(int8_t index, int inFlags);
-		static int Pentaflake_NoBackDiag(int8_t index, int inFlags);
-#pragma endregion
-
-#pragma region CutFunctions_Hexaflake
-	public:
-		static int Hexaflake_NoCornerParam(int8_t index, int inFlags);
-		static int Hexaflake_NoBackDiag(int8_t index, int inFlags);
-#pragma endregion
-
-#pragma region CutFunctions_BeamTree
-	public:
-		static int Beamtree_OuterJoint(int8_t index, int inFlags);
-		static int Beamtree_InnerJoint(int8_t index, int inFlags);
-		static int Beamtree_NoBeam(int8_t index, int inFlags);
+		static int32_t Tetraflake_NoCornerParam(int8_t index, int32_t inFlags, const Fractal& f);
+		static int32_t Tetraflake_NoCornerRadHolesParam(int8_t index, int32_t inFlags, const Fractal& f);
+		static int32_t Tetraflake_NoCornerCornerHolesParam(int8_t index, int32_t inFlags, const Fractal& f);
+		static int32_t Tetraflake_NoCornerTriangleHolesParam(int8_t index, int32_t inFlags, const Fractal& f);
 #pragma endregion
 
 	};
