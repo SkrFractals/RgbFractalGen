@@ -54,7 +54,7 @@ public partial class GeneratorForm : Form {
 	protected short abortDelay = 500;           // Set time to restart generator
 	protected short restartTimer = 0;
 	private string gifPath = "";                // Gif export path name
-	private string mp4Path = "";				// Mp4 export path name
+	private string mp4Path = "";                // Mp4 export path name
 	private Fractal tosave = null;
 
 	// Display Variables
@@ -80,6 +80,7 @@ public partial class GeneratorForm : Form {
 	private short mem_blur, mem_defaulthue, mem_hue, mem_abort;
 	private float mem_bloom;
 	private bool performHash = false;
+	private bool previewMode = true;
 	#endregion
 
 	#region Core
@@ -1012,6 +1013,8 @@ public partial class GeneratorForm : Form {
 			generator.selectHue = mem_hue;
 			generator.selectDefaultHue = mem_defaulthue;
 			abortDelay = mem_abort;
+			generator.selectPreviewMode = false;
+
 		} else {
 			mem_blur = generator.selectBlur;
 			mem_bloom = generator.selectBloom;
@@ -1020,11 +1023,12 @@ public partial class GeneratorForm : Form {
 			mem_defaulthue = generator.selectDefaultHue;
 			mem_abort = abortDelay;
 			abortDelay = 10;
-			generator.selectParallelType = FractalGenerator.ParallelType.OfDepth;
 			generator.selectGenerationType = FractalGenerator.GenerationType.AnimationRAM;
 			generator.selectBloom = generator.selectBlur = generator.selectHue = 0;
+			generator.selectPreviewMode = previewMode;
 		}
 		editorPanel.Visible = !(generatorPanel.Visible = editorPanel.Visible);
+		QueueReset();
 	}
 	private void AddEditorPoint(float[] cx, float[] cy, float[] ca, byte[] cc, bool single = true) {
 		int i = editorPoint.Count;
@@ -1263,6 +1267,10 @@ public partial class GeneratorForm : Form {
 		tosave = generator.GetFractal();
 		_ = saveFractal.ShowDialog();
 	}
+	private void preButton_Click(object sender, EventArgs e) {
+		generator.selectPreviewMode = previewMode = !previewMode;
+		QueueReset();
+	}
 	private void FractalSelect_TextUpdate(object sender, EventArgs e) {
 		// TODO verify it actually gets selected
 		if (fractalSelect.Items.Contains(fractalSelect.Text))
@@ -1342,7 +1350,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void SaveSettings() {
 		var f = generator.GetFractal();
-		File.WriteAllText("settings.txt", "fractal|" + fractalSelect.Text + "|path|" + f.path + "|edit|" + (editorPanel.Visible ? 1 : 0) + "|angle|" + angleSelect.SelectedIndex + "|color|" + colorSelect.SelectedIndex + "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
+		File.WriteAllText("settings.txt", "fractal|" + fractalSelect.Text + "|path|" + f.path + "|preview|" + (previewMode ? 1 : 0) + "|edit|" + (editorPanel.Visible ? 1 : 0) + "|angle|" + angleSelect.SelectedIndex + "|color|" + colorSelect.SelectedIndex + "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
 			+ "|w|" + resX.Text + "|h|" + resY.Text + "|res|" + resSelect.SelectedIndex + "|period|" + periodBox.Text + "|periodmul|" + periodMultiplierBox.Text + "|zoom|" + zoomSelect.SelectedIndex + "|defaultzoom|" + defaultZoom.Text
 			+ "|spin|" + spinSelect.SelectedIndex + "|spinmul|" + spinSpeedBox.Text + "|defaultangle|" + defaultAngle.Text + "|hue|" + hueSelect.SelectedIndex + "|huemul|" + hueSpeedBox.Text + "|defaulthue|" + defaultHue.Text + "|amb|" + ambBox.Text
 			+ "|noise|" + noiseBox.Text + "|saturate|" + saturateBox.Text + "|detail|" + detailBox.Text + "|bloom|" + bloomBox.Text + "|blur|" + blurBox.Text + "|brightness|" + brightnessBox.Text + "|parallel|" + parallelTypeSelect.SelectedIndex
@@ -1358,7 +1366,8 @@ public partial class GeneratorForm : Form {
 			bool p = int.TryParse(v, out int n);
 			switch (s[i]) {
 				case "path": if (v != "" && File.Exists(v)) _ = LoadFractal(v, true); break;
-				case "fractal": if(fractalSelect.Items.Contains(v)) fractalSelect.SelectedItem = v; break;
+				case "fractal": if (fractalSelect.Items.Contains(v)) fractalSelect.SelectedItem = v; break;
+				case "preview": if (p) previewMode = n > 0; break;
 				case "edit": if (p) generatorPanel.Visible = !(editorPanel.Visible = n > 0); break;
 				case "angle": if (p) angleSelect.SelectedIndex = Math.Min(angleSelect.Items.Count - 1, n); break;
 				case "color": if (p) colorSelect.SelectedIndex = Math.Min(colorSelect.Items.Count - 1, n); break;
@@ -1400,11 +1409,14 @@ public partial class GeneratorForm : Form {
 			generator.selectBloom = generator.selectBlur = 0;
 			generator.selectHue = generator.selectDefaultHue = 0;
 			mem_hue = (short)hueSelect.SelectedIndex;
+			generator.selectPreviewMode = previewMode;
 			if (short.TryParse(defaultHue.Text, out var n))
 				mem_defaulthue = n;
 			abortDelay = 10;
 			if (short.TryParse(abortBox.Text, out n))
 				mem_abort = n;
+		} else {
+			generator.selectPreviewMode = false;
 		}
 		SetupFractal();
 	}
@@ -1621,4 +1633,6 @@ public partial class GeneratorForm : Form {
 
 	}
 	#endregion
+
+
 }

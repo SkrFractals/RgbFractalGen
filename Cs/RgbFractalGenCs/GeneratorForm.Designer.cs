@@ -93,6 +93,7 @@
 			voidBox = new System.Windows.Forms.TextBox();
 			modeButton = new System.Windows.Forms.Button();
 			editorPanel = new System.Windows.Forms.Panel();
+			preButton = new System.Windows.Forms.Button();
 			pointLabel = new System.Windows.Forms.Label();
 			sizeLabel = new System.Windows.Forms.Label();
 			colorBox = new System.Windows.Forms.TextBox();
@@ -312,7 +313,7 @@
 			// 
 			// pngButton
 			// 
-			pngButton.Location = new System.Drawing.Point(88, 403);
+			pngButton.Location = new System.Drawing.Point(62, 403);
 			pngButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			pngButton.Name = "pngButton";
 			pngButton.Size = new System.Drawing.Size(66, 27);
@@ -323,10 +324,10 @@
 			// 
 			// gifButton
 			// 
-			gifButton.Location = new System.Drawing.Point(162, 403);
+			gifButton.Location = new System.Drawing.Point(136, 403);
 			gifButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			gifButton.Name = "gifButton";
-			gifButton.Size = new System.Drawing.Size(108, 27);
+			gifButton.Size = new System.Drawing.Size(59, 27);
 			gifButton.TabIndex = 35;
 			gifButton.Text = "Save GIF";
 			gifButton.UseVisualStyleBackColor = true;
@@ -479,7 +480,7 @@
 			helpButton.Location = new System.Drawing.Point(14, 403);
 			helpButton.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			helpButton.Name = "helpButton";
-			helpButton.Size = new System.Drawing.Size(66, 27);
+			helpButton.Size = new System.Drawing.Size(40, 27);
 			helpButton.TabIndex = 33;
 			helpButton.Text = "Help";
 			helpButton.UseVisualStyleBackColor = true;
@@ -748,6 +749,7 @@
 			// 
 			// generatorPanel
 			// 
+			generatorPanel.Controls.Add(mp4Button);
 			generatorPanel.Controls.Add(fpsBox);
 			generatorPanel.Controls.Add(voidBox);
 			generatorPanel.Controls.Add(zoomSelect);
@@ -827,6 +829,7 @@
 			// 
 			// editorPanel
 			// 
+			editorPanel.Controls.Add(preButton);
 			editorPanel.Controls.Add(pointLabel);
 			editorPanel.Controls.Add(sizeLabel);
 			editorPanel.Controls.Add(colorBox);
@@ -848,6 +851,16 @@
 			editorPanel.Name = "editorPanel";
 			editorPanel.Size = new System.Drawing.Size(286, 441);
 			editorPanel.TabIndex = 56;
+			// 
+			// preButton
+			// 
+			preButton.Location = new System.Drawing.Point(148, 410);
+			preButton.Name = "preButton";
+			preButton.Size = new System.Drawing.Size(122, 27);
+			preButton.TabIndex = 58;
+			preButton.Text = "PREVIEW MODE";
+			preButton.UseVisualStyleBackColor = true;
+			preButton.Click += preButton_Click;
 			// 
 			// pointLabel
 			// 
@@ -909,10 +922,10 @@
 			// addCut
 			// 
 			addCut.FormattingEnabled = true;
-			addCut.Location = new System.Drawing.Point(118, 379);
+			addCut.Location = new System.Drawing.Point(121, 379);
 			addCut.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
 			addCut.Name = "addCut";
-			addCut.Size = new System.Drawing.Size(152, 23);
+			addCut.Size = new System.Drawing.Size(149, 23);
 			addCut.TabIndex = 67;
 			addCut.Text = "Select CutFunction";
 			addCut.SelectedIndexChanged += AddCut_SelectedIndexChanged;
@@ -946,9 +959,9 @@
 			// 
 			// saveButton
 			// 
-			saveButton.Location = new System.Drawing.Point(148, 408);
+			saveButton.Location = new System.Drawing.Point(80, 410);
 			saveButton.Name = "saveButton";
-			saveButton.Size = new System.Drawing.Size(122, 23);
+			saveButton.Size = new System.Drawing.Size(56, 27);
 			saveButton.TabIndex = 58;
 			saveButton.Text = "SAVE";
 			saveButton.UseVisualStyleBackColor = true;
@@ -958,7 +971,7 @@
 			// 
 			loadButton.Location = new System.Drawing.Point(14, 408);
 			loadButton.Name = "loadButton";
-			loadButton.Size = new System.Drawing.Size(122, 23);
+			loadButton.Size = new System.Drawing.Size(56, 27);
 			loadButton.TabIndex = 57;
 			loadButton.Text = "LOAD";
 			loadButton.UseVisualStyleBackColor = true;
@@ -1022,9 +1035,9 @@
 			// 
 			// mp4Button
 			// 
-			mp4Button.Location = new System.Drawing.Point(179, 606);
+			mp4Button.Location = new System.Drawing.Point(201, 403);
 			mp4Button.Name = "mp4Button";
-			mp4Button.Size = new System.Drawing.Size(108, 23);
+			mp4Button.Size = new System.Drawing.Size(69, 27);
 			mp4Button.TabIndex = 57;
 			mp4Button.Text = "Save Mp4";
 			mp4Button.UseVisualStyleBackColor = true;
@@ -1048,7 +1061,6 @@
 			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
 			ClientSize = new System.Drawing.Size(1085, 1178);
-			Controls.Add(mp4Button);
 			Controls.Add(editorPanel);
 			Controls.Add(modeButton);
 			Controls.Add(generatorPanel);
@@ -1172,6 +1184,7 @@
 		private System.Windows.Forms.SaveFileDialog saveMp4;
 		private System.Windows.Forms.TextBox fpsBox;
 		private System.Windows.Forms.SaveFileDialog convertMp4;
+		private System.Windows.Forms.Button preButton;
 	}
 }
 
