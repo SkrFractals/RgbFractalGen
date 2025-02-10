@@ -388,9 +388,9 @@ public partial class GeneratorForm : Form {
 		if (gTask == null) {
 			gifButton.Enabled = aTask == null && (isGifReady = generator.IsGifReady()) != 0;
 			gifButton.Text = "Save " + v;
-		} else if (gifButton.Text != "Cancel Saving " + v) {
+		} else if (gifButton.Text != "Cancel") {
 			gifButton.Enabled = true;
-			gifButton.Text = "Cancel Saving " + v;
+			gifButton.Text = "Cancel";
 		}
 		// Fetch a bitmap to display
 		UpdatePreview();
@@ -404,7 +404,7 @@ public partial class GeneratorForm : Form {
 			infoText = currentBitmapIndex.ToString() + infoText;
 		}
 		infoLabel.Text = infoText;
-		gifButton.Text = gTask == null ? "Save GIF" : "Saving GIF...";
+		gifButton.Text = gTask == null ? "Save GIF" : "Saving";
 	}
 
 	#endregion
