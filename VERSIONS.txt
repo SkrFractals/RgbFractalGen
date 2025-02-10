@@ -1,3 +1,8 @@
+1.92
+- a bunch of bugfixes preventing a lot of crashes and fixing some modes
+- editor preview mode
+- performance upgrades
+
 1.9
 - fractal editor
 - improved color seamlessness to account for predicting cutfunctions split color mixing

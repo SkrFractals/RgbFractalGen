@@ -1025,7 +1025,7 @@ internal class FractalGenerator {
 				return;
 			}
 			for (var b = 0; b < applyBlur; ++b) {
-				ModFrameParameters(task.applyWidth, task.applyHeight, bitmapIndex >= previewFrames, ref size, ref angle, ref spin, ref hueAngle, ref color);
+				ModFrameParameters(task.applyWidth, task.applyHeight, ref size, ref angle, ref spin, ref hueAngle, ref color);
 				// Preiterate values that change the same way as iteration goes deeper, so they only get calculated once
 				var preIterateTask = task.preIterate;
 				float inSize = size;
@@ -1039,7 +1039,7 @@ internal class FractalGenerator {
 #if SMOOTHNESSDEBUG_XY
 						preIterateTask[i].Item3[c] = (f.childX[c] * inSize, f.childY[c] * inSize);
 #else
-preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
+						preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 #endif
 					inSize /= f.childSize;
 				}
@@ -1624,21 +1624,21 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			hueAngle += (hueCycleMultiplier + 3 * selectExtraHue) * (float)applyHueCycle / (finalPeriodMultiplier * blurPeriod);
 			IncFrameSize(ref size, blurPeriod);
 		}
-		void ModFrameParameters(short width, short height, bool sw, ref float size, ref float angle, ref short spin, ref float hueAngle, ref byte color) {
+		void ModFrameParameters(short width, short height, ref float size, ref float angle, ref short spin, ref float hueAngle, ref byte color) {
 			void SwitchParentChild(ref float angle, ref short spin, ref byte color, short z) {
 				if (Math.Abs(spin) > 1) {
 					// reverse angle and spin when antispinning, or else the direction would change when parent and child switches
 					angle = -angle;
 					spin = (short)-spin;
 				}
-				if(!applyPreviewMode)
-					color = (byte)((3 + color + z * childColor[0]) % 3);
+				if (applyPreviewMode)
+					return;
+				color = (byte)((3 + color + z * childColor[0]) % 3);
 			}
 			float fp = f.childSize;
 			var w = Math.Max(width, height) * f.maxSize;
 			if (applyPreviewMode) 
 				w *= 0.1f;
-			sw &= !applyPreviewMode;
 			// Zoom Rotation
 			while (angle > Math.PI * 2)
 				angle -= (float)Math.PI * 2;
@@ -1652,17 +1652,17 @@ preIterateTask[i].Item3[c] = (f.childX[c] * inDetail, f.childY[c] * inDetail);
 			// Swap Parent<->CenterChild after a full period
 			while (size >= w * fp) {
 				size /= fp;
-				if (sw) {
-					angle += childAngle[0];
-					SwitchParentChild(ref angle, ref spin, ref color, 1);
-				}
+				if (applyPreviewMode)
+					continue;
+				angle += childAngle[0];
+				SwitchParentChild(ref angle, ref spin, ref color, 1);
 			}
 			while (size < w) {
 				size *= fp;
-				if (sw) {
-					angle -= childAngle[0];
-					SwitchParentChild(ref angle, ref spin, ref color, -1);
-				}
+				if (applyPreviewMode)
+					continue;
+				angle -= childAngle[0];
+				SwitchParentChild(ref angle, ref spin, ref color, -1);
 			}
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
