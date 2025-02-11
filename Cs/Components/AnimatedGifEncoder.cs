@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.IO.Pipes;
 using System.Threading;
 using System.Threading.Tasks;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -110,7 +111,6 @@ namespace Gif.Components {
 		protected int colorDepth = 8;       // number of bit planes
 		protected int palSize = 7;          // color table size (bits-1)
 		protected int dispose = -1;         // disposal code (-1 = use default)
-		protected bool firstFrame = true;   // is the header of the file not written yet?
 		protected int sample = 10;          // default sample interval for quantizer
 
 
@@ -227,7 +227,7 @@ namespace Gif.Components {
 			bool ok = true;
 			stream = os;
 			try {
-				WriteString("GIF89a"); // header
+				WriteString(os, "GIF89a"); // header
 			} catch (IOException) {
 				ok = Abort();
 			}
@@ -274,17 +274,7 @@ namespace Gif.Components {
 		 * @return Failed if error, Waiting if next frame task still running or next frame not added yet, FinishedFrame if successfully written next frame to a file, FinishedAnimation if file is finished
 		 */
 		public TryWrite TryWrite(bool parallel = false) {
-			TryWrite r;
-			if (parallel) {
-				Monitor.Enter(this);
-				try {
-				r = TryWriteInternal();
-				if (r == Components.TryWrite.Failed)
-					Abort();
-				}finally { Monitor.Exit(this); }
-				return r;
-			}
-			r = TryWriteInternal();
+			var r = TryWriteInternal(parallel);
 			if (r == Components.TryWrite.Failed)
 				Abort();
 			return r;
@@ -303,9 +293,9 @@ namespace Gif.Components {
 			// this will let me know the encodeTaskData (whcih hasn't got started a Task yet, so it's next is null) is just marking the need of the file
 			encodeTaskData.finished = true;
 			// try a final write (if not parallel)
-			while (writeTaskData.finished && writeTaskData.nextTask != null)
-				TryWrite();
-			return true;
+			var r = Components.TryWrite.FinishedAnimation;
+			while (writeTaskData.finished && writeTaskData.nextTask != null && (r = TryWrite()) != Components.TryWrite.Failed) ;
+			return Abort(r == Components.TryWrite.Failed);
 		}
 		/**Finished the next encodeTask without assiging a new next one.
 		 * This will let the TryWriteFrameIntoFile task finisher know we have finished adding frames and it will then flush any pending data and close output file.
@@ -321,9 +311,9 @@ namespace Gif.Components {
 			// this will let me know the encodeTaskData (whcih hasn't got started a Task yet, so it's next is null) is just marking the need of the file
 			encodeTaskData.finished = true;
 			// try a final write (if not parallel)
-			while(writeTaskData.finished && writeTaskData.nextTask != null)
-				TryWrite();
-			return true;
+			var r = Components.TryWrite.FinishedAnimation;
+			while (writeTaskData.finished && writeTaskData.nextTask != null && (r = TryWrite()) != Components.TryWrite.Failed) ;
+			return Abort(r == Components.TryWrite.Failed);
 		}
 		#endregion
 
@@ -626,8 +616,11 @@ namespace Gif.Components {
 				encodeData.transIndex = nq.Map(transparent.B, transparent.G, transparent.R);
 			if (encodeData.bitmapData != null)
 				encodeData.bitmap.UnlockBits(encodeData.bitmapData); // unlock bits if we were adding a direct image
+
+			bool ok = WriteFrame(encodeData, null);
+
 			encodeData.finished = true; // lets the TryWriteFrameIntoFile know this task was finished so it can write the data into the file
-			return false;
+			return encodeData.failed = !ok;
 		}
 
 		/**
@@ -802,8 +795,12 @@ namespace Gif.Components {
 				return Abort();
 			try {
 				fs = new FileStream(file, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
-				fs.Write(ms.ToArray(), 0, (int)ms.Length);
+				ms.Position = 0;
+				ms.CopyTo(fs);
+				//fs.Write(ms.ToArray(), 0, (int)ms.Length);
 				fs.Close();
+				ms.Close();
+				ms = new MemoryStream(10 * 1024);
 				fs = null;
 			} catch (IOException) {
 				return Abort();
@@ -830,7 +827,7 @@ namespace Gif.Components {
 			encodeTaskData = writeTaskData = null;
 			return false;
 		}
-		protected TryWrite TryWriteInternal() {
+		protected TryWrite TryWriteInternal(bool parallel) {
 			if (finishedAnimation)
 				return Components.TryWrite.FinishedAnimation; // already finished
 			if (!started || writeTaskData.failed)
@@ -871,7 +868,7 @@ namespace Gif.Components {
 				} catch (Exception) {
 					ok = false;
 				}
-				finishedAnimation = firstFrame = true;
+				finishedAnimation = true;
 				return ok ? Components.TryWrite.FinishedAnimation : Components.TryWrite.Failed; // Has writing the full file finished or failed?
 			}
 			// this nextTask is not null, so this task is actually a frame and not an end yet, so write that frame into the file
@@ -886,34 +883,65 @@ namespace Gif.Components {
 				return Components.TryWrite.Failed; // failed to make indexes pixels from a global color map
 			try { // try writing the frame
 				  // so now we know the data for the next frame is ready to write, so let's do it!
-				if (firstFrame) {
-					WriteLSD(); // logical screen descriptior
-					WritePalette(table == ColorTable.Local ? writeTask.colorTab : globalTab); // global color table
-					if (repeat >= 0)
-						WriteNetscapeExt();  // use NS app extension to indicate reps
+
+				if (writeTask.ms == null)
+					WriteFrame(writeTask, stream);
+				else {
+					// Frame is alraedy written into memory stream, so just dump that into the filestream:
+					try {
+						writeTask.ms.Flush();
+						writeTask.ms.Position = 0; // Reset position before copying
+						writeTask.ms.CopyTo(stream);
+						writeTask.ms.Close();
+						writeTask.ms = null;
+					} catch (IOException) {
+						return Components.TryWrite.Failed;
+					}
 				}
-				WriteGraphicCtrlExt(writeTask); // write graphic control extension
-				bool global = firstFrame || table != ColorTable.Local;
-				WriteImageDesc(global); // image descriptor
-				if (!global)
-					WritePalette(writeTask.colorTab); // local color table
-				WritePixels(writeTask); // encode and write pixel data
 				++finishedFrame;
 			} catch (Exception) {
 				ok = false;
 			}
-			firstFrame = false;
-			if (prevWrite == null) {
-				if (writeTaskData == null) 
-					return Components.TryWrite.Failed;
-				// Now that I wrote the frame, I can forget the task data, and move on to the next one.
-				writeTaskData = writeTaskData.nextTask;
-			} else {
-				// The first queued writeTaskData was not the next sequential frame to be written and we were not writing that one...
-				// ...so we have to skip and forget the one later in the list that we actually wrote
-				prevWrite.nextTask = writeTask.nextTask;
+
+			if (parallel) {
+				Monitor.Enter(this);
+				try {
+
+					if (prevWrite == null) {
+						if (writeTaskData == null)
+							return Components.TryWrite.Failed;
+						// Now that I wrote the frame, I can forget the task data, and move on to the next one.
+						writeTaskData = writeTaskData.nextTask;
+					} else {
+						// The first queued writeTaskData was not the next sequential frame to be written and we were not writing that one...
+						// ...so we have to skip and forget the one later in the list that we actually wrote
+						prevWrite.nextTask = writeTask.nextTask;
+					}
+				} finally { Monitor.Exit(this); }
 			}
 			return ok ? Components.TryWrite.FinishedFrame : Components.TryWrite.Failed; // Has writing this next frame finished or failed?
+		}
+		protected bool WriteFrame(EncoderTaskData task, Stream to) {
+			bool ok = true;
+			try {
+				bool global = task.frameIndex == 0 || table != ColorTable.Local;
+				// if Stream was not supplied, it will write into a newly create memory stream in the task itself:
+				to ??= task.ms = new MemoryStream((task.frameIndex == 0 ? 7 + 768 + width * height + (repeat >= 0 ? 19 : 0) : width * height) + (global ? 18 : 18 + 768));
+				if (task.frameIndex == 0) {
+					WriteLSD(to); // logical screen descriptior
+					WritePalette(to, table == ColorTable.Local ? task.colorTab : globalTab); // global color table
+					if (repeat >= 0)
+						WriteNetscapeExt(to);  // use NS app extension to indicate reps
+				}
+				WriteGraphicCtrlExt(to, task); // write graphic control extension
+				WriteImageDesc(to, global); // image descriptor
+				if (!global)
+					WritePalette(to, task.colorTab); // local color table
+				WritePixels(to, task); // encode and write pixel data
+			} catch (IOException) {
+				ok = false;
+			}
+			return ok;
 		}
 		protected bool GetGlobalMap(CancellationToken token) {
 			if (globalTab != null)
@@ -939,10 +967,10 @@ namespace Gif.Components {
 
 		#region Write
 		/** Writes Graphic Control Extension */
-		protected void WriteGraphicCtrlExt(EncoderTaskData writeData) {
-			stream.WriteByte(0x21); // extension introducer
-			stream.WriteByte(0xf9); // GCE label
-			stream.WriteByte(4); // data block size
+		protected void WriteGraphicCtrlExt(Stream to, EncoderTaskData writeData) {
+			to.WriteByte(0x21); // extension introducer
+			to.WriteByte(0xf9); // GCE label
+			to.WriteByte(4); // data block size
 			int transp, disp;
 			if (transparent != Color.Empty) {
 				transp = 1;
@@ -951,27 +979,27 @@ namespace Gif.Components {
 			if (dispose >= 0)
 				disp = dispose & 7; // user override
 									// packed fields
-			stream.WriteByte(Convert.ToByte(0 | // 1:3 reserved
+			to.WriteByte(Convert.ToByte(0 | // 1:3 reserved
 				(disp <<= 2) | // 4:6 disposal
 				0 | // 7   user input - 0 = none
 				transp)); // 8   transparency flag
 
-			WriteShort(delay); // delay x 1/100 sec
-			stream.WriteByte(Convert.ToByte(writeData.transIndex)); // transparent color index
-			stream.WriteByte(0); // block terminator
+			WriteShort(to, delay); // delay x 1/100 sec
+			to.WriteByte(Convert.ToByte(writeData.transIndex)); // transparent color index
+			to.WriteByte(0); // block terminator
 		}
 
 		/**
 		 * Writes Image Descriptor
 		 */
-		protected void WriteImageDesc(bool global) {
-			stream.WriteByte(0x2c); // image separator
-			WriteShort(0); // image position x,y = 0,0
-			WriteShort(0);
-			WriteShort(width); // image size
-			WriteShort(height);
+		protected void WriteImageDesc(Stream to, bool global) {
+			to.WriteByte(0x2c); // image separator
+			WriteShort(to, 0); // image position x,y = 0,0
+			WriteShort(to, 0);
+			WriteShort(to, width); // image size
+			WriteShort(to, height);
 			// packed fields
-			stream.WriteByte(global ? (byte)0 // no LCT  - GCT is used for first (or only) frame
+			to.WriteByte(global ? (byte)0 // no LCT  - GCT is used for first (or only) frame
 				:  // specify normal LCT
 				Convert.ToByte(0x80 | // 1 local color table  1=yes
 					0 | // 2 interlace - 0=no
@@ -984,66 +1012,66 @@ namespace Gif.Components {
 		/**
 		 * Writes Logical Screen Descriptor
 		 */
-		protected void WriteLSD() {
+		protected void WriteLSD(Stream to) {
 			// logical screen size
-			WriteShort(width);
-			WriteShort(height);
+			WriteShort(to, width);
+			WriteShort(to, height);
 			// packed fields
-			stream.WriteByte(Convert.ToByte(0x80 | // 1   : global color table flag = 1 (gct used)
+			to.WriteByte(Convert.ToByte(0x80 | // 1   : global color table flag = 1 (gct used)
 				0x70 | // 2-4 : color resolution = 7
 				0x00 | // 5   : gct sort flag = 0
 				palSize)); // 6-8 : gct size
-			stream.WriteByte(0); // background color index
-			stream.WriteByte(0); // pixel aspect ratio - assume 1:1
+			to.WriteByte(0); // background color index
+			to.WriteByte(0); // pixel aspect ratio - assume 1:1
 		}
 
 		/**
 		 * Writes Netscape application extension to define
 		 * repeat count.
 		 */
-		protected void WriteNetscapeExt() {
-			stream.WriteByte(0x21); // extension introducer
-			stream.WriteByte(0xff); // app extension label
-			stream.WriteByte(11); // block size
-			WriteString("NETSCAPE" + "2.0"); // app id + auth code
-			stream.WriteByte(3); // sub-block size
-			stream.WriteByte(1); // loop sub-block id
-			WriteShort(repeat); // loop count (extra iterations, 0=repeat forever)
-			stream.WriteByte(0); // block terminator
+		protected void WriteNetscapeExt(Stream to) {
+			to.WriteByte(0x21); // extension introducer
+			to.WriteByte(0xff); // app extension label
+			to.WriteByte(11); // block size
+			WriteString(to, "NETSCAPE" + "2.0"); // app id + auth code
+			to.WriteByte(3); // sub-block size
+			to.WriteByte(1); // loop sub-block id
+			WriteShort(to, repeat); // loop count (extra iterations, 0=repeat forever)
+			to.WriteByte(0); // block terminator
 		}
 
 		/**
 		 * Writes color table
 		 */
-		protected void WritePalette(byte[] tab) {
-			stream.Write(tab, 0, tab.Length);
+		protected static void WritePalette(Stream to, byte[] tab) {
+			to.Write(tab, 0, tab.Length);
 			int n = 3 * 256 - tab.Length;
 			while (0 <= --n)
-				stream.WriteByte(0);
+				to.WriteByte(0);
 		}
 
 		/**
 		 * Encodes and writes pixel data
 		 */
-		protected void WritePixels(EncoderTaskData writeData) {
-			new LZWEncoder(width, height, writeData.indexedPixels, colorDepth).Encode(stream);
+		protected void WritePixels(Stream to, EncoderTaskData writeData) {
+			new LZWEncoder(width, height, writeData.indexedPixels, colorDepth).Encode(to);
 		}
 
 		/**
 		 *    Write 16-bit value to output stream, LSB first
 		 */
-		protected void WriteShort(int value) {
-			stream.WriteByte(Convert.ToByte(value & 0xff));
-			stream.WriteByte(Convert.ToByte((value >> 8) & 0xff));
+		protected static void WriteShort(Stream to, int value) {
+			to.WriteByte(Convert.ToByte(value & 0xff));
+			to.WriteByte(Convert.ToByte((value >> 8) & 0xff));
 		}
 
 		/**
 		 * Writes string to output stream
 		 */
-		protected void WriteString(string s) {
+		protected static void WriteString(Stream to, string s) {
 			char[] chars = s.ToCharArray();
 			for (int i = 0; i < chars.Length; ++i)
-				stream.WriteByte((byte)chars[i]);
+				to.WriteByte((byte)chars[i]);
 		}
 		#endregion
 	}

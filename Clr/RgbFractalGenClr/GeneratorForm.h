@@ -74,6 +74,26 @@ namespace RgbFractalGenClr {
 	private: System::Windows::Forms::ComboBox^ encodeSelect;
 	private: System::Windows::Forms::CheckBox^ debugBox;
 	private: System::Windows::Forms::Label^ debugLabel;
+	private: System::Windows::Forms::Panel^ panel1;
+	private: System::Windows::Forms::Button^ button7;
+	private: System::Windows::Forms::Button^ button6;
+	private: System::Windows::Forms::Button^ button5;
+	private: System::Windows::Forms::ComboBox^ comboBox3;
+	private: System::Windows::Forms::Button^ button4;
+	private: System::Windows::Forms::Button^ button3;
+	private: System::Windows::Forms::Button^ button2;
+	private: System::Windows::Forms::Button^ button1;
+	private: System::Windows::Forms::Label^ label2;
+	private: System::Windows::Forms::ComboBox^ comboBox2;
+	private: System::Windows::Forms::ComboBox^ comboBox1;
+	private: System::Windows::Forms::TextBox^ textBox4;
+	private: System::Windows::Forms::TextBox^ textBox3;
+	private: System::Windows::Forms::TextBox^ textBox2;
+	private: System::Windows::Forms::TextBox^ textBox1;
+	private: System::Windows::Forms::Label^ paramLabel;
+	private: System::Windows::Forms::Panel^ panel2;
+	private: System::Windows::Forms::Button^ addChild;
+	private: System::Windows::Forms::Label^ pointLabel;
 
 	private: System::ComponentModel::IContainer^ components;
 

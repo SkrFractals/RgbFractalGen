@@ -12,11 +12,11 @@
 #define F(N) new float[N]
 #define BA(N) new std::pair<std::string, uint8_t*>[N]
 #define B(N) new uint8_t[N]
-#define CA(N) new std::pair<std::string, Fractal::CutFunction>[N]
+#define CA(N) new std::tuple<std::string, Fractal::CutFunction, uint32_t*>[N]
 #define FE { "", new float[0] { } }
 #define BE { "", new uint8_t[0] { } }
-#define CE { "", nullptr }
-#define CHILDPARAMS pack(selectWidth * .5f, selectHeight * .5f), pack(angle, Math::Abs(spin) > 1 ? 2 * angle : 0), color, -applyCutparam, static_cast<uint8_t>(0)
+#define CE { "", nullptr, nullptr }
+#define CHILDPARAMS pack(selectWidth * .5f, selectHeight * .5f), pack(angle, Math::Abs(spin) > 1 ? 2 * angle : 0), color, -cp, static_cast<uint8_t>(0)
 #define IFAPPLIEDDOT float inX, inY; unpack(inXY, inX, inY); const auto& preIterated = task.preIterate[inDepth]; const auto& inSize = std::get<0>(preIterated);\
 	if (ApplyDot(inSize < selectDetail, task, inX, inY, std::get<1>(preIterated), inColor))
 #define STARTITERATION const auto& newPreIterated = task.preIterate[++inDepth];auto i = f->childCount; while (0 <= --i)
@@ -136,10 +136,10 @@ namespace RgbFractalGenClr {
 					{ "CenterNeighbors", B(10) { 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 } },
 					BE
 				}, CA(5) {
-					{ "NoChild", Fractal::Trees_NoChildParam },
-					{ "NoBeam", Fractal::Beamtree_NoBeam },
-					{ "OuterJoint", Fractal::Beamtree_OuterJoint },
-					{ "InnerJoint", Fractal::Beamtree_InnerJoint },
+					{ "NoChild", Fractal::NoChildSimpleParam, nullptr },
+					{ "NoBeam", Fractal::Beamtree_NoBeam, nullptr },
+					{ "OuterJoint", Fractal::Beamtree_OuterJoint, nullptr },
+					{ "InnerJoint", Fractal::Beamtree_InnerJoint, nullptr },
 					CE
 				}
 			), 
@@ -158,8 +158,8 @@ namespace RgbFractalGenClr {
 				FA(2) { { "Center", F(4) { pi / 3, 0, 0, 0 } }, FE },
 				BA(2) { { "Center", B(4) { 1, 0, 0, 0 } }, BE },
 				CA(3) {
-					{ "NoChild", Fractal::Triflake_NoCornerParam },
-					{ "NoBackDiag", Fractal::Triflake_NoBackDiag },
+					{ "NoChild", Fractal::NoChildComplexParam, nullptr },
+					{ "NoBackDiag", Fractal::NoBackDiag, nullptr },
 					CE
 				}
 			),
@@ -181,10 +181,10 @@ namespace RgbFractalGenClr {
 					{ "Center Swirl 2", B(16) { 1, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
 					BE
 				}, CA(5) {
-					{ "NoCorner", Fractal::Tetraflake_NoCornerParam },
-					{ "NoCorner + RadHoles", Fractal::Tetraflake_NoCornerRadHolesParam },
-					{ "NoCorner + CornerHoles", Fractal::Tetraflake_NoCornerCornerHolesParam },
-					{ "NoCorner + TriangleHoles", Fractal::Tetraflake_NoCornerTriangleHolesParam },
+					{ "NoCorner", Fractal::Tetraflake_NoCornerParam, nullptr },
+					{ "NoCorner + RadHoles", Fractal::Tetraflake_NoCornerRadHolesParam, nullptr },
+					{ "NoCorner + CornerHoles", Fractal::Tetraflake_NoCornerCornerHolesParam, nullptr },
+					{ "NoCorner + TriangleHoles", Fractal::Tetraflake_NoCornerTriangleHolesParam, nullptr },
 					CE
 				}
 			), 
@@ -211,10 +211,10 @@ namespace RgbFractalGenClr {
 						{ "Sierpinski Carpet",  B(9) { 1, 0, 0, 0, 0, 0, 0, 0, 0 } },
 						{ "H-I De Rivera",  B(9) { 0, 0, 1, 0, 0, 0, 1, 0, 0 } },
 						BE
-					}, CA(4) {
-						{ "NoChild", Fractal::Carpet_NoCornerParam },
-						{ "NoBackDiag", Fractal::Carpet_NoBackDiag },
-						{ "NoBackDiag2", Fractal::Carpet_NoBackDiag2 },
+					}, CA(3) {
+						{ "NoChild", Fractal::NoChildComplexParam, nullptr },
+						{ "NoBackDiag", Fractal::NoBackDiag, nullptr },
+						CE
 					 } 
 				),
 				new Fractal("Pentaflake", 6, pfs, .2f * pfs, .15f, .9f, pfx, pfy,
@@ -224,8 +224,8 @@ namespace RgbFractalGenClr {
 						FE 
 					}, BA(2) { { "Center", B(6) { 1, 0, 0, 0, 0, 0 } }, BE },
 					CA(3) {
-						{ "NoChild", Fractal::Pentaflake_NoCornerParam },
-						{ "NoBackDiag", Fractal::Pentaflake_NoBackDiag },
+						{ "NoChild", Fractal::NoChildComplexParam, nullptr },
+						{ "NoBackDiag", Fractal::NoBackDiag, nullptr },
 						CE
 					}
 				),
@@ -238,8 +238,8 @@ namespace RgbFractalGenClr {
 						{ "Y", B(7) { 1, 0, 1, 0, 1, 0, 1 } },
 						BE
 					}, CA(3) {
-						{ "NoChild", Fractal::Hexaflake_NoCornerParam },
-						{ "NoBackDiag", Fractal::Hexaflake_NoBackDiag },
+						{ "NoChild", Fractal::NoChildComplexParam, nullptr },
+						{ "NoBackDiag", Fractal::NoBackDiag, nullptr },
 						CE
 					}
 				),
@@ -557,6 +557,9 @@ namespace RgbFractalGenClr {
 				//R->H->FromVector(Vector::Lerp(Z(*colorBlend), *colorBlend, lerp));
 				break;
 			}
+			uint32_t* m;
+			int cp = applyGenerationType == (f->cutFunction != nullptr && (m = std::get<2>(f->cutFunction[selectCut])) != nullptr && m[0] >= 0 ? m[applyCutparam] : applyCutparam);
+
 			if (applyMaxTasks <= 2 || applyParallelType != ParallelType::OfDepth)
 				GenerateDots_SingleTask(task, CHILDPARAMS);
 			else {
@@ -812,7 +815,7 @@ namespace RgbFractalGenClr {
 			ITERATECHILDREN GenerateDots_SingleTask(task, NEWCHILD);
 		}
 	}
-	System::Void FractalGenerator::GenerateDots_OfDepth(const uint16_t bitmapIndex) {
+	System::Void FractalGenerator::GenerateDots_OfDepth(const uint32_t bitmapIndex) {
 		uint16_t index = 0, insertTo = 1, max = applyMaxTasks * 8, maxcount = max - f->childCount - 1;
 		int16_t count = (max + insertTo - index) % max;
 		while (count > 0 && count < maxcount) {
@@ -1140,7 +1143,7 @@ namespace RgbFractalGenClr {
 	}
 	System::Void FractalGenerator::ResetGenerator() {
 		applyZoom = (short)(selectZoom != 0 ? selectZoom : random.NextDouble() < .5f ? -1 : 1);
-		applyCutparam = selectCutparam < 0 ? (short)random.Next(0, cutparamMaximum) : selectCutparam;
+		applyCutparam = selectCutparam < 0 ? (short)random.Next(0, GetMaxCutparam()) : selectCutparam;
 		SetupColor();
 
 		// get the multiplier of the basic period required to get to a seamless loop

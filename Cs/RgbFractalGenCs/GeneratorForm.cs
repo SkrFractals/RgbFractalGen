@@ -84,19 +84,22 @@ public partial class GeneratorForm : Form {
 	#endregion
 
 	#region Core
-	public void UpdatePreview() {
+	private void UpdateBitmap(Bitmap bitmap) {
+		if (currentBitmap == bitmap)
+			return;
+		// Update the display with the bitmap when it's not loaded
+		currentBitmap = bitmap;
+		screenPanel?.Invalidate();
+	}
+	private void UpdatePreview() {
 		Monitor.Enter(this);
 		try {
 			int bitmapsFinished = generator.GetBitmapsFinished();
-			// Fetch a bitmap to display
-			var bitmap = bitmapsFinished > 0
+			// Fetch a bitmap to display						
+			UpdateBitmap(bitmapsFinished > 0
 				? generator.GetBitmap(currentBitmapIndex = (animated ? currentBitmapIndex + 1 : currentBitmapIndex) % bitmapsFinished) // Make sure the index is is range
-				: generator.GetPreviewBitmap(); // Try preview bitmap if none of the main ones are generated yet
-												// Update the display with it if necessary
-			if (currentBitmap != bitmap) {
-				currentBitmap = bitmap;
-				screenPanel.Invalidate();
-			}
+				: generator.GetPreviewBitmap() // Try preview bitmap if none of the main ones are generated yet
+			);
 		} finally { Monitor.Exit(this); }
 	}
 	void SetupEditControl(System.Windows.Forms.Control control, string tip) {
@@ -296,7 +299,7 @@ public partial class GeneratorForm : Form {
 			var screenHeight = Math.Max(height, Math.Min(Height - bh - 8, (Width - bw - 314) * height / width));
 			screenPanel.SetBounds(305, 4, screenHeight * width / height, screenHeight);
 			helpPanel.SetBounds(305, 4, Width - bw - 314, Height - bh - 8);
-			screenPanel.Invalidate();
+			screenPanel?.Invalidate();
 		}
 		void SizeAdapt() {
 			fx = Width;
@@ -719,7 +722,6 @@ public partial class GeneratorForm : Form {
 				"Warning",
 				MessageBoxButtons.OK,
 				MessageBoxIcon.Warning);
-			return;
 		}
 		generator.selectParallelType = (FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex;
 	}
@@ -781,7 +783,6 @@ public partial class GeneratorForm : Form {
 				"Warning",
 				MessageBoxButtons.OK,
 				MessageBoxIcon.Warning);
-			return;
 		}
 
 		var prev = generator.selectGenerationType;
@@ -794,14 +795,28 @@ public partial class GeneratorForm : Form {
 		screenPanel.Visible = !screenPanel.Visible;
 	}
 	private void PngButton_Click(object sender, EventArgs e) {
-		if (generator.GetBitmapsFinished() < 1) {
+		if (generator.selectParallelType == FractalGenerator.ParallelType.OfDepth) {
+			var result = MessageBox.Show(
+				"Warning: You have used OfDepth parallelism type. This can mess up some of the pixels, if you want to export, I highly recommend using OfAnimation instead.\nSwitch to OfAnimation to regenerate in high quality?",
+				"Warning",
+				MessageBoxButtons.YesNo,
+				MessageBoxIcon.Warning);
+			if (result == DialogResult.Yes) {
+				parallelTypeSelect.SelectedIndex = 0;
+				return;
+			}
+		}
+		var b = generator.GetBitmapsFinished();
+		if (b < 1) {
 			_ = MessageBox.Show(
 				"This is only a low resolution preview image, please wait until the full resolution you have selected if finished.",
-				"Warning",
+				"Please wait",
 				MessageBoxButtons.OK,
-				MessageBoxIcon.Warning);
+				MessageBoxIcon.Error);
 			return;
 		}
+		// Make sure the bitmap is actually loaded
+		UpdateBitmap(generator.GetBitmap(currentBitmapIndex %= b));
 		_ = savePng.ShowDialog();
 	}
 	private void DebugBox_CheckedChanged(object sender, EventArgs e) {
@@ -835,12 +850,25 @@ public partial class GeneratorForm : Form {
 		}
 	}
 	private void SaveVideoButton_Click(object sender, EventArgs e) => SaveVideo();
-	private DialogResult SaveVideo() => generator.selectGenerationType == FractalGenerator.GenerationType.Mp4 ? saveMp4.ShowDialog() : saveGif.ShowDialog();
+	private DialogResult SaveVideo() {
+		if (generator.selectParallelType == FractalGenerator.ParallelType.OfDepth) {
+			var result = MessageBox.Show(
+				"Warning: You have used OfDepth parallelism type. This can mess up some of the pixels, if you want to export, I highly recommend using OfAnimation instead.\nSwitch to OfAnimation to regenerate in high quality?",
+				"Warning",
+				MessageBoxButtons.YesNo,
+				MessageBoxIcon.Warning);
+			if (result == DialogResult.Yes) {
+				parallelTypeSelect.SelectedIndex = 0;
+				return DialogResult.Cancel;
+			}
+		}
+		return generator.selectGenerationType == FractalGenerator.GenerationType.Mp4 ? saveMp4.ShowDialog() : saveGif.ShowDialog();
+	}
 
 	private void Mp4Button_Click(object sender, EventArgs e) {
 		string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 		if (!File.Exists(ffmpegPath)) {
-			MessageBox.Show(
+			_ = MessageBox.Show(
 				"ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
 				"Unavailable",
 				MessageBoxButtons.OK,
@@ -848,7 +876,7 @@ public partial class GeneratorForm : Form {
 			return;
 		}
 		if (gTask != null) {
-			MessageBox.Show(
+			_ = MessageBox.Show(
 				"GIF or Mp4 is still saving, either wait until it's finished, or click this button before saving the GIF.",
 				"Unavailable",
 				MessageBoxButtons.OK,
@@ -903,7 +931,7 @@ public partial class GeneratorForm : Form {
 	private void ConvertMp4_FileOk(object sender, CancelEventArgs e) {
 		string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 		if (!File.Exists(ffmpegPath)) {
-			MessageBox.Show(
+			_ = MessageBox.Show(
 				"ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
 				"Unavailable",
 				MessageBoxButtons.OK,
@@ -911,7 +939,7 @@ public partial class GeneratorForm : Form {
 			return;
 		}
 		if (gTask != null) {
-			MessageBox.Show(
+			_ = MessageBox.Show(
 				"GIF or Mp4 is still saving, either wait until it's finished, or click this button before saving the GIF.",
 				"Unavailable",
 				MessageBoxButtons.OK,
@@ -938,12 +966,14 @@ public partial class GeneratorForm : Form {
 	/// </summary>
 	/// <returns></returns>
 	private void ExportGif() {
+		isGifReady = 0;
 		var attempt = 0;
 		while (++attempt <= 10 && !cancel.Token.IsCancellationRequested && generator.SaveGif(gifPath) > 0)
 			Thread.Sleep(1000);
 		gTask = null;
 	}
 	private void ExportMp4() {
+		isGifReady = 0;
 		var attempt = 0;
 		while (++attempt <= 10 && !cancel.Token.IsCancellationRequested && generator.SaveMp4(gifPath, mp4Path) > 0)
 			Thread.Sleep(1000);
@@ -1284,7 +1314,7 @@ public partial class GeneratorForm : Form {
 		tosave = generator.GetFractal();
 		_ = saveFractal.ShowDialog();
 	}
-	private void preButton_Click(object sender, EventArgs e) {
+	private void PreButton_Click(object sender, EventArgs e) {
 		generator.selectPreviewMode = previewMode = !previewMode;
 		QueueReset();
 	}
@@ -1303,9 +1333,7 @@ public partial class GeneratorForm : Form {
 			fracname = fracname[(i + 1)..];
 		while ((i = fracname.IndexOf('\\')) >= 0)
 			fracname = fracname[(i + 1)..];
-		fracname.Replace(';', '.');
-		fracname.Replace(':', '.');
-		fracname.Replace('|', '.');
+		fracname = fracname.Replace('|', '.').Replace(':', '.').Replace(';', '.');
 		if (fractalSelect.Items.Contains(fracname)) {
 			_ = Error("There already is a loaded fractal of the same name, selecting it.", "Already exists");
 			fractalSelect.SelectedIndex = fractalSelect.Items.IndexOf(fracname);
@@ -1320,10 +1348,7 @@ public partial class GeneratorForm : Form {
 			fracname = fracname[(index + 1)..];
 		while ((index = fracname.IndexOf('\\')) >= 0)
 			fracname = fracname[(index + 1)..];
-		fracname.Replace(';', '.');
-		fracname.Replace(':', '.');
-		fracname.Replace('|', '.');
-		f.name = fracname;
+		f.name = fracname.Replace('|', '.').Replace(':', '.').Replace(';', '.');
 		// Consts
 		string p, a, s = f.name + "|" + f.childCount + "|" + f.childSize + "|" + f.maxSize + "|" + f.minSize + "|" + f.cutSize;
 		// XY

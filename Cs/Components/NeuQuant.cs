@@ -46,6 +46,7 @@ using static Gif.Components.AnimatedGifEncoder;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.IO;
 
 namespace Gif.Components {
 
@@ -70,6 +71,7 @@ namespace Gif.Components {
 		public EncoderTaskData
 			nextTask = null;            // The task for next frame
 										// (if its null, the previous task was the last frame and the animation shoudl complete upon it's finish)
+		public MemoryStream ms;
 	}
 
 	public class NeuQuant {

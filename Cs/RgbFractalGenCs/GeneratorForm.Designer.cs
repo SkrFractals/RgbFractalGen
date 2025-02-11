@@ -860,7 +860,7 @@
 			preButton.TabIndex = 58;
 			preButton.Text = "PREVIEW MODE";
 			preButton.UseVisualStyleBackColor = true;
-			preButton.Click += preButton_Click;
+			preButton.Click += PreButton_Click;
 			// 
 			// pointLabel
 			// 

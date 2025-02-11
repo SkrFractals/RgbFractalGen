@@ -766,19 +766,18 @@ internal class FractalGenerator {
 		#endregion
 		#region GenerateTasks
 		void PreviewResolution(FractalTask task) {
-			int div;
 			if (task.bitmapIndex < previewFrames) {
-				div = 1 << (previewFrames - task.bitmapIndex);
+				int div = 1 << (applyParallelType == ParallelType.OfDepth ? previewFrames - task.bitmapIndex : previewFrames - task.bitmapIndex - 1);
 				task.applyWidth = (short)(selectWidth / div);
 				task.applyHeight = (short)(selectHeight / div);
+				task.bloom0 = selectBloom / div;
 			} else {
-				div = 1;
+				task.bloom0 = selectBloom;
 				task.applyWidth = selectWidth;
 				task.applyHeight = selectHeight;
 			}
 			task.widthBorder = (short)(task.applyWidth - 2);
 			task.heightBorder = (short)(task.applyHeight - 2);
-			task.bloom0 = selectBloom / div;
 			task.bloom1 = task.bloom0 + 1;
 			task.upleftStart = -task.bloom1;
 			task.rightEnd = task.widthBorder + task.bloom1;
@@ -1348,9 +1347,11 @@ internal class FractalGenerator {
 				}
 				#endregion
 				// Make a locked bitmap, remember the locked state
-				var p = (byte*)(void*)(bitmapData[task.bitmapIndex] = (bitmap[task.bitmapIndex] = new(task.applyWidth, task.applyHeight)).LockBits(task.bitmapIndex < previewFrames ? new Rectangle(0,0,task.applyWidth, task.applyHeight) : rect,
-					ImageLockMode.ReadWrite,
-					System.Drawing.Imaging.PixelFormat.Format24bppRgb)).Scan0;
+				var p = (byte*)(void*)(bitmapData[task.bitmapIndex] = (bitmap[task.bitmapIndex] = new(task.applyWidth, task.applyHeight)).LockBits( // make a new bitmaps and lock it's bits
+						(applyParallelType == ParallelType.OfDepth ? task.bitmapIndex : task.bitmapIndex + 1) < previewFrames ? new Rectangle(0,0,task.applyWidth, task.applyHeight) : rect, // The ractangle (use a new smaller one for smaller previews)
+						ImageLockMode.ReadWrite, // Writing now, possibly reading for encoding gif later
+						System.Drawing.Imaging.PixelFormat.Format24bppRgb // BGR format (no alpha, if the gif is transparent, the transparency is just the color black)
+					)).Scan0;
 				bitmapState[task.bitmapIndex] = BitmapState.Drawing;
 				// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
 				// Switch between th selected settings such as saturation, noise, image parallelism...
@@ -1442,6 +1443,7 @@ internal class FractalGenerator {
 			if (task.bitmapIndex < previewFrames) {
 				bitmapState[task.bitmapIndex] = BitmapState.FinishedBitmap;
 				task.state = TaskState.Done;
+				TryFinishBitmaps(false);
 			} else {
 				if (applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam and not GenerationType.Mp4)
 					GenerateGif(task);
@@ -1567,10 +1569,7 @@ internal class FractalGenerator {
 			if (token.IsCancellationRequested)
 				return false;
 			bool gif = applyGenerationType is >= GenerationType.EncodeGIF and <= GenerationType.AllParam;
-
-
 			if (gif && bitmapsFinished < bitmap.Length && bitmapsFinished >= previewFrames && !gifThread) {
-
 				int tryEncode = bitmapsFinished;
 				int maxTry = Math.Min(bitmap.Length, bitmapsFinished + applyMaxTasks);
 				while(tryEncode < maxTry) {
@@ -1579,38 +1578,42 @@ internal class FractalGenerator {
 							bitmapData[tryEncode] = bitmap[tryEncode].LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
 						bitmapState[tryEncode] = BitmapState.Encoding;
 						gifThread = applyGenerationType == GenerationType.Mp4;
-						
 						task.Start(tryEncode, () => GenerateGif(task));
 						return true;
 					}
 					++tryEncode;
 				}
 			}
-			while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (gif || bitmapState[bitmapsFinished] == BitmapState.Encoding ? BitmapState.FinishedBitmap : BitmapState.DrawingFinished)) {
-				bitmapState[bitmapsFinished] = gif || bitmapsFinished < previewFrames ? BitmapState.Unlocked : BitmapState.UnlockedRAM;
-				if (applyGenerationType == GenerationType.HashParam) {
-					using SHA256 sha256 = SHA256.Create();
-					unchecked {
-						unsafe {
-							int bytenum = bitmapData[bitmapsFinished].Stride * selectHeight;
-							byte[] pixelData = new byte[bytenum];
+			TryFinishBitmaps(gif);
+			return false;
+		}
+		void TryFinishBitmaps(bool gif) {
+			Monitor.Enter(taskLock);
+			try {
+				while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (gif || bitmapState[bitmapsFinished] == BitmapState.Encoding ? BitmapState.FinishedBitmap : BitmapState.DrawingFinished)) {
+					bitmapState[bitmapsFinished] = gif || bitmapsFinished < previewFrames ? BitmapState.Unlocked : BitmapState.UnlockedRAM;
+					if (applyGenerationType == GenerationType.HashParam) {
+						using SHA256 sha256 = SHA256.Create();
+						unchecked {
+							unsafe {
+								int bytenum = bitmapData[bitmapsFinished].Stride * selectHeight;
+								byte[] pixelData = new byte[bytenum];
 
-							// Copy the raw pixel data from Scan0 to the byte array
-							fixed (byte* dest = pixelData) {
-								Buffer.MemoryCopy((void*)bitmapData[bitmapsFinished].Scan0, dest, bytenum, bytenum);
+								// Copy the raw pixel data from Scan0 to the byte array
+								fixed (byte* dest = pixelData) {
+									Buffer.MemoryCopy((void*)bitmapData[bitmapsFinished].Scan0, dest, bytenum, bytenum);
+								}
+								string key = BitConverter.ToString(sha256.ComputeHash(pixelData));
+								if (!hash.ContainsKey(key))
+									hash.Add(key, bitmapsFinished);
 							}
-							string key = BitConverter.ToString(sha256.ComputeHash(pixelData));
-							if (!hash.ContainsKey(key))
-								hash.Add(key, bitmapsFinished);
 						}
 					}
+					bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
+					if (bitmapsFinished++ <= previewFrames && !token.IsCancellationRequested)
+						UpdatePreview?.Invoke();
 				}
-				bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
-				if (bitmapsFinished++ <= previewFrames && !token.IsCancellationRequested)
-					UpdatePreview?.Invoke();
-
-			}
-			return false;
+			} finally { Monitor.Exit(taskLock); }
 		}
 
 #endregion

@@ -234,10 +234,31 @@ RadHoles:
 CornerHoles: 1 2 3 4 8 33 34 35 64 66 100
 TriangleHoles: 3 7 8 12 16 24
 
+---------------------------------------------------------------------------------------------------------
 
+How it works:
 
+The app has a fractal generator, that can put up to maxTasks threads to work, each will do one of the steps for one frame, each frame is also slightly zoomed/rotated to create the animation.
+These steps to create the image are:
 
+1. Generating Fractal Dots - Creates a large shape in the center and recursively splits it into smaller different colored shapes, until they are smaller than a pixel, and then it paints the color of those minishapes into the buffer.
+2. Generating Dijkstra Void - All points in the buffer with any fractal colors in them, and all border points are assigned depth 0, and then a Dijkstra algorithm breadth first searches how deep (far away from the fractal) each pixel outside of the fractal is. The deeper, the lighter grey it will then be. It will also remember the maximum depth to normalize the grey levels.
+3. Drawing Bitmap - Generates the void noise, and then line by line it draws the pixels into a bitmap, either the buffer when there are fractal dots, or the void grey with sampled noise when outside the fractal
+4. Encoding GIF/MP4 - Encodes the image into a GIF or MP4 frame. This step is skipped if the encoding is not desired.
+5. Writing - Writes the GIF/MP4 frame into the file. This step is skipped if the encoding is not desired. 
 
+Image states:
+1. Queued - no free task to start processing this image yet.
+2. Generating Fractal Dots has started - step 1
+3. Generating Dijkstra Void has started - step 2
+4. Drawing Bitmap has started - step 3
+5. Drawing Finished - step 3 is complete, waiting to start step 4
+6. Unlocked RAM - encoding is not desired, so the bitmap got unlocked and is now available to see in the preview
+7. Encoding - Encoding of GIF/MP4 has started - step 4
+8. Encoding Finished - step 4 is complete, waiting to start step 5, or step 5 already started
+9. Bitmap finished - step 5 is complete
+10. Unlocked Encoded - everything is finished, so the bitmap got unlocked and is now avaiable to see in the preview
 
-
-
+Task states:
+1. "Image state" - the task is performing the step the image state is associated with
+2. Writing - the task is performing the step 5

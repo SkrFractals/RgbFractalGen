@@ -2,7 +2,7 @@ Language Implementations:
 
 RgbFractalGenCs
 - The original c sharp version
-- Relatively fast, and bugfree
+- Relatively fast, and bugfree, and most likely to be the first to have new versions and features
 - Easiest code
 
 RgbFractalGenClr
@@ -122,18 +122,27 @@ Motion Blur:
 - Not recommended for "Only Image", or if you want the animation super crisp even at the edges.
 
 
-Parallel generation:
-- Will enable threading, significantly boosting performance on multicore CPUs
-- Will also make a lot more of your cores work hard, making your PC heat more, and leave less resources for other tasks
+Brightness:
+- The brightness of the main RGB fractal. In percentage.
+- 100 is 100% max brightness. 300 is 3x overeposure over maximum.
+
+Void Noise Scale:
+- Scales up the noise in the void in bilinear fashion.
+- Recommended for high resolutions, or if you want to compress into a video.
+
 
 Parallelism Type:
 - Of Animation Frames: Batches each animation frame to a different thread, recommended and even faster for animations, but no boost for "Only Image"
 - Of Depth: Parallelize generation of each image at an ideal precomputed depth, making "Only Image" option a lot faster, but possible slightly corrupt like 1/1000000 pixels
 - Of Recursion: Older version of "Of Depth", but just tries to parallelize each recursive call down until a depth. More buggy, and probably not as good as "Of Depth" 
+- (as od now, OfDepth has been deprecated)
 
 Max Threads:
 - If you want to leave some resources for other task, you can reduce the maximum allowed number of parallel threads
 
+
+Abort Delay:
+- How long it takes for the generator to restart after you change something.
 
 Delay:
 - A delay between animation frames in hundredths of seconds
@@ -149,10 +158,15 @@ Preview Animation:
 RESTART
 - Will restart the generator (only useful if something goes wrong or you have random settings enabled)
 
+
 Generation Options:
 - Only Image: Will only render one still image
 - Animation RAM: Will render the animation without encoding a GIF, about 2x faster, but can't export the file afterwards
-- Encode GIF: Wil lencode a GIF during the generation, so you could save it when finished.
+- Local GIF: Will encode a GIF during the generation, so you could save it when finished.
+- Global GIF: Will encode a GIF while only analyzing the first frame's colors. Not recommended when shifting hues.
+- Mp4: Will encode an Mp4. (not currently available)
+- All Param: Will generate all the CutFunction seeds instead of a zoom.
+- Hash Param: Like All param, but it's used to export all the unique seeds into a file.
 
 Help:
 - Displays this text, you might already know this though...
@@ -164,6 +178,14 @@ Save GIF:
 - Save the finished animation into a GIF
 - Must have selected "Encode GIF" Generation Option above
 - Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
+
+Debug Log:
+- Will show a state list of CPU threads and images.
+
+Save Mp4:
+- Will use the included ffmpeg.exe to save your animation as mp4.
+- It converts the encoded GIF, so you have to run Local GIf, Global GIF or AllParam generation mode to be able to Save Mp4.
+- You can use it before of after saving the GIF.
 
 ---------------------------------------------------------------------------------------------------------
 
@@ -180,6 +202,41 @@ TriTree:
 -R_BeamTree_OuterJoint + F_OuterJoint
 -R_BeamTree_InnerJoint + F_InnerJoint
 
+TetraTriflake nice seeds:
+NoChild: 10 12 13 14 21 48 49 53 56! 57! 58! 62 69 71 72 74 75 76 81 85 88 96 97 98! 99! 101 113 132 149! 157 164 172 176 177 179 192 209 224 225! 226!
+	227 270 272 273 288 289 305 320 336 352 354 388 401 416! 480
+RadHoles:
+CornerHoles: 1 2 3 4 8 33 34 35 64 66 100
+TriangleHoles: 3 7 8 12 16 24
+
+---------------------------------------------------------------------------------------------------------
+
+How it works:
+
+The app has a fractal generator, that can put up to maxTasks threads to work, each will do one of the steps for one frame, each frame is also slightly zoomed/rotated to create the animation.
+These steps to create the image are:
+
+1. Generating Fractal Dots - Creates a large shape in the center and recursively splits it into smaller different colored shapes, until they are smaller than a pixel, and then it paints the color of those minishapes into the buffer.
+2. Generating Dijkstra Void - All points in the buffer with any fractal colors in them, and all border points are assigned depth 0, and then a Dijkstra algorithm breadth first searches how deep (far away from the fractal) each pixel outside of the fractal is. The deeper, the lighter grey it will then be. It will also remember the maximum depth to normalize the grey levels.
+3. Drawing Bitmap - Generates the void noise, and then line by line it draws the pixels into a bitmap, either the buffer when there are fractal dots, or the void grey with sampled noise when outside the fractal
+4. Encoding GIF/MP4 - Encodes the image into a GIF or MP4 frame. This step is skipped if the encoding is not desired.
+5. Writing - Writes the GIF/MP4 frame into the file. This step is skipped if the encoding is not desired. 
+
+Image states:
+1. Queued - no free task to start processing this image yet.
+2. Generating Fractal Dots has started - step 1
+3. Generating Dijkstra Void has started - step 2
+4. Drawing Bitmap has started - step 3
+5. Drawing Finished - step 3 is complete, waiting to start step 4
+6. Unlocked RAM - encoding is not desired, so the bitmap got unlocked and is now available to see in the preview
+7. Encoding - Encoding of GIF/MP4 has started - step 4
+8. Encoding Finished - step 4 is complete, waiting to start step 5, or step 5 already started
+9. Bitmap finished - step 5 is complete
+10. Unlocked Encoded - everything is finished, so the bitmap got unlocked and is now avaiable to see in the preview
+
+Task states:
+1. "Image state" - the task is performing the step the image state is associated with
+2. Writing - the task is performing the step 5
 
 
 
