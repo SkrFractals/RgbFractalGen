@@ -311,7 +311,8 @@ bool NeuQuant::learn(unsigned char* p, const int lengthcount, const int samplefa
         return false;
     }
     //auto& token = *canceltoken;
-
+    if (isCancel(cancelType, cancel))
+        return true;
     samplepixels /= factor;
     while (0 <= --factor) {
         if (isCancel(cancelType, cancel))

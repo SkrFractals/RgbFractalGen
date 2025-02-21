@@ -50,6 +50,7 @@ public struct NeuQuantTask {
     int m_frameHeight;          // height of the image
     int transIndex;             // index of the transparent color
     int transR, transG, transB; // transparent color
+    int stride;
     //int factor;
     NeuQuant
         neuquant = NeuQuant();  // unstaticed instance of neuquant to allow it to run in parallel
@@ -62,7 +63,7 @@ public struct NeuQuantTask {
     void* cancel;               // cancellation pointer
     bool cancelType;            // false - cancel = std::atomic<bool>*, true - cancel = System::Threading::CancellationToken*
 
-    NeuQuantTask(const int width, const int height);
+    NeuQuantTask(const int width, const int height, const int stride);
 
     void setTransparent(const int r, const int g, const int b);
 
@@ -135,7 +136,7 @@ public:
      * @return
      */
     bool push(const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height,
-              const int delay = 5, const int frameIndex = -1, bool cancelType = false, void* cancel = nullptr);
+              const int delay = 5, const int frameIndex = -1, const int stride = -1, bool cancelType = false, void* cancel = nullptr);
 
     /**
      * add frame - original compatibility - only uncopied BGR, allowing out of order pushing, allowing cancellation
@@ -151,8 +152,8 @@ public:
      * @return
      */
     inline bool push(uint8_t* frame, const int width, const int height,
-                     const int delay = 5, const int frameIndex = -1, bool cancelType = false, void* cancel = nullptr) {
-        return push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, cancelType, cancel);
+                     const int delay = 5, const int frameIndex = -1, const int stride = -1, bool cancelType = false, void* cancel = nullptr) {
+        return push(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, stride, cancelType, cancel);
     }
 
     /**
@@ -245,7 +246,7 @@ public:
      * @return
      */
     bool push_parallel(const GifEncoderPixelFormat format, uint8_t* frame, const int width, const int height,
-                       const int delay = 5, const int frameIndex = -1, bool cancelType = false, void* cancel = nullptr);
+                       const int delay = 5, const int frameIndex = -1, const int stride = -1, bool cancelType = false, void* cancel = nullptr);
 
     /**
      * add frame - only uncopied BGR, allowing out of order, cancellable (or cancellable from open's cancel)
@@ -259,8 +260,8 @@ public:
      * @cancel cancellation pointer, send nullptr if you don't have one or don't want it to be cancellable, or if you want to use the one supplied from open()
      * @return
      */
-    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay = 5, const int frameIndex = -1, bool cancelType = false, void* cancel = nullptr) {
-        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, cancelType, cancel);
+    inline bool push_parallel(uint8_t* frame, const int width, const int height, const int delay = 5, const int frameIndex = -1, const int stride = -1, bool cancelType = false, void* cancel = nullptr) {
+        return push_parallel(GifEncoderPixelFormat::PIXEL_FORMAT_BGR_NATIVE, frame, width, height, delay, frameIndex, stride, cancelType, cancel);
     }
 
     /**
@@ -270,6 +271,9 @@ public:
      * @return Failed = somethign went wrong, stop trying the file has been closed. Waiting - try again later, or some frames are missing. FinishedFrame - one frame was written. FinishedAnimation - file is completed.
      */
     GifEncoderTryWriteResult tryWrite(bool parallel = false);
+
+    /** Attempts to abort a cancelled/failed file */
+    bool abort(const bool fail = true);
 
     /** has the file been fully written ? */
     inline bool isFinishedAnimation() const { return finishedAnimation; }
@@ -281,7 +285,7 @@ public:
 private:
 
 #pragma region EXPANSION_PRIVATES_AND_VARIABLES
-    GifEncoderTryWriteResult tryWriteInternal();
+    GifEncoderTryWriteResult tryWriteInternal(bool parallel);
 
     /** Attempts to open a file, returns true if failed (unlike most other function returns here) */
     bool initOpen(const std::string& file, const int width, const int height);
@@ -293,10 +297,7 @@ private:
     void clearTask(NeuQuantTask& task);
 
     /** Fetch the next data_encode, and make a new empty one after that, uses a mutex lock for data integrity */
-    NeuQuantTask* GifEncoder::nextEncode(const int index, const int width, const int height, bool& first);
-
-    /** Attempts to abort a cancelled/failed file */
-    bool abort(const bool fail);
+    NeuQuantTask* GifEncoder::nextEncode(const int index, const int width, const int height, const int stride, bool& first);
 
     /** Attempts to free the allocated memory of a failed/cancelled file, MIGHT CRASH SOMETIMES */
     void freeEverything();

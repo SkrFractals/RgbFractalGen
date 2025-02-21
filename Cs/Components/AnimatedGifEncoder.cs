@@ -815,16 +815,21 @@ namespace Gif.Components {
 		public bool Abort(bool fail = true) {
 			if (!fail)
 				return true;
-			started = false;
-			ms?.Close();
-			fs?.Close();
-			if (fs != null && filename != null && filename != "")
-				File.Delete(filename);
-			fs = null;
-			ms = null;
-			finishedAnimation = false;
-			addedFrames = finishedFrame = 0;
-			encodeTaskData = writeTaskData = null;
+			Monitor.Enter(this);
+			try {
+				if (!started)
+					return false;
+				started = false;
+				ms?.Close();
+				fs?.Close();
+				if (fs != null && filename != null && filename != "")
+					File.Delete(filename);
+				fs = null;
+				ms = null;
+				finishedAnimation = false;
+				addedFrames = finishedFrame = 0;
+				encodeTaskData = writeTaskData = null;
+			} finally { Monitor.Exit(this); }
 			return false;
 		}
 		protected TryWrite TryWriteInternal(bool parallel) {

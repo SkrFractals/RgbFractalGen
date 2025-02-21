@@ -437,6 +437,9 @@ namespace Gif.Components {
 		   ------------------ */
 		unsafe public bool Learn(CancellationToken token) {
 
+			if (token.IsCancellationRequested)
+				return true;
+
 			int i, j, b, g, r, radius, rad, rad2, alpha, step, delta, samplepixels, pix, lim, modpix, scanPtr, scanMod;
 			int len = 0;
 			PixelsFrame f;

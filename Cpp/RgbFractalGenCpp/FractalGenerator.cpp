@@ -49,8 +49,8 @@ namespace RgbFractalGenCpp {
 	FractalGenerator::FractalGenerator() {
 
 		std::random_device rd;
-		std::mt19937 randGenerator(rd());
-		std::uniform_real_distribution<float> randomDist(0.0f, 1.0f);
+		randomGenerator = std::mt19937(rd());
+		randomDist = std::uniform_real_distribution<float>(0.0f, 1.0f);
 
 		selectCutparam = debug = selectDefaultHue = selectDefaultZoom = selectDefaultAngle = selectExtraSpin = selectExtraHue = 0;
 		selectZoom = 1;
@@ -58,7 +58,7 @@ namespace RgbFractalGenCpp {
 		selectParallelType = ParallelType::OfAnimation;
 		selectGenerationType = GenerationType::EncodeGIF;
 		gifEncoder = nullptr;
-		bitmap = nullptr;
+		bitmapData = nullptr;
 		cutFunction = nullptr;
 		tuples = nullptr;
 		childAngle = nullptr;
@@ -720,7 +720,7 @@ namespace RgbFractalGenCpp {
 		/*uint8_t* p = (uint8_t*)(void*)((bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = gcnew Bitmap(width, height))->LockBits(rect,
 			ImageLockMode::WriteOnly,
 			System::Drawing::Imaging::PixelFormat::Format24bppRgb))->Scan0);*/
-		uint8_t* mp, *p = mp = bitmap[task.bitmapIndex];
+		uint8_t* mp, *p = mp = bitmapData[task.bitmapIndex];
 		bitmapState[task.bitmapIndex] = BitmapState::Drawing;
 		// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
 		// Switch between th selected settings such as saturation, noise, image parallelism...
@@ -1073,8 +1073,8 @@ namespace RgbFractalGenCpp {
 		frames = debug > 0 ? debug : selectPeriod * finalPeriodMultiplier;
 		if (allocatedFrames != frames) {
 			if (allocatedFrames >= 0)
-				delete[] bitmap;
-			bitmap = new uint8_t * [allocatedFrames = frames];
+				delete[] bitmapData;
+			bitmapData = new uint8_t * [allocatedFrames = frames];
 		}
 		//bitmapData = new uint8_t[BitmapData];
 		bitmapState.reserve(frames + 1);

@@ -155,7 +155,7 @@ namespace RgbFractalGenCpp {
 
         // Frames
         uint16_t frames;                // how many animation frames am i generating?
-        uint8_t** bitmap;               // BitmapData pointers
+        uint8_t** bitmapData;               // BitmapData pointers
         std::vector<BitmapState> 
             bitmapState;                // Flag if the bitmap was finished generating (ready to encode GIF and UnlockBits)
         uint16_t finalPeriodMultiplier; // How much will the period get finally stretched? (calculated for seamless + user multiplier)
@@ -236,6 +236,8 @@ namespace RgbFractalGenCpp {
         std::string debugString;
         int16_t* counter = new int16_t[8];
 
+
+
 #pragma region Init
     public:
         FractalGenerator();
@@ -310,7 +312,7 @@ namespace RgbFractalGenCpp {
         void ResetGenerator();
         void RequestCancel();
         bool SaveGif();
-        inline void SetPixelsPointer(const uint16_t i, uint8_t* pointer) { bitmap[i] = pointer; }
+        inline void SetPixelsPointer(const uint16_t i, uint8_t* pointer) { bitmapData[i] = pointer; }
         inline void UnlockBitmapState(uint16_t bitmapIndex) { bitmapState[bitmapIndex] = BitmapState::Unlocked; }
 #ifdef CUSTOMDEBUG
         void Log(std::string& log, const std::string& line);
@@ -372,7 +374,7 @@ namespace RgbFractalGenCpp {
             return bitmapState.size() <= bitmapIndex ? false 
                 : bitmapState[bitmapIndex] >= (applyGenerationType >= GenerationType::EncodeGIF ? BitmapState::Finished : BitmapState::Encoding);
         }
-        inline uint8_t* GetPixelsPointer(const uint16_t i) { return bitmap[i]; }
+        inline uint8_t* GetPixelsPointer(const uint16_t i) { return bitmapData[i]; }
 #pragma endregion
 
     };
