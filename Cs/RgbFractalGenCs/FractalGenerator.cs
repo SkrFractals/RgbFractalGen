@@ -2066,7 +2066,7 @@ internal class FractalGenerator {
 	internal short GetValidZoomChildren() {
 
 		if (selectGenerationType >= GenerationType.AllParam || f == null) {
-			validZoomChildren = [1];
+			validZoomChildren = [0];
 			return maxZoomChild = 0;
 		}
 		validZoomChildren = [];
