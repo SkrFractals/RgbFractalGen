@@ -9,10 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Collections.Generic;
-//using System.Windows.Media;
 using System.Numerics;
-using System.Drawing.Imaging;
-using System.Windows.Documents;
 
 //using FFmpeg.AutoGen;
 
