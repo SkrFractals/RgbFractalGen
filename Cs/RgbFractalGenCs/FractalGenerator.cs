@@ -1,5 +1,5 @@
 ﻿// Allow debug code, comment this when releasing for slightly better performance
-#define CUSTOMDEBUG
+//#define CUSTOMDEBUG
 
 //#define SMOOTHNESSDEBUG_XY
 
