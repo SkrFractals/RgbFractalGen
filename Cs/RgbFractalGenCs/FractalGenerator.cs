@@ -886,7 +886,7 @@ internal class FractalGenerator {
 				restartGif = false;
 				toFinishAnimation = true;
 				// wait for all tasks to finish to preserve integrity, especially including gifs, and only return true if it tries to start new ones, so they actually finish:
-				FinishTasks(true, (short taskIndex) => false);
+				FinishTasks(true, true, (short taskIndex) => false);
 				StopGif(null);
 				StartGif();
 			}
@@ -958,7 +958,7 @@ internal class FractalGenerator {
 				
 				// Image parallelism
 				//imageTasks = applyParallelType == 2 ? [] : null;
-				FinishTasks(true, (short taskIndex) => {
+				FinishTasks(false, true, (short taskIndex) => {
 					if (nextBitmap >= GetGenerateLength())
 						return false;// The task is finished, no need to wait for this one
 					var bmp = nextBitmap++;
@@ -1397,7 +1397,7 @@ internal class FractalGenerator {
 				}
 				// we now have a nice number of tasks to perform in parallel, so do that:
 				// false argument makes sure that we only finish processing these iteration tasks, we can exit if other kinds of tasks are still running as we don't need to wait for these here
-				FinishTasks(false, (short taskIndex) => {
+				FinishTasks(false, false, (short taskIndex) => {
 					// until the queue is empty
 					if (count <= 0)
 						return false;
@@ -1746,7 +1746,7 @@ internal class FractalGenerator {
 		 * @param mainLoop - being called from the main loop and not the OnDepth
 		 * @param operation - gets called when a task is free, should return true if it created a new task
 		 */
-		void FinishTasks(bool mainLoop, Func<short, bool> lambda) {
+		void FinishTasks(bool cancel, bool mainLoop, Func<short, bool> lambda) {
 			FractalTask task;
 			for (int i = 3; i > 0; --i) {
 				for (var tasksRemaining = true; tasksRemaining; MakeDebugString()) {
@@ -1754,7 +1754,7 @@ internal class FractalGenerator {
 					for (short t = applyMaxTasks; 0 <= --t;)
 						tasksRemaining |= (task = tasks[t]).IsStillRunning()
 							? mainLoop || task.bitmapIndex >= 0 && bitmapState[task.bitmapIndex] <= BitmapState.Dots // Must finish all Dots threads, and if in main loop all secondary threads too (OnDepth can continu back to main loop when secondary threads are running so it could start a new OnDepth loop)
-							: !token.IsCancellationRequested && ( // Cancel Request forbids any new threads to start
+							: !(token.IsCancellationRequested || cancel) && ( // Cancel Request forbids any new threads to start
 								!mainLoop || selectMaxTasks == applyMaxTasks && applyParallelType == selectParallelType && selectGenerationType == applyGenerationType // changing these settings yout exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
 							) && (mainLoop && (TryWriteBitmaps(task) || TryFinishBitmap(task)) || lambda(t)); // in the main loop we try Bitmap finishing and writing secondary threads (onDepth loop would get stuck )
 					if (tasksRemaining)
@@ -1960,7 +1960,7 @@ internal class FractalGenerator {
 		hash.Clear();
 		byte gifIndex = 0;
 		gifToken = (gifCancel = new()).Token;
-		switch (selectGenerationType) {
+		switch (applyGenerationType = selectGenerationType) {
 			case GenerationType.EncodeGIF:
 			case GenerationType.GlobalGIF:
 			case GenerationType.AllParam:
@@ -1974,7 +1974,7 @@ internal class FractalGenerator {
 			while (gifIndex < 255) {
 				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
 				if (!gifEncoder.Start(selectWidth, selectHeight, gifTempPath,
-					applyGenerationType == GenerationType.GlobalGIF ? Gif.Components.ColorTable.GlobalSingle : Gif.Components.ColorTable.Local)
+					selectGenerationType == GenerationType.GlobalGIF ? Gif.Components.ColorTable.GlobalSingle : Gif.Components.ColorTable.Local)
 				) {
 					++gifIndex;
 					continue;

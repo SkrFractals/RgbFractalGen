@@ -1051,6 +1051,10 @@ public partial class GeneratorForm : Form {
 		var now = generator.selectGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex);
 		if ((now is >= FractalGenerator.GenerationType.OnlyImage and <= FractalGenerator.GenerationType.Mp4) != (prev is >= FractalGenerator.GenerationType.OnlyImage and <= FractalGenerator.GenerationType.Mp4))
 			QueueReset();
+		else {
+			if (now > FractalGenerator.GenerationType.AnimationRAM && prev > FractalGenerator.GenerationType.AnimationRAM && now != prev)
+				generator.restartGif = true;
+		}
 	}
 	private void HelpButton_Click(object sender, EventArgs e) {
 		helpPanel.Visible = screenPanel.Visible;

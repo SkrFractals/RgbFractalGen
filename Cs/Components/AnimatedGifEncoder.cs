@@ -1,12 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using System.IO.Pipes;
 using System.Threading;
 using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
 #region .NET Disclaimer/Info
@@ -703,7 +700,8 @@ namespace Gif.Components {
 				if (!started || (encodeTask = encodeTaskData).failed)
 					return null;
 				encodeTaskData = encodeTask.nextTask = new EncoderTaskData(); // make a next one for the next call of Addframe to work on
-			encodeTask.frameIndex = index < 0 ? addedFrames++ : index;
+			encodeTask.frameIndex = index < 0 ? addedFrames : index;
+			addedFrames++;
 			} finally { Monitor.Exit(this); }
 			return encodeTask;
 		}

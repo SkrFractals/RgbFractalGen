@@ -42,10 +42,7 @@ using System.Drawing.Imaging;
 using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
-using static Gif.Components.AnimatedGifEncoder;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.IO;
 
 namespace Gif.Components {
