@@ -56,6 +56,26 @@ Resolution Select
 - The second option is your custom resolution typed in the boxes to the left
 
 
+Palette Select:
+- Select the colors over which the fractals will keep cycling.
+- If you select RGB and the Children Colors with a 3/2 postfix, then each child that switches colors will step 1.5 steps
+- So in RGB + 3/2 blue might become yellow. But Hue Shift would then cycle between Blue-Yellow, Red-Cyan and Green-Magenta
+- If you instead select a Blue-Yellow palette and regular step Childrens Colors, but a Hue Shift would only flip to Yellow-Blue
+
+Delete Palette (X):
+- Removes the selected palette from the list, erasing if custom, if it's one of the defaults, it will be restored next launch.
+
+Add Palette (+):
+- Make your own custom palette, keep picking colors until you are finished, then cancel the next pick.
+- If you make a mistake you could always delete it and try again.
+- It will be saved to settings.txt to be reloaded in the next launch, unless you delete it.
+
+Default Hue:
+- What hue shift will the fractal start at? With static Hue Shift, this default is permanent over the whole animation
+- 1 would shift RGB to GBR, 2 would shift RGB to BRG, with a palette with X colors, an X default hue would loop back to the original
+- If -1 it will be random after each start
+
+
 Period
 - The number of frames to zoom from a parent to a child or vice versa
 - The final number of frames can be higher if the child is not identical to the parent, but some deeper child is
@@ -74,6 +94,20 @@ Default Zoom:
 - Useful for the "Only Image" option, not really significant for animations
 - If -1 it will be random after each start
 
+
+Hue Shift:
+- Static: The colors of each child will stay the same through the animation
+- ->: The palettes will continuously shift forward in time, for example RGB would go GBR and then BRG and then back to RGB
+- ->: tends to appear as if the colors are spilling out from children to parents (when usual small Children Colors steps)
+- <-: Like -> but shifting backwards. RGB would become BGR, then GBR and then back to RGB
+- <-: tends to appear as if the colors were retreating inside from the parents into children (when usual small Children Colors steps)
+- If you select Children Colors that use reverse color steps (that are larger than the number of colors in the palette, like 4 in RGB) then the hue shifts will appear to flow in opposite directions. If the pick combines both, then the colors will flow in both directions in these different parts.
+
+
+Extra hue cycling speed
+- Adds as many full 160° hue rotations to the loop as you type in. If your period is too long and spin too slow, you can speed it up like this
+
+
 Zoom Spin:
 - Toggle the way the fractal spins as it zooms in, either no spin, clockwise/counterclockwise, or antispin (children in different directions)
 - Beware, the antispin option can result in flashing overlapping luminosity in most fractals
@@ -86,20 +120,6 @@ Default Angle:
 
 Extra Spin Speed:
 - Adds as many symmetric rotations to the loop as you type in. If your period is too long and spin too slow, you can speed it up like this
-
-
-Color Palette / Hue Cycle:
-- RGB, BGR: flips the color shift in children, for example a child that turn to green from red would turn to blue and vice versa.
-- X->Y: Starting with the X palette like above, but also hue cycles as they go deeper and/or in time
-
-Default Hue Angle:
-- Beginning hue shift, in degrees (for example 120 will turn red to green)
-- Will preshift the hue of the fractal in the beginning for this number of degrees
-- Will result in completely permanently shifted colors for fractals that have the central child the same color as the parent
-- If -1 it will be random after each start
-
-Extra hue cycling speed
-- Adds as many full 160° hue rotations to the loop as you type in. If your period is too long and spin too slow, you can speed it up like this
 
 
 Void Ambient:
@@ -207,7 +227,7 @@ Save GIF:
 
 Save Mp4:
 - Will use the included ffmpeg.exe to save your animation as mp4.
-- It converts the encoded GIF, so you have to run Local GIf, Global GIF or AllParam generation mode to be able to Save Mp4.
+- It converts the encoded GIF, so you have to run Local GIF, Global GIF or AllParam generation mode to be able to Save Mp4.
 - You can use it before of after saving the GIF.
 
 
@@ -217,7 +237,7 @@ Debug Log:
 ---------------------------------------------------------------------------------------------------------
 
 Nice fractal setting combinations:
--as I've combined all the definition choises to allow every combination, not every choise really is supposed to work with every choise of different definitions.
+-as I've combined all the definition choices to allow every combination, not every choice really is supposed to work with every choice of different definitions.
 -so here are those that are supposed to work together
 -any other combination is at your own "risk" of turning out looking bad
 -R_X - rotation Definition
@@ -259,7 +279,7 @@ Image states:
 7. Encoding - Encoding of GIF/MP4 has started - step 4
 8. Encoding Finished - step 4 is complete, waiting to start step 5, or step 5 already started
 9. Bitmap finished - step 5 is complete
-10. Unlocked Encoded - everything is finished, so the bitmap got unlocked and is now avaiable to see in the preview
+10. Unlocked Encoded - everything is finished, so the bitmap got unlocked and is now available to see in the preview
 
 Task states:
 1. "Image state" - the task is performing the step the image state is associated with
