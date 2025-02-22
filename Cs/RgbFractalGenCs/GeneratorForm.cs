@@ -27,6 +27,8 @@ public partial class GeneratorForm : Form {
 		screenPanel.Paint += new(ScreenPanel_Paint);
 		screenPanel.Click += new(AnimateButton_Click);
 		Controls.Add(screenPanel);
+		MouseDown += Control_MouseDown; // Detect clicks on empty form space
+		RegisterMouseDownRecursive(this); // Detect clicks on all controls
 	}
 	#endregion
 
@@ -69,6 +71,7 @@ public partial class GeneratorForm : Form {
 	private int fx, fy;             // Memory of window size
 	private int controlTabIndex = 0;// Iterator for tabIndexes - to make sure all the controls tab in the correct order even as i add new ones in the middle
 	private int pointTabIndex = 0;
+	private bool notify = true;
 
 	// Editor
 	private readonly List<(
@@ -407,7 +410,7 @@ public partial class GeneratorForm : Form {
 			} else {
 				SetupFractal();
 				ResizeAll();
-				restartButton.Enabled = true;
+				notify = restartButton.Enabled = true;
 				ResetRestart();
 				generator.restartGif = false;
 				generator.StartGenerate();
@@ -417,8 +420,16 @@ public partial class GeneratorForm : Form {
 			ResetRestart();
 		// Fetch the state of generated bitmaps
 		int bitmapsFinished = generator.GetBitmapsFinished(), bitmapsTotal = generator.GetFrames();
+
+
 		if (bitmapsTotal <= 0)
 			return;
+
+		if (bitmapsFinished == bitmapsTotal && notify) {
+			BackColor = Color.FromArgb(128, 128, 64);
+			notify = false;
+		}
+		
 		// Only Allow GIF Export when generation is finished
 		//string v = generator.selectGenerationType == FractalGenerator.GenerationType.Mp4 ? "Mp4" : "Gif";
 
@@ -1029,6 +1040,14 @@ public partial class GeneratorForm : Form {
 		}*/
 		generator.selectParallelType = (FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex;
 	}
+	private void TimingSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		toolTips.SetToolTip(timingBox, timingSelect.SelectedIndex switch {
+			0 => "A delay between frames in 1/100 of seconds for the preview and exported GIF file, so if you want to export a GIF, make sure to set this instead of framerate to avoid rounding errors.\nThe framerate will be roughly 100/delay",
+			1 => "The framerate per second (roughly 100/delay). Used for exporting Mp4, so if you want to export MP4, make sure to set this instead of delay to avoid rounding errors",
+			_ => ""
+		});
+		timingBox.Text = (timingSelect.SelectedIndex == 0 ? generator.selectDelay : generator.selectFps).ToString();
+	}
 	private void AbortBox_TextChanged(object sender, EventArgs e) => abortDelay = ParseClampRetext(abortBox, (short)0, (short)10000);
 	private void TimingBox_TextChanged(object sender, EventArgs e) {
 		switch (timingSelect.SelectedIndex) {
@@ -1314,6 +1333,7 @@ public partial class GeneratorForm : Form {
 			Thread.Sleep(1000);
 		if (!gCancel.Token.IsCancellationRequested)
 			isGifReady = 0;
+		BackColor = Color.FromArgb(128, 128, 64);
 		gTask = null;
 	}
 	/// <summary>
@@ -1327,6 +1347,7 @@ public partial class GeneratorForm : Form {
 			Thread.Sleep(1000);
 		if (!mCancel.Token.IsCancellationRequested)
 			isGifReady = 0;
+		BackColor = Color.FromArgb(128, 128, 64);
 		gifPath = "";
 		mp4Path = "";
 		mTask = null;
@@ -1340,6 +1361,7 @@ public partial class GeneratorForm : Form {
 		var attempt = 0;
 		while (++attempt <= 10 && !mCancel.Token.IsCancellationRequested && generator.SaveMp4(mp4Path) > 0)
 			Thread.Sleep(1000);
+		BackColor = Color.FromArgb(128, 128, 64);
 		mp4Path = "";
 		mTask = null;
 	}
@@ -1963,12 +1985,15 @@ public partial class GeneratorForm : Form {
 	}
 	#endregion
 
-	private void TimingSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		toolTips.SetToolTip(timingBox, timingSelect.SelectedIndex switch {
-			0 => "A delay between frames in 1/100 of seconds for the preview and exported GIF file, so if you want to export a GIF, make sure to set this instead of framerate to avoid rounding errors.\nThe framerate will be roughly 100/delay",
-			1 => "The framerate per second (roughly 100/delay). Used for exporting Mp4, so if you want to export MP4, make sure to set this instead of delay to avoid rounding errors",
-			_ => ""
-		});
-		timingBox.Text = (timingSelect.SelectedIndex == 0 ? generator.selectDelay : generator.selectFps).ToString();
+	#region Notify
+	private void Control_MouseDown(object sender, MouseEventArgs e) {
+		BackColor = Color.FromArgb(64, 64, 64);
 	}
+	private void RegisterMouseDownRecursive(Control parent) {
+		foreach (Control ctrl in parent.Controls) {
+			ctrl.MouseDown += Control_MouseDown;
+			RegisterMouseDownRecursive(ctrl); // Recursively register for child controls
+		}
+	}
+	#endregion
 }
