@@ -42,18 +42,17 @@ namespace RgbFractalGenCs {
 			toolTips = new ToolTip(components);
 			timer = new Timer(components);
 			periodBox = new TextBox();
-			delayBox = new TextBox();
+			timingBox = new TextBox();
 			prevButton = new Button();
 			nextButton = new Button();
 			animateButton = new Button();
-			pngButton = new Button();
-			gifButton = new Button();
+			exportButton = new Button();
 			savePng = new SaveFileDialog();
 			saveGif = new SaveFileDialog();
 			loadFractal = new OpenFileDialog();
 			saveFractal = new SaveFileDialog();
 			voidAmbientLabel = new Label();
-			dotLabel = new Label();
+			saturateLabel = new Label();
 			statusLabel = new Label();
 			infoLabel = new Label();
 			bloomLabel = new Label();
@@ -88,11 +87,11 @@ namespace RgbFractalGenCs {
 			debugBox = new CheckBox();
 			debugLabel = new Label();
 			generatorPanel = new Panel();
+			exportSelect = new ComboBox();
 			panel1 = new Panel();
+			timingSelect = new ComboBox();
 			label2 = new Label();
-			fpsLabel = new Label();
-			label1 = new Label();
-			fpsBox = new TextBox();
+			timingLabel = new Label();
 			parallelLabel = new Label();
 			zoomChildLabel = new Label();
 			zoomChildBox = new TextBox();
@@ -102,7 +101,6 @@ namespace RgbFractalGenCs {
 			voidScaleLabel = new Label();
 			voidNoiseLabel = new Label();
 			voidBox = new TextBox();
-			mp4Button = new Button();
 			modeButton = new Button();
 			editorPanel = new Panel();
 			preButton = new Button();
@@ -285,15 +283,15 @@ namespace RgbFractalGenCs {
 			periodBox.Text = "120";
 			periodBox.TextChanged += PeriodBox_TextChanged;
 			// 
-			// delayBox
+			// timingBox
 			// 
-			delayBox.Location = new System.Drawing.Point(164, 430);
-			delayBox.Margin = new Padding(4, 3, 4, 3);
-			delayBox.Name = "delayBox";
-			delayBox.Size = new System.Drawing.Size(59, 23);
-			delayBox.TabIndex = 28;
-			delayBox.Text = "5";
-			delayBox.TextChanged += DelayBox_TextChanged;
+			timingBox.Location = new System.Drawing.Point(164, 430);
+			timingBox.Margin = new Padding(4, 3, 4, 3);
+			timingBox.Name = "timingBox";
+			timingBox.Size = new System.Drawing.Size(59, 23);
+			timingBox.TabIndex = 28;
+			timingBox.Text = "60";
+			timingBox.TextChanged += TimingBox_TextChanged;
 			// 
 			// prevButton
 			// 
@@ -328,27 +326,16 @@ namespace RgbFractalGenCs {
 			animateButton.UseVisualStyleBackColor = true;
 			animateButton.Click += AnimateButton_Click;
 			// 
-			// pngButton
+			// exportButton
 			// 
-			pngButton.Location = new System.Drawing.Point(62, 378);
-			pngButton.Margin = new Padding(4, 3, 4, 3);
-			pngButton.Name = "pngButton";
-			pngButton.Size = new System.Drawing.Size(66, 27);
-			pngButton.TabIndex = 34;
-			pngButton.Text = "Save PNG";
-			pngButton.UseVisualStyleBackColor = true;
-			pngButton.Click += PngButton_Click;
-			// 
-			// gifButton
-			// 
-			gifButton.Location = new System.Drawing.Point(136, 378);
-			gifButton.Margin = new Padding(4, 3, 4, 3);
-			gifButton.Name = "gifButton";
-			gifButton.Size = new System.Drawing.Size(59, 27);
-			gifButton.TabIndex = 35;
-			gifButton.Text = "Save GIF";
-			gifButton.UseVisualStyleBackColor = true;
-			gifButton.Click += SaveVideoButton_Click;
+			exportButton.Location = new System.Drawing.Point(62, 378);
+			exportButton.Margin = new Padding(4, 3, 4, 3);
+			exportButton.Name = "exportButton";
+			exportButton.Size = new System.Drawing.Size(92, 27);
+			exportButton.TabIndex = 34;
+			exportButton.Text = "Export:";
+			exportButton.UseVisualStyleBackColor = true;
+			exportButton.Click += ExportButton_Click;
 			// 
 			// savePng
 			// 
@@ -360,7 +347,7 @@ namespace RgbFractalGenCs {
 			// 
 			saveGif.DefaultExt = "gif";
 			saveGif.Filter = "GIF files (*.gif)|*.gif";
-			saveGif.FileOk += SaveVideo_FileOk;
+			saveGif.FileOk += SaveGif_FileOk;
 			// 
 			// loadFractal
 			// 
@@ -386,17 +373,17 @@ namespace RgbFractalGenCs {
 			voidAmbientLabel.TabIndex = 0;
 			voidAmbientLabel.Text = "Void Ambient (0-30):";
 			// 
-			// dotLabel
+			// saturateLabel
 			// 
-			dotLabel.AutoSize = true;
-			dotLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
-			dotLabel.ForeColor = System.Drawing.Color.White;
-			dotLabel.Location = new System.Drawing.Point(4, 259);
-			dotLabel.Margin = new Padding(4, 0, 4, 0);
-			dotLabel.Name = "dotLabel";
-			dotLabel.Size = new System.Drawing.Size(87, 15);
-			dotLabel.TabIndex = 0;
-			dotLabel.Text = "Saturate (0-10):";
+			saturateLabel.AutoSize = true;
+			saturateLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			saturateLabel.ForeColor = System.Drawing.Color.White;
+			saturateLabel.Location = new System.Drawing.Point(4, 259);
+			saturateLabel.Margin = new Padding(4, 0, 4, 0);
+			saturateLabel.Name = "saturateLabel";
+			saturateLabel.Size = new System.Drawing.Size(87, 15);
+			saturateLabel.TabIndex = 0;
+			saturateLabel.Text = "Saturate (0-10):";
 			// 
 			// statusLabel
 			// 
@@ -494,7 +481,7 @@ namespace RgbFractalGenCs {
 			// helpPanel
 			// 
 			helpPanel.AutoScroll = true;
-			helpPanel.BackColor = System.Drawing.Color.White;
+			helpPanel.BackColor = System.Drawing.Color.Black;
 			helpPanel.Controls.Add(helpLabel);
 			helpPanel.Location = new System.Drawing.Point(309, 14);
 			helpPanel.Name = "helpPanel";
@@ -504,6 +491,7 @@ namespace RgbFractalGenCs {
 			// helpLabel
 			// 
 			helpLabel.AutoSize = true;
+			helpLabel.ForeColor = System.Drawing.Color.White;
 			helpLabel.Location = new System.Drawing.Point(15, 8);
 			helpLabel.Name = "helpLabel";
 			helpLabel.Size = new System.Drawing.Size(30, 15);
@@ -585,9 +573,9 @@ namespace RgbFractalGenCs {
 			parallelTypeSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			parallelTypeSelect.FormattingEnabled = true;
 			parallelTypeSelect.Items.AddRange(new object[] { "Of Animation", "Of Depth" });
-			parallelTypeSelect.Location = new System.Drawing.Point(53, 401);
+			parallelTypeSelect.Location = new System.Drawing.Point(59, 401);
 			parallelTypeSelect.Name = "parallelTypeSelect";
-			parallelTypeSelect.Size = new System.Drawing.Size(105, 23);
+			parallelTypeSelect.Size = new System.Drawing.Size(99, 23);
 			parallelTypeSelect.TabIndex = 27;
 			parallelTypeSelect.SelectedIndexChanged += ParallelTypeSelect_SelectedIndexChanged;
 			// 
@@ -656,7 +644,7 @@ namespace RgbFractalGenCs {
 			// 
 			// abortBox
 			// 
-			abortBox.Location = new System.Drawing.Point(164, 488);
+			abortBox.Location = new System.Drawing.Point(164, 459);
 			abortBox.Margin = new Padding(4, 3, 4, 3);
 			abortBox.Name = "abortBox";
 			abortBox.Size = new System.Drawing.Size(59, 23);
@@ -699,7 +687,7 @@ namespace RgbFractalGenCs {
 			// 
 			encodeSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			encodeSelect.FormattingEnabled = true;
-			encodeSelect.Items.AddRange(new object[] { "Only Image", "Animation RAM", "Local GIF", "Global GIF", "Encode Mp4", "AllSeeds" });
+			encodeSelect.Items.AddRange(new object[] { "Only Image", "Animation RAM", "Animation Mp4", "Local GIF", "Global GIF", "All Seeds GIF", "All Seeds Mp4" });
 			encodeSelect.Location = new System.Drawing.Point(162, 349);
 			encodeSelect.Name = "encodeSelect";
 			encodeSelect.Size = new System.Drawing.Size(108, 23);
@@ -730,10 +718,9 @@ namespace RgbFractalGenCs {
 			// 
 			// generatorPanel
 			// 
+			generatorPanel.Controls.Add(exportSelect);
 			generatorPanel.Controls.Add(panel1);
-			generatorPanel.Controls.Add(mp4Button);
-			generatorPanel.Controls.Add(gifButton);
-			generatorPanel.Controls.Add(pngButton);
+			generatorPanel.Controls.Add(exportButton);
 			generatorPanel.Controls.Add(infoLabel);
 			generatorPanel.Controls.Add(encodeSelect);
 			generatorPanel.Controls.Add(statusLabel);
@@ -747,13 +734,24 @@ namespace RgbFractalGenCs {
 			generatorPanel.Size = new System.Drawing.Size(286, 413);
 			generatorPanel.TabIndex = 54;
 			// 
+			// exportSelect
+			// 
+			exportSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+			exportSelect.FormattingEnabled = true;
+			exportSelect.Items.AddRange(new object[] { "Current PNG", "GIF", "GIF->MP4", "PNGs->MP4" });
+			exportSelect.Location = new System.Drawing.Point(162, 381);
+			exportSelect.Name = "exportSelect";
+			exportSelect.Size = new System.Drawing.Size(108, 23);
+			exportSelect.TabIndex = 61;
+			exportSelect.SelectedIndexChanged += exportSelect_SelectedIndexChanged;
+			// 
 			// panel1
 			// 
 			panel1.AutoScroll = true;
+			panel1.BackColor = System.Drawing.Color.Black;
+			panel1.Controls.Add(timingSelect);
 			panel1.Controls.Add(label2);
-			panel1.Controls.Add(fpsLabel);
-			panel1.Controls.Add(label1);
-			panel1.Controls.Add(fpsBox);
+			panel1.Controls.Add(timingLabel);
 			panel1.Controls.Add(parallelLabel);
 			panel1.Controls.Add(zoomChildLabel);
 			panel1.Controls.Add(zoomChildBox);
@@ -770,8 +768,8 @@ namespace RgbFractalGenCs {
 			panel1.Controls.Add(zoomSelect);
 			panel1.Controls.Add(spinLabel);
 			panel1.Controls.Add(brightnessBox);
-			panel1.Controls.Add(delayBox);
-			panel1.Controls.Add(dotLabel);
+			panel1.Controls.Add(timingBox);
+			panel1.Controls.Add(saturateLabel);
 			panel1.Controls.Add(threadsBox);
 			panel1.Controls.Add(hueLabel);
 			panel1.Controls.Add(periodLabel);
@@ -795,51 +793,40 @@ namespace RgbFractalGenCs {
 			panel1.Size = new System.Drawing.Size(256, 300);
 			panel1.TabIndex = 60;
 			// 
+			// timingSelect
+			// 
+			timingSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+			timingSelect.FormattingEnabled = true;
+			timingSelect.Items.AddRange(new object[] { "Delay", "Framerate" });
+			timingSelect.Location = new System.Drawing.Point(59, 430);
+			timingSelect.Name = "timingSelect";
+			timingSelect.Size = new System.Drawing.Size(98, 23);
+			timingSelect.TabIndex = 70;
+			timingSelect.SelectedIndexChanged += TimingSelect_SelectedIndexChanged;
+			// 
 			// label2
 			// 
 			label2.AutoSize = true;
 			label2.Font = new System.Drawing.Font("Segoe UI", 9F);
 			label2.ForeColor = System.Drawing.Color.White;
-			label2.Location = new System.Drawing.Point(4, 491);
+			label2.Location = new System.Drawing.Point(4, 462);
 			label2.Margin = new Padding(4, 0, 4, 0);
 			label2.Name = "label2";
 			label2.Size = new System.Drawing.Size(72, 15);
 			label2.TabIndex = 69;
 			label2.Text = "Abort Delay:";
 			// 
-			// fpsLabel
+			// timingLabel
 			// 
-			fpsLabel.AutoSize = true;
-			fpsLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
-			fpsLabel.ForeColor = System.Drawing.Color.White;
-			fpsLabel.Location = new System.Drawing.Point(4, 462);
-			fpsLabel.Margin = new Padding(4, 0, 4, 0);
-			fpsLabel.Name = "fpsLabel";
-			fpsLabel.Size = new System.Drawing.Size(63, 15);
-			fpsLabel.TabIndex = 68;
-			fpsLabel.Text = "Framerate:";
-			// 
-			// label1
-			// 
-			label1.AutoSize = true;
-			label1.Font = new System.Drawing.Font("Segoe UI", 9F);
-			label1.ForeColor = System.Drawing.Color.White;
-			label1.Location = new System.Drawing.Point(4, 433);
-			label1.Margin = new Padding(4, 0, 4, 0);
-			label1.Name = "label1";
-			label1.Size = new System.Drawing.Size(39, 15);
-			label1.TabIndex = 67;
-			label1.Text = "Delay:";
-			// 
-			// fpsBox
-			// 
-			fpsBox.Location = new System.Drawing.Point(164, 459);
-			fpsBox.Margin = new Padding(4, 3, 4, 3);
-			fpsBox.Name = "fpsBox";
-			fpsBox.Size = new System.Drawing.Size(59, 23);
-			fpsBox.TabIndex = 53;
-			fpsBox.Text = "20";
-			fpsBox.TextChanged += FpsBox_TextChanged;
+			timingLabel.AutoSize = true;
+			timingLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			timingLabel.ForeColor = System.Drawing.Color.White;
+			timingLabel.Location = new System.Drawing.Point(4, 433);
+			timingLabel.Margin = new Padding(4, 0, 4, 0);
+			timingLabel.Name = "timingLabel";
+			timingLabel.Size = new System.Drawing.Size(47, 15);
+			timingLabel.TabIndex = 67;
+			timingLabel.Text = "Timing:";
 			// 
 			// parallelLabel
 			// 
@@ -942,16 +929,6 @@ namespace RgbFractalGenCs {
 			voidBox.TabIndex = 52;
 			voidBox.Text = "8";
 			voidBox.TextChanged += VoidBox_TextChanged;
-			// 
-			// mp4Button
-			// 
-			mp4Button.Location = new System.Drawing.Point(201, 378);
-			mp4Button.Name = "mp4Button";
-			mp4Button.Size = new System.Drawing.Size(69, 27);
-			mp4Button.TabIndex = 57;
-			mp4Button.Text = "Save Mp4";
-			mp4Button.UseVisualStyleBackColor = true;
-			mp4Button.Click += Mp4Button_Click;
 			// 
 			// modeButton
 			// 
@@ -1069,6 +1046,7 @@ namespace RgbFractalGenCs {
 			// pointPanel
 			// 
 			pointPanel.AutoScroll = true;
+			pointPanel.BackColor = System.Drawing.Color.Black;
 			pointPanel.Controls.Add(addPoint);
 			pointPanel.Location = new System.Drawing.Point(14, 31);
 			pointPanel.Name = "pointPanel";
@@ -1173,7 +1151,7 @@ namespace RgbFractalGenCs {
 			// 
 			saveMp4.DefaultExt = "mp4";
 			saveMp4.Filter = "MP4 files (*.mp4)|*.mp4";
-			saveMp4.FileOk += SaveVideo_FileOk;
+			saveMp4.FileOk += SaveMp4_FileOk;
 			// 
 			// convertMp4
 			// 
@@ -1293,15 +1271,14 @@ namespace RgbFractalGenCs {
 		private System.Windows.Forms.SaveFileDialog saveFractal;
 		private System.Windows.Forms.OpenFileDialog loadFractal;
 		private System.Windows.Forms.TextBox periodBox;
-		private System.Windows.Forms.TextBox delayBox;
+		private System.Windows.Forms.TextBox timingBox;
 		private System.Windows.Forms.Button prevButton;
 		private System.Windows.Forms.Button nextButton;
 		private System.Windows.Forms.Button animateButton;
 		private System.Windows.Forms.Label statusLabel;
 		private System.Windows.Forms.Label infoLabel;
-		private System.Windows.Forms.Button pngButton;
-		private System.Windows.Forms.Button gifButton;
-		private System.Windows.Forms.Label dotLabel;
+		private System.Windows.Forms.Button exportButton;
+		private System.Windows.Forms.Label saturateLabel;
 		private System.Windows.Forms.Label voidAmbientLabel;
 		private System.Windows.Forms.Label bloomLabel;
 		private System.Windows.Forms.TextBox defaultZoom;
@@ -1356,9 +1333,7 @@ namespace RgbFractalGenCs {
 		private System.Windows.Forms.Label pointLabel;
 		private System.Windows.Forms.TextBox voidBox;
 		private System.Windows.Forms.Label sizeLabel;
-		private System.Windows.Forms.Button mp4Button;
 		private System.Windows.Forms.SaveFileDialog saveMp4;
-		private System.Windows.Forms.TextBox fpsBox;
 		private System.Windows.Forms.SaveFileDialog convertMp4;
 		private System.Windows.Forms.Button preButton;
 		private System.Windows.Forms.Panel panel1;
@@ -1371,13 +1346,14 @@ namespace RgbFractalGenCs {
 		private System.Windows.Forms.Label zoomChildLabel;
 		private System.Windows.Forms.TextBox zoomChildBox;
 		private System.Windows.Forms.Label label2;
-		private System.Windows.Forms.Label fpsLabel;
-		private System.Windows.Forms.Label label1;
+		private System.Windows.Forms.Label timingLabel;
 		private System.Windows.Forms.ComboBox paletteSelect;
 		private System.Windows.Forms.Label paletteLabel;
 		private System.Windows.Forms.Button addPalette;
 		private System.Windows.Forms.Button removePalette;
 		private System.Windows.Forms.ColorDialog paletteDialog;
+		private ComboBox exportSelect;
+		private ComboBox timingSelect;
 	}
 }
 

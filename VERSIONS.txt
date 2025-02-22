@@ -7,6 +7,7 @@
 -expanded and custom color palettes
 -no zoom option (make sure to account for in hue multiplier)
 -fixed OfDepth pixels
+-added PNG->MP4 high quality MP4 export
 
 1.9.2
 - a bunch of bugfixes preventing a lot of crashes and fixing some modes

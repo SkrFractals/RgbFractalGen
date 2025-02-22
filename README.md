@@ -38,6 +38,22 @@ RgbFractalGenCpp
 
 ---------------------------------------------------------------------------------------------------------
 
+Terminology:
+
+- Parent-Child: A parent fractal is made of smaller versions of itself - it's children.
+- Dot: The deepest smallest children that are only effectively points.
+- CutFunction: A special function that determines to cut some specific children making more complex patterns.
+- Period: The number of images it takes for an animation to match a child to a parent or vice versa.
+- Palette: Sequence of colors that the fractal cycles through.
+- Hue: Interpolated color between the ones on the palette.
+- Void: Empty space where there are no fractal dots. Where the parent doesn't have children, or the CutFunction cut them off.
+- Zoom: Scaling up and down.
+- Spin: rotating around.
+- Antispin: Children are rotating in opposite direction of their parents.
+- Parallelism: Splitting the generation work between more CPU threads to improve generator speed.
+
+----------------------------------------------------------------------------------------------------------
+
 Settings:
 - in reading direction from top left
 - rows are separated by double new lines
@@ -64,10 +80,12 @@ Cutfunction Definition Select:
 - Different variants of CutFunction implementations
 - Each one will use a different algorithm to take the seed below and use it to cut different subchildren into voids
 
-CutFunction Param Seed (textbox + slider):
+CutFunction Param Seed:
 - A binary seed for the CutFuntion
 - Each power of two has one effect, sum of powers combines the effects
 - For example with pentaflake: 1 cuts the outer child, 4 cuts the diagonály inner child, 5 cuts both
+- Some CutFunction have multiple seeds with the same outcome, those get skipped so the binary sum might not always apply
+- If -1 it will be random after each start
 
 
 Resolution Width:
@@ -83,9 +101,9 @@ Resolution Select
 
 Palette Select:
 - Select the colors over which the fractals will keep cycling.
-- If you select RGB and the Children Colors with a 3/2 postfix, then each child that switches colors will step 1.5 steps
+- If you select RGB and the Color Definitions with a 3/2 postfix, then each child that switches colors will step 1.5 steps
 - So in RGB + 3/2 blue might become yellow. But Hue Shift would then cycle between Blue-Yellow, Red-Cyan and Green-Magenta
-- If you instead select a Blue-Yellow palette and regular step Childrens Colors, but a Hue Shift would only flip to Yellow-Blue
+- If you instead select a Blue-Yellow palette and regular step Color Definitions, but a Hue Shift would only flip to Yellow-Blue
 
 Delete Palette (X):
 - Removes the selected palette from the list, erasing if custom, if it's one of the defaults, it will be restored next launch.
@@ -125,8 +143,9 @@ Hue Shift:
 - ->: The palettes will continuously shift forward in time, for example RGB would go GBR and then BRG and then back to RGB
 - ->: tends to appear as if the colors are spilling out from children to parents (when usual small Children Colors steps)
 - <-: Like -> but shifting backwards. RGB would become BGR, then GBR and then back to RGB
-- <-: tends to appear as if the colors were retreating inside from the parents into children (when usual small Children Colors steps)
-- If you select Children Colors that use reverse color steps (that are larger than the number of colors in the palette, like 4 in RGB) then the hue shifts will appear to flow in opposite directions. If the pick combines both, then the colors will flow in both directions in these different parts.
+- <-: tends to appear as if the colors were retreating inside from the parents into children (when usual small Color Definition steps)
+- If you select Color Definitions that use reverse color steps (that are larger than the number of colors in the palette, like 4 in RGB) then the hue shifts will appear to flow in opposite directions.
+- If the pick combines both, then the colors will flow in both directions in these different parts.
 
 
 Extra hue cycling speed
@@ -177,7 +196,7 @@ Super Saturate:
 
 Brightness:
 - The brightness of the main RGB fractal. In percentage.
-- 100 is 100% max brightness. 300 is 3x overeposure over maximum.
+- 100 is 100% max brightness. 300 is 3x overexposure over maximum.
 
 
 Bloom:
@@ -242,18 +261,14 @@ Generation Options:
 Help:
 - Displays this text, you might already know this though...
 
-Save PNG:
-- Saves the current displayed preview image frame into a PNG
+Export:
+- Will export whatever you have selected in the select box to the right.
 
-Save GIF:
-- Save the finished animation into a GIF
-- Must have selected "Encode GIF" Generation Option above
-- Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
-
-Save Mp4:
-- Will use the included ffmpeg.exe to save your animation as mp4.
-- It converts the encoded GIF, so you have to run Local GIF, Global GIF or AllParam generation mode to be able to Save Mp4.
-- You can use it before of after saving the GIF.
+Export Select:
+- Current PNG: Saves the current displayed preview image frame into a PNG
+- GIF: Saves the finished animation to a GIF. You need to have LocalGIF, GlobalGIF, or AllSeeds generation type selected for this to be available. Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
+- GIF->MP4: Convert the temporary or exported GIF into an MP4. You need to have LocalGIF, GlobalGIF, or AllSeeds generation type selected for this to be available. You can use it before of after saving the GIF.
+- MP4: Will Export the animation as PNG series and covert those intohigh quality MP4. If you select MP4 generation type, it will export the PNGs faster in parallel.
 
 
 Debug Log:
@@ -309,3 +324,4 @@ Image states:
 Task states:
 1. "Image state" - the task is performing the step the image state is associated with
 2. Writing - the task is performing the step 5
+
