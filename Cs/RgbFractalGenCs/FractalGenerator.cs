@@ -293,7 +293,7 @@ internal class FractalGenerator {
 	internal string debugString = "";
 	private readonly short[] counter = new short[11];
 
-	private string filePrefix;
+	private readonly string filePrefix;
 
 	#endregion
 
@@ -791,7 +791,7 @@ internal class FractalGenerator {
 		startTime = new();
 		startTime.Start();
 #endif
-
+		CleanupTempFiles();
 		restartGif = false;
 		applyPalette = Colors[applyPaletteType = (short)(selectPaletteType < 0 ? random.Next(0, Colors.Count) : selectPaletteType)].Item2;
 		applyPalette2 = 2 * applyPalette.Length;
@@ -2211,7 +2211,7 @@ internal class FractalGenerator {
 
 			//string arguments = $"-y -framerate 60 -i temp/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p temp/temp.mp4";
 			//string arguments = $"-y -framerate {selectFps} -i temp/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
-			string arguments = $"-y -framerate {selectFps} -i temp"+ filePrefix + "/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
+			string arguments = $"-y -framerate {selectFps} -i temp/"+ filePrefix + "image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
 			using Process ffmpeg = new Process();
 			ffmpeg.StartInfo.FileName = ffmpegPath;
 			ffmpeg.StartInfo.Arguments = arguments;
