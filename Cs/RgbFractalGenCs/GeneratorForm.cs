@@ -708,6 +708,7 @@ public partial class GeneratorForm : Form {
 		aTask?.Wait();
 		Abort();
 		SaveSettings();
+		generator.CleanupTempFiles();
 	}
 	protected void Abort() {
 		queueAbort = false;

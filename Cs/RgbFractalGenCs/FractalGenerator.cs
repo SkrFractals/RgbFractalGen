@@ -292,11 +292,14 @@ internal class FractalGenerator {
 	internal bool debugmode = false;
 	internal string debugString = "";
 	private readonly short[] counter = new short[11];
-	
+
+	private string filePrefix;
+
 	#endregion
 
 	#region Init
 	internal FractalGenerator() {
+		filePrefix = "guid" + Guid.NewGuid().ToString("N");
 		selectParallelType = ParallelType.OfAnimation;
 		selectGenerationType = GenerationType.LocalGIF;
 		selectDefaultHue = selectCutparam = selectDefaultZoom = selectDefaultAngle = selectExtraSpin = selectExtraHue = debug = 0;
@@ -1805,7 +1808,7 @@ internal class FractalGenerator {
 		void TryFinishBitmap(bool gif, short taskIndex) {
 			Monitor.Enter(taskLock);
 			try {
-				while (bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (gif || bitmapState[bitmapsFinished] == BitmapState.Encoding ? BitmapState.FinishedBitmap : BitmapState.DrawingFinished)) {
+				while (!token.IsCancellationRequested && bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (gif || bitmapState[bitmapsFinished] == BitmapState.Encoding ? BitmapState.FinishedBitmap : BitmapState.DrawingFinished)) {
 					bitmapState[bitmapsFinished] = gif || bitmapsFinished < previewFrames ? BitmapState.Unlocked : BitmapState.UnlockedRAM;
 					if (applyGenerationType == GenerationType.HashParam) {
 						using SHA256 sha256 = SHA256.Create();
@@ -1965,7 +1968,7 @@ internal class FractalGenerator {
 				_ = Directory.CreateDirectory("temp");
 
 			while (gifIndex < 255) {
-				gifTempPath = "temp/gif" + gifIndex.ToString() + ".tmp";
+				gifTempPath = "temp/"+ filePrefix + "gif" + gifIndex.ToString() + ".tmp";
 				if (!gifEncoder.Start(selectWidth, selectHeight, gifTempPath,
 					selectGenerationType == GenerationType.GlobalGIF ? Gif.Components.ColorTable.GlobalSingle : Gif.Components.ColorTable.Local)
 				) {
@@ -2054,6 +2057,17 @@ internal class FractalGenerator {
 	#endregion
 
 	#region Interface_Calls
+	internal void CleanupTempFiles() {
+		string[] files = Directory.GetFiles("temp/", $"{filePrefix}*");
+		foreach (string file in files) {
+			try {
+				File.Delete(file);
+			} catch (Exception) {
+				// Handle exceptions if needed (e.g., log the error)
+				//Console.WriteLine($"Error deleting file {file}: {ex.Message}");
+			}
+		}
+	}
 	// start the generator in a separate main thread so that the form can continue being responsive
 	internal void StartGenerate() => mainTask = Task.Run(GenerateAnimation, token = (cancel = new()).Token);
 	internal short GetValidZoomChildren() {
@@ -2084,9 +2098,7 @@ internal class FractalGenerator {
 	}
 	private List<short> validZoomChildren;
 
-	internal void ResetGenerator() {
-
-	}
+	internal void ResetGenerator() { }
 	internal void RequestCancel() {
 		cancel?.Cancel();
 		gifCancel?.Cancel();
@@ -2172,7 +2184,7 @@ internal class FractalGenerator {
 		try {
 			if (!Directory.Exists("temp"))
 				_ = Directory.CreateDirectory("temp");
-			FileStream myStream = new("temp/image_" + i.ToString(d) + ".png", FileMode.Create);
+			FileStream myStream = new("temp/"+ filePrefix + "image_" + i.ToString(d) + ".png", FileMode.Create);
 			if (myStream == null)
 				return true;
 			bitmap[i + previewFrames].Save(myStream, System.Drawing.Imaging.ImageFormat.Png);
@@ -2199,7 +2211,7 @@ internal class FractalGenerator {
 
 			//string arguments = $"-y -framerate 60 -i temp/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p temp/temp.mp4";
 			//string arguments = $"-y -framerate {selectFps} -i temp/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
-			string arguments = $"-y -framerate {selectFps} -i temp/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
+			string arguments = $"-y -framerate {selectFps} -i temp"+ filePrefix + "/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
 			using Process ffmpeg = new Process();
 			ffmpeg.StartInfo.FileName = ffmpegPath;
 			ffmpeg.StartInfo.Arguments = arguments;
@@ -2216,7 +2228,7 @@ internal class FractalGenerator {
 			if (!Directory.Exists("temp"))
 				_ = Directory.CreateDirectory("temp");
 			for (int i = 0; i < nf; ++i) {
-				File.Delete("temp/image_" + i.ToString(d) + ".png");
+				File.Delete("temp/" + filePrefix + "image_" + i.ToString(d) + ".png");
 			}
 
 			/*arguments = $"-y -i temp/temp.mp4 -r 60 -c copy -movflags faststart \"{mp4Path}\"";
