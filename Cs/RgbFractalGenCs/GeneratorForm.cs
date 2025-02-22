@@ -10,9 +10,6 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Windows.Controls;
-using System.Net.NetworkInformation;
-using System.Windows.Media.Animation;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]

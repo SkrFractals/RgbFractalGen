@@ -142,7 +142,7 @@ internal class FractalGenerator {
 	public short[] childColor;         // A copy of childColor for allowing BGR
 	private double applyPeriodAngle;     // Angle symmetry corrected for periodMultiplier
 	private Fractal.CutFunction 
-		cutFunction;					// Selected CutFunction pointer
+		selectCutFunction;				// Selected CutFunction pointer
 	private long applyCutparam;			// Applied cutparam (selected or random)
 	private short selectMaxIterations = -1;   // maximum depth of iteration (dependent on fractal/detail/resolution)
 	private float logBase;              // Size Log Base
@@ -1119,7 +1119,7 @@ internal class FractalGenerator {
 			return (inXY.Item1 + XY.Item1 * cs - XY.Item2 * sn, inXY.Item2 - XY.Item2 * cs - XY.Item1 * sn);
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		long CalculateFlags(int index, long inFlags) => cutFunction == null ? /*inFlags*/ 0 : cutFunction(index, inFlags, f);
+		long CalculateFlags(int index, long inFlags) => selectCutFunction == null ? /*inFlags*/ 0 : selectCutFunction(index, inFlags, f);
 		void GenerateDots(int bitmapIndex, short stateIndex, double size, double angle, short spin, short color, double hueAngle) {
 
 #if CUSTOMDEBUG
@@ -2122,7 +2122,7 @@ internal class FractalGenerator {
 
 		long s = GetFractal().cutFunction != null && (m = GetFractal().cutFunction[selectCut].Item2) != null && m.Length > 0 && m[0] >= 0 ? -m[selectCutparam] : -selectCutparam;
 
-		var cf = cutFunction = GetFractal().cutFunction == null || GetFractal().cutFunction.Count <= 0 ? null : Fractal.cutFunctions[GetFractal().cutFunction[selectCut].Item1].Item2;
+		var cf = GetFractal().cutFunction == null || GetFractal().cutFunction.Count <= 0 ? null : Fractal.cutFunctions[GetFractal().cutFunction[selectCut].Item1].Item2;
 		for (short i = 0; i < GetFractal().childCount; ++i)
 			if (PregenerateChildren(cf, i, s, 0, 3))
 				validZoomChildren.Add(i);
@@ -2416,7 +2416,7 @@ internal class FractalGenerator {
 		childAngle = f.childAngle[selectChildAngle].Item2;
 	}*/
 	internal void SetupCutFunction() 
-		=> cutFunction = f.cutFunction == null || f.cutFunction.Count <= 0 ? null : Fractal.cutFunctions[f.cutFunction[selectCut].Item1].Item2;
+		=> selectCutFunction = f.cutFunction == null || f.cutFunction.Count <= 0 ? null : Fractal.cutFunctions[f.cutFunction[selectCut].Item1].Item2;
 	internal bool SelectZoomChild(short z) {
 		if (validZoomChildren == null || validZoomChildren.Count < 1 || validZoomChildren[z] == selectZoomChild)
 			return true;
