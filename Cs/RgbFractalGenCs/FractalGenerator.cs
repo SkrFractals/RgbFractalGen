@@ -968,11 +968,10 @@ internal class FractalGenerator {
 				}
 				applyMaxIterations = selectMaxIterations;
 				// Wait if no more frames to generate
-				if (tryPng >= GetGenerateLength())
+				if (tryPng >= GetGenerateLength()) {
+					Thread.Sleep(50);
 					continue;
-				
-				// Image parallelism
-				//imageTasks = applyParallelType == 2 ? [] : null;
+				}
 				FinishTasks(false, true, (short taskIndex) => {
 					if (nextBitmap >= GetGenerateLength())
 						return false;// The task is finished, no need to wait for this one
@@ -1734,7 +1733,7 @@ internal class FractalGenerator {
 					for (short t = applyMaxTasks; 0 <= --t;)
 						tasksRemaining |= (task = tasks[t]).IsStillRunning()
 							? mainLoop || task.bitmapIndex >= 0 && bitmapState[task.bitmapIndex] <= BitmapState.Dots // Must finish all Dots threads, and if in main loop all secondary threads too (OnDepth can continu back to main loop when secondary threads are running so it could start a new OnDepth loop)
-							: !(token.IsCancellationRequested || cancel) && ( // Cancel Request forbids any new threads to start
+							: !(token.IsCancellationRequested || cancel || tryPng >= GetGenerateLength()) && ( // Cancel Request forbids any new threads to start
 								!mainLoop || selectMaxTasks == applyMaxTasks && applyParallelType == selectParallelType && selectGenerationType == applyGenerationType // changing these settings yout exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
 							) && (mainLoop && (TryWriteBitmaps(task) || TryFinishBitmaps(task) || TryPngBitmaps(task)) || lambda(t)); // in the main loop we try Bitmap finishing and writing secondary threads (onDepth loop would get stuck )
 					if (tasksRemaining)

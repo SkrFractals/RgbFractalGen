@@ -236,18 +236,14 @@ Generation Options:
 Help:
 - Displays this text, you might already know this though...
 
-Save PNG:
-- Saves the current displayed preview image frame into a PNG
+Export:
+- Will export whatever you have selected in the select box to the right.
 
-Save GIF:
-- Save the finished animation into a GIF
-- Must have selected "Encode GIF" Generation Option above
-- Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
-
-Save Mp4:
-- Will use the included ffmpeg.exe to save your animation as mp4.
-- It converts the encoded GIF, so you have to run Local GIF, Global GIF or AllParam generation mode to be able to Save Mp4.
-- You can use it before of after saving the GIF.
+Export Select:
+- Current PNG: Saves the current displayed preview image frame into a PNG
+- GIF: Saves the finished animation to a GIF. You need to have LocalGIF, GlobalGIF, or AllSeeds generation type selected for this to be available. Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
+- GIF->MP4: Convert the temporary or exported GIF into an MP4. You need to have LocalGIF, GlobalGIF, or AllSeeds generation type selected for this to be available. You can use it before of after saving the GIF.
+- MP4: Will Export the animation as PNG series and covert those intohigh quality MP4. If you select MP4 generation type, it will export the PNGs faster in parallel.
 
 
 Debug Log:
@@ -303,11 +299,4 @@ Image states:
 Task states:
 1. "Image state" - the task is performing the step the image state is associated with
 2. Writing - the task is performing the step 5
-
-
-
-
-
-
-
 
