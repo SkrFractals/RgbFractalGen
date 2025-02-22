@@ -768,6 +768,10 @@ internal class FractalGenerator {
 		childColor = new short[maxChildren];
 		childAngle = new double[maxChildren];
 	}
+	private void MakeTemp() {
+		if (!Directory.Exists("temp"))
+			_ = Directory.CreateDirectory("temp");
+	}
 	#endregion
 
 	#region Generate_Tasks
@@ -1964,8 +1968,7 @@ internal class FractalGenerator {
 			gifEncoder.SetQuality(1);   // Highest quality
 			gifEncoder.SetTransparent(selectAmbient < 0 ? Color.Black : Color.Empty);
 
-			if (!Directory.Exists("temp"))
-				_ = Directory.CreateDirectory("temp");
+			MakeTemp();
 
 			while (gifIndex < 255) {
 				gifTempPath = "temp/"+ filePrefix + "gif" + gifIndex.ToString() + ".tmp";
@@ -2058,6 +2061,7 @@ internal class FractalGenerator {
 
 	#region Interface_Calls
 	internal void CleanupTempFiles() {
+		MakeTemp();
 		string[] files = Directory.GetFiles("temp/", $"{filePrefix}*");
 		foreach (string file in files) {
 			try {
@@ -2182,8 +2186,7 @@ internal class FractalGenerator {
 			return false;
 		mp4Png[i] = true;
 		try {
-			if (!Directory.Exists("temp"))
-				_ = Directory.CreateDirectory("temp");
+			MakeTemp();
 			FileStream myStream = new("temp/"+ filePrefix + "image_" + i.ToString(d) + ".png", FileMode.Create);
 			if (myStream == null)
 				return true;
@@ -2225,8 +2228,7 @@ internal class FractalGenerator {
 			ffmpeg.BeginErrorReadLine();
 			// Wait for the process to exit
 			ffmpeg.WaitForExit();
-			if (!Directory.Exists("temp"))
-				_ = Directory.CreateDirectory("temp");
+			MakeTemp();
 			for (int i = 0; i < nf; ++i) {
 				File.Delete("temp/" + filePrefix + "image_" + i.ToString(d) + ".png");
 			}
