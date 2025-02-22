@@ -71,7 +71,7 @@ public partial class GeneratorForm : Form {
 	private int fx, fy;             // Memory of window size
 	private int controlTabIndex = 0;// Iterator for tabIndexes - to make sure all the controls tab in the correct order even as i add new ones in the middle
 	private int pointTabIndex = 0;
-	private bool notify = true;
+	private bool notify = true, notifyExp = false;
 
 	// Editor
 	private readonly List<(
@@ -428,6 +428,10 @@ public partial class GeneratorForm : Form {
 		if (bitmapsFinished == bitmapsTotal && notify) {
 			BackColor = Color.FromArgb(128, 128, 64);
 			notify = false;
+		}
+		if (notifyExp) {
+			BackColor = Color.FromArgb(64, 64, 128);
+			notifyExp = false;
 		}
 		
 		// Only Allow GIF Export when generation is finished
@@ -1333,7 +1337,7 @@ public partial class GeneratorForm : Form {
 			Thread.Sleep(1000);
 		if (!gCancel.Token.IsCancellationRequested)
 			isGifReady = 0;
-		BackColor = Color.FromArgb(128, 128, 64);
+		notifyExp = true;
 		gTask = null;
 	}
 	/// <summary>
@@ -1347,7 +1351,7 @@ public partial class GeneratorForm : Form {
 			Thread.Sleep(1000);
 		if (!mCancel.Token.IsCancellationRequested)
 			isGifReady = 0;
-		BackColor = Color.FromArgb(128, 128, 64);
+		notifyExp = true;
 		gifPath = "";
 		mp4Path = "";
 		mTask = null;
@@ -1361,7 +1365,7 @@ public partial class GeneratorForm : Form {
 		var attempt = 0;
 		while (++attempt <= 10 && !mCancel.Token.IsCancellationRequested && generator.SaveMp4(mp4Path) > 0)
 			Thread.Sleep(1000);
-		BackColor = Color.FromArgb(128, 128, 64);
+		notifyExp = true;
 		mp4Path = "";
 		mTask = null;
 	}
