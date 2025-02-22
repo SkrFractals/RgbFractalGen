@@ -30,12 +30,13 @@ internal class FractalGenerator {
 		Void = 2,				// Started Dijksring the Void
 		Drawing = 3,			// Started drawing
 		DrawingFinished = 4,	// Finished drawing
-		UnlockedRAM = 5,		// Unlocked bitmap without encoding
-		Encoding = 6,			// Started Encoding
-		EncodingFinished = 7,	// Finished encoding
-		FinishedBitmap = 8,		// Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
-		Unlocked = 9,			// Unlocked bitmap
-		Error = 10				// Unused, unless error obviously
+		UnlockedRAM = 5,        // Unlocked bitmap without encoding
+		UnlockedPNG = 6,        // Unlocked bitmap without encoding and saved PNG
+		Encoding = 7,			// Started Encoding
+		EncodingFinished = 8,	// Finished encoding
+		FinishedBitmap = 9,		// Finished bitmap (finished drawing if not encodeGIF, or fnished encoding if encodeGIF)
+		Unlocked = 10,			// Unlocked bitmap
+		Error = 11				// Unused, unless error obviously
 	}
 	private enum TaskState : byte {
 		Free = 0,	// The task has not been started yet, or already finished and joined and ready to be started again
@@ -242,7 +243,8 @@ internal class FractalGenerator {
 	private Mp4Encoder mp4Encoder;
 	private int gifSuccess;				// Temp GIF file "gif.tmp" successfuly created
 	private bool gifThread = false;
-	internal string gifTempPath;		// Temporary GIF file name
+	internal string gifTempPath;        // Temporary GIF file name
+	private int tryPng;
 	private System.Drawing.Rectangle 
 		rect;							// Bitmap rectangle TODO implement
 
@@ -291,7 +293,7 @@ internal class FractalGenerator {
 	// Debug
 	internal bool debugmode = false;
 	internal string debugString = "";
-	private readonly short[] counter = new short[11];
+	private readonly short[] counter = new short[12];
 
 	private readonly string filePrefix;
 
@@ -847,6 +849,7 @@ internal class FractalGenerator {
 
 		// setup bitmap data
 		bitmapsFinished = nextBitmap = 0;
+		tryPng = previewFrames;
 		var frames = (applyGenerationType = selectGenerationType) switch {
 			GenerationType.AllSeedsGIF => GetMaxCutparam() + 1,
 			GenerationType.AllSeedsMP4 => GetMaxCutparam() + 1,
@@ -1734,7 +1737,7 @@ internal class FractalGenerator {
 							? mainLoop || task.bitmapIndex >= 0 && bitmapState[task.bitmapIndex] <= BitmapState.Dots // Must finish all Dots threads, and if in main loop all secondary threads too (OnDepth can continu back to main loop when secondary threads are running so it could start a new OnDepth loop)
 							: !(token.IsCancellationRequested || cancel) && ( // Cancel Request forbids any new threads to start
 								!mainLoop || selectMaxTasks == applyMaxTasks && applyParallelType == selectParallelType && selectGenerationType == applyGenerationType // changing these settings yout exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
-							) && (mainLoop && (TryWriteBitmaps(task) || TryFinishBitmaps(task)) || lambda(t)); // in the main loop we try Bitmap finishing and writing secondary threads (onDepth loop would get stuck )
+							) && (mainLoop && (TryWriteBitmaps(task) || TryFinishBitmaps(task) || TryPngBitmaps(task)) || lambda(t)); // in the main loop we try Bitmap finishing and writing secondary threads (onDepth loop would get stuck )
 					if (tasksRemaining)
 						i = 3;
 				}
@@ -1790,8 +1793,8 @@ internal class FractalGenerator {
 				int tryEncode = bitmapsFinished;
 				int maxTry = Math.Min(bitmap.Length, bitmapsFinished + applyMaxTasks);
 				while (tryEncode < maxTry) {
-					if (bitmapState[tryEncode] is >= BitmapState.DrawingFinished and <= BitmapState.UnlockedRAM) {
-						if (bitmapState[tryEncode] == BitmapState.UnlockedRAM)
+					if (bitmapState[tryEncode] is >= BitmapState.DrawingFinished and <= BitmapState.UnlockedPNG) {
+						if (bitmapState[tryEncode] is >= BitmapState.UnlockedRAM and <= BitmapState.UnlockedPNG)
 							bitmapData[tryEncode] = bitmap[tryEncode].LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
 						bitmapState[tryEncode] = BitmapState.Encoding;
 						gifThread = false;//applyGenerationType == GenerationType.Mp4;
@@ -1831,14 +1834,6 @@ internal class FractalGenerator {
 						}
 					}
 					bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
-					// Export MP4 PNG
-					if (applyGenerationType is GenerationType.AnimationMP4 or GenerationType.AllSeedsMP4) {
-						int n = 1;
-						for (int f = bitmap.Length - previewFrames; f >= 10; f /= 10)
-							++n;
-						string d = "D" + n.ToString();
-						SaveMp4Png(bitmapsFinished - previewFrames, d);
-					}
 					// Let the form know it's ready
 					if (bitmapsFinished++ <= previewFrames && !token.IsCancellationRequested)
 						UpdatePreview?.Invoke();
@@ -1849,6 +1844,30 @@ internal class FractalGenerator {
 					task.state = TaskState.Done;
 			} finally { Monitor.Exit(taskLock); }
 			isFinishingBitmaps = 2;
+		}
+		bool TryPngBitmaps(FractalTask task) {
+			if (token.IsCancellationRequested) // Do not write gid frames when cancelled
+				return false;
+			if (applyGenerationType is not GenerationType.AnimationMP4 and not GenerationType.AllSeedsMP4)
+				return false;
+			//var task = tasks[taskIndex];
+			int bitmapIndex = tryPng;
+			for (int mx = Math.Min(bitmap.Length, tryPng + applyMaxTasks); bitmapIndex < bitmap.Length && bitmapState[bitmapIndex] != BitmapState.UnlockedRAM; ++bitmapIndex) ;
+			if (bitmapState[bitmapIndex] != BitmapState.UnlockedRAM)
+				return false;
+			bitmapState[bitmapIndex] = BitmapState.UnlockedPNG;
+			if (token.IsCancellationRequested) // Do not write gid frames when cancelled
+				return false;
+			task.Start(-3, () => TryPngBitmap(task.taskIndex, bitmapIndex));
+			return true;
+		}
+		void TryPngBitmap(short taskIndex, int bitmapIndex) {
+			int n = 1;
+			for (int f = bitmap.Length - previewFrames; f >= 10; f /= 10)
+				++n;
+			string d = "D" + n.ToString();
+			SaveMp4Png(bitmapIndex - previewFrames, d);
+			tasks[taskIndex].state = TaskState.Done;
 		}
 		#endregion
 		#region AnimationParams
@@ -2145,7 +2164,7 @@ internal class FractalGenerator {
 			if (!File.Exists(ffmpegPath))
 				return gifSuccess = 0;
 			double gifFps = 1000.0 / (10 * selectDelay); // Convert to frames per second
-			string arguments = $"-y -i \"{gifPath}\" -vf \"fps={selectFps},setpts=PTS*({gifFps}/{selectFps})\" -c:v libx264 -crf 0 -preset veryslow \"{mp4Path}\"";
+			string arguments = $"-y -i \"{gifPath}\" -vf \"fps={selectFps},setpts=PTS*({gifFps}/{selectFps})\" -movflags +faststart -c:v libx264 -crf 0 -preset veryslow \"{mp4Path}\"";
 			using Process ffmpeg = new Process();
 			ffmpeg.StartInfo.FileName = ffmpegPath;
 			ffmpeg.StartInfo.Arguments = arguments;
@@ -2210,11 +2229,9 @@ internal class FractalGenerator {
 			string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 			if (!File.Exists(ffmpegPath))
 				return 0;
+			//string arguments = $"-y -framerate {selectFps} -i temp/"+ filePrefix + "image_%0{n}d.png -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
 
-
-			//string arguments = $"-y -framerate 60 -i temp/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p temp/temp.mp4";
-			//string arguments = $"-y -framerate {selectFps} -i temp/image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
-			string arguments = $"-y -framerate {selectFps} -i temp/"+ filePrefix + "image_%0{n}d.png -vf \"scale=iw:ih\" -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
+			string arguments = $"-y -framerate {selectFps} -i temp/{filePrefix}image_%0{n}d.png -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
 			using Process ffmpeg = new Process();
 			ffmpeg.StartInfo.FileName = ffmpegPath;
 			ffmpeg.StartInfo.Arguments = arguments;
@@ -2278,6 +2295,7 @@ internal class FractalGenerator {
 #endif
 	private void MakeDebugString() {
 		string GetTaskState(int bmp) => bmp switch {
+			-3 => "EXPORTING PNG",
 			-2 => "FINISHING",
 			-1 => "WRITING",
 			_ => GetBitmapState(bitmapState[bmp])
@@ -2292,6 +2310,7 @@ internal class FractalGenerator {
 			BitmapState.EncodingFinished => "ENCODING FINISHED (LOCKED)",
 			BitmapState.FinishedBitmap => "BITMAP FINISHED (LOCKED)",
 			BitmapState.UnlockedRAM => "UNLOCKED_RAM",
+			BitmapState.UnlockedPNG => "UNLOCKED_PNG",
 			BitmapState.Unlocked => "UNLOCKED_ENCODED",
 			_ => "ERROR! (SHOULDN'T HAPPEN)",
 		};
