@@ -84,7 +84,8 @@ internal class FractalGenerator {
 		internal double rightEnd, 
 			downEnd;					// slightly beyond width and depth, to ensure even bloomed pixels don't cutoff too early
 		internal double bloom0;
-		internal double bloom1;			// = selectBloom + 1;
+		internal double bloom1;         // = selectBloom + 1;
+		internal double applyDetail;
 		internal double upleftStart;		// = -selectBloom;
 		internal float lightNormalizer;	// maximum brightness found in the buffer, for normalizing the final image brightness
 		internal float voidDepthMax;	// maximum reached void depth during the dijkstra search, for normalizing the void intensity
@@ -1052,6 +1053,7 @@ internal class FractalGenerator {
 			task.upleftStart = -task.bloom1;
 			task.rightEnd = task.widthBorder + task.bloom1;
 			task.downEnd = task.heightBorder + task.bloom1;
+			task.applyDetail = applyDetail * task.bloom1;
 		}
 		void PregenerateParam(int bitmapIndex, Dictionary<long, Vector3[]> blends, ref long startParam) {
 			int[] m;
@@ -1196,8 +1198,8 @@ internal class FractalGenerator {
 				for (int i = 0; i < totalMaxIterations; ++i) {
 					// get a new scale of the lower level, and also from that:
 					// get a progress between splits (so that the parent wil lsmoothly turn into a preparation to split into children seamlessly)
-					preIterateTask[i].Item2 = (float)Math.Log(applyDetail / (preIterateTask[i].Item1 = inSize)) / logBase;
-					var inDetail = preIterateTask[i].Item2 = (float)Math.Log(applyDetail / (preIterateTask[i].Item1 = inSize)) / logBase;
+					preIterateTask[i].Item2 = (float)Math.Log(task.applyDetail / (preIterateTask[i].Item1 = inSize)) / logBase;
+					var inDetail = preIterateTask[i].Item2 = (float)Math.Log(task.applyDetail / (preIterateTask[i].Item1 = inSize)) / logBase;
 					var inDetailSize = -inSize * Math.Max(-1, inDetail);
 					if (preIterateTask[i].Item3 == null || preIterateTask[i].Item3.Length < f.childCount)
 						preIterateTask[i].Item3 = new (double, double)[f.childCount];
@@ -1208,7 +1210,7 @@ internal class FractalGenerator {
 #else
 						preIterateTask[i].Item3[c] = (f.childX[c] * inDetailSize, f.childY[c] * inDetailSize);
 #endif
-					if (inSize < applyDetail) {
+					if (inSize < task.applyDetail) {
 						// This is the final level, lerp the detail here:
 						foreach (var C in task.F) {
 							var Lerped = new Vector3[C.Value.Length];
@@ -1320,7 +1322,7 @@ internal class FractalGenerator {
 				var task = tasks[taskIndex];
 				var preIterated = task.preIterate[inDepth];
 				var newPreIterated = task.preIterate[++inDepth];
-				if (newPreIterated.Item1 < applyDetail) {
+				if (newPreIterated.Item1 < task.applyDetail) {
 					// we are deep enough that the parent is within a pixel, so jsut split it one last time and draw it's children as dots
 					for (int i = 0; i < f.childCount; ++i) {
 						if (token.IsCancellationRequested)
@@ -1370,7 +1372,7 @@ internal class FractalGenerator {
 					var preIterated = task.preIterate[inDepth];
 					var newPreIterated = task.preIterate[++inDepth];
 					// Draw Dots
-					if (newPreIterated.Item1 < applyDetail) {
+					if (newPreIterated.Item1 < task.applyDetail) {
 						// we are deep enough that the parent is within a pixel, so jsut split it one last time and draw it's children as dots
 						for (int i = 0; i < f.childCount; ++i) {
 							if (token.IsCancellationRequested)
