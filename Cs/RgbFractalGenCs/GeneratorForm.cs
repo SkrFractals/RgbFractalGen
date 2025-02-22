@@ -96,7 +96,7 @@ public partial class GeneratorForm : Form {
 		return false;
 	}
 	private void UpdateBitmap(Bitmap bitmap) {
-		if (currentBitmap == bitmap)
+		if (currentBitmap == bitmap || bitmap == null)
 			return;
 		// Update the display with the bitmap when it's not loaded
 		currentBitmap = bitmap;
