@@ -849,7 +849,6 @@ internal class FractalGenerator {
 
 		// setup bitmap data
 		bitmapsFinished = nextBitmap = 0;
-		tryPng = previewFrames;
 		var frames = (applyGenerationType = selectGenerationType) switch {
 			GenerationType.AllSeedsGIF => GetMaxCutparam() + 1,
 			GenerationType.AllSeedsMP4 => GetMaxCutparam() + 1,
@@ -868,6 +867,7 @@ internal class FractalGenerator {
 		else for (int i = frames - previewFrames; 0 <= --i; mp4Png[i] = false) ;
 		// Setup reseted BitmapStates
 		for (int b = frames; b >= 0; bitmapState[b--] = BitmapState.Queued) ;
+		tryPng = previewFrames;
 
 		StartGif();
 		// Initialize the starting default animation values
@@ -906,7 +906,7 @@ internal class FractalGenerator {
 				StopGif(null);
 				StartGif();
 			}
-			if (bitmapsFinished < bitmap.Length) {
+			if (tryPng < bitmap.Length) {
 				// Use the selected ParallelType, or OfDepth if OnlyImage (if you want a GenerateDots_SingleTask like OfAnimation with OnlyImage, set the maxTasks to <= MINTASKS)
 				applyParallelType = selectParallelType;
 				// Initialize buffers (delete and reset if size changed)
@@ -969,7 +969,7 @@ internal class FractalGenerator {
 				}
 				applyMaxIterations = selectMaxIterations;
 				// Wait if no more frames to generate
-				if (bitmapsFinished >= GetGenerateLength())
+				if (tryPng >= GetGenerateLength())
 					continue;
 				
 				// Image parallelism
@@ -1834,6 +1834,10 @@ internal class FractalGenerator {
 						}
 					}
 					bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
+					// If not exporting PNGs jsut mark the PNG export as finished
+					if (applyGenerationType is not GenerationType.AnimationMP4 and not GenerationType.AllSeedsMP4)
+						bitmapState[bitmapsFinished] = BitmapState.UnlockedPNG;
+
 					// Let the form know it's ready
 					if (bitmapsFinished++ <= previewFrames && !token.IsCancellationRequested)
 						UpdatePreview?.Invoke();
@@ -1848,11 +1852,17 @@ internal class FractalGenerator {
 		bool TryPngBitmaps(FractalTask task) {
 			if (token.IsCancellationRequested) // Do not write gid frames when cancelled
 				return false;
-			if (applyGenerationType is not GenerationType.AnimationMP4 and not GenerationType.AllSeedsMP4)
+			if (applyGenerationType is not GenerationType.AnimationMP4 and not GenerationType.AllSeedsMP4) {
+				tryPng = bitmapsFinished;
+				return false;
+			}
+			while (tryPng < bitmap.Length && bitmapState[tryPng] == BitmapState.UnlockedPNG)
+				++tryPng;
+			if (tryPng >= bitmap.Length)
 				return false;
 			//var task = tasks[taskIndex];
 			int bitmapIndex = tryPng;
-			for (int mx = Math.Min(bitmap.Length, tryPng + applyMaxTasks); bitmapIndex < bitmap.Length && bitmapState[bitmapIndex] != BitmapState.UnlockedRAM; ++bitmapIndex) ;
+			for (int mx = Math.Min(bitmap.Length, tryPng + applyMaxTasks); bitmapIndex < mx && bitmapState[bitmapIndex] != BitmapState.UnlockedRAM; ++bitmapIndex) ;
 			if (bitmapState[bitmapIndex] != BitmapState.UnlockedRAM)
 				return false;
 			bitmapState[bitmapIndex] = BitmapState.UnlockedPNG;
@@ -1866,7 +1876,10 @@ internal class FractalGenerator {
 			for (int f = bitmap.Length - previewFrames; f >= 10; f /= 10)
 				++n;
 			string d = "D" + n.ToString();
-			SaveMp4Png(bitmapIndex - previewFrames, d);
+			if (SaveMp4Png(bitmapIndex - previewFrames, d)) {
+				tryPng = bitmapIndex;
+				bitmapState[bitmapIndex] = BitmapState.UnlockedRAM;
+			}
 			tasks[taskIndex].state = TaskState.Done;
 		}
 		#endregion
@@ -2212,7 +2225,8 @@ internal class FractalGenerator {
 			bitmap[i + previewFrames].Save(myStream, System.Drawing.Imaging.ImageFormat.Png);
 			myStream.Close();
 			return false;
-		} catch (Exception) { 
+		} catch (Exception) {
+			mp4Png[i] = false;
 			return true;
 		}
 	}
@@ -2223,9 +2237,13 @@ internal class FractalGenerator {
 			for (int f = nf; f >= 10; f /= 10) 
 				++n;
 			string d = "D" + n.ToString();
+			int attempt = 0;
 			for (int i = 0; i < nf; ++i)
-				if (SaveMp4Png(i, d))
-					return 0;
+				while (SaveMp4Png(i, d)) {
+					if(++attempt > 10)
+						return 0;
+					Thread.Sleep(100);
+				}
 			string ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 			if (!File.Exists(ffmpegPath))
 				return 0;
@@ -2427,7 +2445,7 @@ internal class FractalGenerator {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Fractal GetFractal() => fractals[selectFractal];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal Bitmap GetBitmap(int index) => bitmap == null || bitmap.Length <= index ? null : bitmap[index + previewFrames];
+	internal Bitmap GetBitmap(int index) => bitmap == null || bitmap.Length <= index || bitmapState[index] == BitmapState.UnlockedRAM ? null : bitmap[index + previewFrames];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Bitmap GetPreviewBitmap() => bitmapsFinished < 1 ? null : bitmap[bitmapsFinished-1];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
