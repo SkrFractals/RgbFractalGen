@@ -797,7 +797,6 @@ internal class FractalGenerator {
 		startTime = new();
 		startTime.Start();
 #endif
-		CleanupTempFiles();
 		restartGif = false;
 		applyPalette = Colors[applyPaletteType = (short)(selectPaletteType < 0 ? random.Next(0, Colors.Count) : selectPaletteType)].Item2;
 		applyPalette2 = 2 * applyPalette.Length;
@@ -849,6 +848,7 @@ internal class FractalGenerator {
 
 		// setup bitmap data
 		bitmapsFinished = nextBitmap = 0;
+		tryPng = -1;
 		var frames = (applyGenerationType = selectGenerationType) switch {
 			GenerationType.AllSeedsGIF => GetMaxCutparam() + 1,
 			GenerationType.AllSeedsMP4 => GetMaxCutparam() + 1,
@@ -867,7 +867,6 @@ internal class FractalGenerator {
 		else for (int i = frames - previewFrames; 0 <= --i; mp4Png[i] = false) ;
 		// Setup reseted BitmapStates
 		for (int b = frames; b >= 0; bitmapState[b--] = BitmapState.Queued) ;
-		tryPng = previewFrames;
 
 		StartGif();
 		// Initialize the starting default animation values
@@ -1850,8 +1849,12 @@ internal class FractalGenerator {
 			isFinishingBitmaps = 2;
 		}
 		bool TryPngBitmaps(FractalTask task) {
-			if (token.IsCancellationRequested) // Do not write gid frames when cancelled
+			if (token.IsCancellationRequested || bitmapsFinished < previewFrames) // Do not write gid frames when cancelled
 				return false;
+			if (tryPng < 0) {
+				tryPng = previewFrames;
+				CleanupTempFiles();
+			}
 			if (applyGenerationType is not GenerationType.AnimationMP4 and not GenerationType.AllSeedsMP4) {
 				tryPng = bitmapsFinished;
 				return false;
