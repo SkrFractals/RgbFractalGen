@@ -2245,10 +2245,10 @@ internal class FractalGenerator {
 			ffmpeg.BeginErrorReadLine();
 			// Wait for the process to exit
 			ffmpeg.WaitForExit();
-			MakeTemp();
+			/*MakeTemp();
 			for (int i = 0; i < nf; ++i) {
 				File.Delete("temp/" + filePrefix + "image_" + i.ToString(d) + ".png");
-			}
+			}*/
 
 			/*arguments = $"-y -i temp/temp.mp4 -r 60 -c copy -movflags faststart \"{mp4Path}\"";
 			using Process remux = new Process();
