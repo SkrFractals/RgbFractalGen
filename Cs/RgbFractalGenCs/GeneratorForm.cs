@@ -219,6 +219,8 @@ public partial class GeneratorForm : Form {
 				helpLabel.Text = File.ReadAllText("README.txt");
 
 			// Update Input fields to default values - modifySettings is true from constructor so that it doesn't abort and restant the generator over and over
+			generator.selectFps = 60;
+			generator.selectDelay = 100 / 60;
 			FillPalette();
 			fractalSelect.SelectedIndex = 0;
 			resSelect.SelectedIndex = 0;
