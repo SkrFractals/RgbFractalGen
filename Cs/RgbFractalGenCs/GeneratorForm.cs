@@ -410,9 +410,9 @@ public partial class GeneratorForm : Form {
 			} else {
 				SetupFractal();
 				ResizeAll();
-				notify = restartButton.Enabled = true;
+				restartButton.Enabled = true;
 				ResetRestart();
-				generator.restartGif = false;
+				notifyExp = generator.restartGif = false;
 				generator.StartGenerate();
 			}
 		}
@@ -425,7 +425,10 @@ public partial class GeneratorForm : Form {
 		if (bitmapsTotal <= 0)
 			return;
 
-		if (bitmapsFinished == bitmapsTotal && notify) {
+		if (bitmapsFinished < bitmapsTotal)
+			notify = true;
+
+		if (bitmapsFinished == bitmapsTotal && notify && !generator.IsCancelRequested()) {
 			BackColor = Color.FromArgb(128, 128, 64);
 			notify = false;
 		}

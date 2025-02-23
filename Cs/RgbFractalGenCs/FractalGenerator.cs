@@ -2223,7 +2223,7 @@ internal class FractalGenerator {
 		mp4Png[i] = true;
 		try {
 			MakeTemp();
-			FileStream myStream = new("temp/"+ filePrefix + "image_" + i.ToString(d) + ".png", FileMode.Create);
+			using FileStream myStream = new("temp/"+ filePrefix + "image_" + i.ToString(d) + ".png", FileMode.Create);
 			if (myStream == null)
 				return true;
 			bitmap[i + previewFrames].Save(myStream, System.Drawing.Imaging.ImageFormat.Png);
@@ -2462,5 +2462,7 @@ internal class FractalGenerator {
 	//GetTempGif();
 	internal Fractal.CutFunction GetCutFunction() 
 		=> GetFractal().cutFunction == null? null : Fractal.cutFunctions[GetFractal().cutFunction[selectCut].Item1].Item2;
+
+	internal bool IsCancelRequested() => token.IsCancellationRequested;
 	#endregion
 }
