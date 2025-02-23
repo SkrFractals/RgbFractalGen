@@ -29,8 +29,8 @@ public partial class GeneratorForm : Form {
 		screenPanel.Paint += ScreenPanel_Paint;
 		screenPanel.Click += AnimateButton_Click;
 		Controls.Add(screenPanel);
-		MouseDown += Control_MouseDown; // Detect clicks on empty form space
-		RegisterMouseDownRecursive(this); // Detect clicks on all controls
+		//MouseDown += Control_MouseDown; // Detect clicks on empty form space
+		//RegisterMouseDownRecursive(this); // Detect clicks on all controls
 	}
 	#endregion
 
@@ -427,9 +427,10 @@ public partial class GeneratorForm : Form {
 		if (bitmapsTotal <= 0)
 			return;
 
-		if (bitmapsFinished < bitmapsTotal)
+		if (bitmapsFinished < bitmapsTotal) {
+			BackColor = Color.FromArgb(64, 64, 64);
 			notify = true;
-
+		}
 		if (bitmapsFinished == bitmapsTotal && notify && !generator.IsCancelRequested()) {
 			BackColor = Color.FromArgb(128, 128, 64);
 			notify = false;
@@ -1985,7 +1986,7 @@ public partial class GeneratorForm : Form {
 	}
 	#endregion
 
-	#region Notify
+	/*#region Notify
 	private void Control_MouseDown(object sender, MouseEventArgs e) {
 		BackColor = Color.FromArgb(64, 64, 64);
 	}
@@ -1995,5 +1996,5 @@ public partial class GeneratorForm : Form {
 			RegisterMouseDownRecursive(ctrl); // Recursively register for child controls
 		}
 	}
-	#endregion
+	#endregion*/
 }

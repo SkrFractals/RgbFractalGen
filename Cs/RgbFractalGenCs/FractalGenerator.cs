@@ -31,12 +31,13 @@ internal class FractalGenerator {
 		Drawing = 3,			// Started drawing
 		DrawingFinished = 4,	// Finished drawing
 		UnlockedRam = 5,        // Unlocked bitmap without encoding
-		UnlockedPng = 6,        // Unlocked bitmap without encoding and saved PNG
-		Encoding = 7,			// Started Encoding
-		EncodingFinished = 8,	// Finished encoding
-		FinishedBitmap = 9,		// Finished bitmap (finished drawing if not encodeGIF, or finished encoding if encodeGIF)
-		Unlocked = 10,			// Unlocked bitmap
-		Error = 11				// Unused, unless error obviously
+		UnlockingPng = 6,       // Saving bitmap PNG
+		UnlockedPng = 7,        // Unlocked bitmap without encoding and saved PNG
+		Encoding = 8,			// Started Encoding
+		EncodingFinished = 9,	// Finished encoding
+		FinishedBitmap = 10,	// Finished bitmap (finished drawing if not encodeGIF, or finished encoding if encodeGIF)
+		Unlocked = 11,			// Unlocked bitmap
+		Error = 12				// Unused, unless error obviously
 	}
 	private enum TaskState : byte {
 		Free = 0,	// The task has not been started yet, or already finished and joined and ready to be started again
@@ -166,6 +167,7 @@ internal class FractalGenerator {
 	private short applyZoom;            // Applied zoom (selected or random)
 	private short applyMaxIterations;
 	private double applyDetail;
+	private short applyExtraSpin;
 	private GenerationType applyGenerationType;
 
 	// Color
@@ -745,12 +747,12 @@ internal class FractalGenerator {
 				("180", [pi / 3, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0]),
 				("Symmetric", [symmetric + pi23, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0])
 			], [
-				("Center", [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Center_Y", [1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Center_Y2", [1, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Y", [0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Double_Y", [0, 2, 1, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Center_Double_Y", [1, 2, 1, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center", [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_Y", [2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_Y2", [2, 0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y", [0, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Double_Y", [0, 4, 2, 4, 2, 4, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_Double_Y", [2, 4, 2, 4, 2, 4, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_3/2", [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_Y_3/2", [3, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Y_3/2", [0, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -815,11 +817,12 @@ internal class FractalGenerator {
 		var asymmetric = ChildAngle[selectZoomChild] < 2.0 * Math.PI;
 		var doubled = (Math.Abs(SelectedSpin) > 1 && selectZoomChild == 0 || SelectedSpin == 0 && asymmetric) && applyZoom != 0;
 		m = (short)(doubled ? 2 * m : m);
+		bool twice =  asymmetric && !doubled;
 		// Get the multiplier of the basic period required to get to a seamless loop
 		if (selectZoomChild == 0) {
 			finalPeriodMultiplier = m;
 			applyPeriodAngle = f.ChildCount <= 0 ? 0 : ChildAngle[0] % (2.0 * Math.PI);
-			applyPeriodAngle = SelectedPeriodMultiplier % 2 == 0 && asymmetric && !doubled ? applyPeriodAngle * 2 : applyPeriodAngle;
+			applyPeriodAngle = SelectedPeriodMultiplier % 2 == 0 && twice ? applyPeriodAngle * 2 : applyPeriodAngle;
 		} else {
 			var a = ChildAngle[selectZoomChild] * m % (2 * Math.PI);
 			if (SelectedSpin == 0) {
@@ -831,6 +834,8 @@ internal class FractalGenerator {
 			}
 			applyPeriodAngle = a == 0 ? 2 * Math.PI : a;
 		}
+		applyExtraSpin = twice ? (short)(2 * SelectedExtraSpin) : SelectedExtraSpin;
+
 		// A complex expression to calculate the minimum needed hue shift speed to match the loop: supporting the new custom palettes:
 		var finalHueShift = finalPeriodMultiplier * cc[selectZoomChild] % applyPalette2;
 		if (finalHueShift == 0 || applyZoom == 0) {
@@ -1895,7 +1900,7 @@ internal class FractalGenerator {
 				tryPng = bitmapsFinished;
 				return false;
 			}
-			while (tryPng < bitmap.Length && bitmapState[tryPng] == BitmapState.UnlockedPng)
+			while (tryPng < bitmap.Length && bitmapState[tryPng] >= BitmapState.UnlockingPng)
 				++tryPng;
 			if (tryPng >= bitmap.Length)
 				return false;
@@ -1904,7 +1909,7 @@ internal class FractalGenerator {
 			for (var mx = Math.Min(bitmap.Length, tryPng + applyMaxTasks); bitmapIndex < mx && bitmapState[bitmapIndex] != BitmapState.UnlockedRam; ++bitmapIndex) {}
 			if (bitmapState[bitmapIndex] != BitmapState.UnlockedRam)
 				return false;
-			bitmapState[bitmapIndex] = BitmapState.UnlockedPng;
+			bitmapState[bitmapIndex] = BitmapState.UnlockingPng;
 			if (token.IsCancellationRequested) // Do not write gid frames when cancelled
 				return false;
 			task.Start(-3, () => TryPngBitmap(task.TaskIndex, bitmapIndex));
@@ -1918,7 +1923,7 @@ internal class FractalGenerator {
 			if (SaveMp4Png(bitmapIndex - previewFrames, d)) {
 				tryPng = bitmapIndex;
 				bitmapState[bitmapIndex] = BitmapState.UnlockedRam;
-			}
+			} else bitmapState[bitmapIndex] = BitmapState.UnlockedPng;
 			tasks[taskIndex].State = TaskState.Done;
 		}
 		#endregion
@@ -1978,7 +1983,7 @@ internal class FractalGenerator {
 				return;
 			var blurPeriod = SelectedPeriod * blur;
 			// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
-			refAngle += refSpin * (applyPeriodAngle * (1 + SelectedExtraSpin)) / (finalPeriodMultiplier * blurPeriod);
+			refAngle += refSpin * (applyPeriodAngle * (1 + applyExtraSpin)) / (finalPeriodMultiplier * blurPeriod);
 			refHueAngle += (hueCycleMultiplier + applyPalette2 * SelectedExtraHue) * (float)applyHue / (finalPeriodMultiplier * blurPeriod * 2);
 			IncFrameSize(ref refSize, blurPeriod);
 		}
@@ -2388,6 +2393,7 @@ internal class FractalGenerator {
 			BitmapState.EncodingFinished => "ENCODING FINISHED (LOCKED)",
 			BitmapState.FinishedBitmap => "BITMAP FINISHED (LOCKED)",
 			BitmapState.UnlockedRam => "UNLOCKED_RAM",
+			BitmapState.UnlockingPng => "UNLOCKING_PNG",
 			BitmapState.UnlockedPng => "UNLOCKED_PNG",
 			BitmapState.Unlocked => "UNLOCKED_ENCODED",
 			_ => "ERROR! (SHOULDN'T HAPPEN)"
@@ -2464,7 +2470,7 @@ internal class FractalGenerator {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Fractal GetFractal() => fractals[SelectedFractal];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal Bitmap GetBitmap(int index) => bitmap == null || bitmap.Length <= index || bitmapState[index] == BitmapState.UnlockedRam ? null : bitmap[index + previewFrames];
+	internal Bitmap GetBitmap(int index) => bitmap == null || bitmap.Length <= index || bitmapState[index] <= BitmapState.UnlockingPng ? null : bitmap[index + previewFrames];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Bitmap GetPreviewBitmap() => bitmapsFinished < 1 ? null : bitmap[bitmapsFinished-1];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
