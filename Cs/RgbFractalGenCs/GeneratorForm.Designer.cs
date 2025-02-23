@@ -233,7 +233,7 @@ namespace RgbFractalGenCs {
 			cutparamBox.Size = new System.Drawing.Size(94, 23);
 			cutparamBox.TabIndex = 5;
 			cutparamBox.Text = "0";
-			cutparamBox.TextChanged += CutparamBox_TextChanged;
+			cutparamBox.TextChanged += CutParamBox_TextChanged;
 			// 
 			// resX
 			// 
