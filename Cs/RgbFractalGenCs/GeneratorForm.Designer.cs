@@ -341,24 +341,28 @@ namespace RgbFractalGenCs {
 			// 
 			savePng.DefaultExt = "png";
 			savePng.Filter = "PNG files (*.png)|*.png";
+			savePng.RestoreDirectory = true;
 			savePng.FileOk += SavePng_FileOk;
 			// 
 			// saveGif
 			// 
 			saveGif.DefaultExt = "gif";
 			saveGif.Filter = "GIF files (*.gif)|*.gif";
+			saveGif.RestoreDirectory = true;
 			saveGif.FileOk += SaveGif_FileOk;
 			// 
 			// loadFractal
 			// 
 			loadFractal.DefaultExt = "fractal";
 			loadFractal.Filter = "Fractal files (*.fractal)|*.fractal";
+			loadFractal.RestoreDirectory = true;
 			loadFractal.FileOk += LoadFractal_FileOk;
 			// 
 			// saveFractal
 			// 
 			saveFractal.DefaultExt = "fractal";
 			saveFractal.Filter = "Fractal files (*.fractal)|*.fractal";
+			saveFractal.RestoreDirectory = true;
 			saveFractal.FileOk += SaveFractal_FileOk;
 			// 
 			// voidAmbientLabel
@@ -743,7 +747,7 @@ namespace RgbFractalGenCs {
 			exportSelect.Name = "exportSelect";
 			exportSelect.Size = new System.Drawing.Size(108, 23);
 			exportSelect.TabIndex = 61;
-			exportSelect.SelectedIndexChanged += exportSelect_SelectedIndexChanged;
+			exportSelect.SelectedIndexChanged += ExportSelect_SelectedIndexChanged;
 			// 
 			// panel1
 			// 
@@ -1151,12 +1155,14 @@ namespace RgbFractalGenCs {
 			// 
 			saveMp4.DefaultExt = "mp4";
 			saveMp4.Filter = "MP4 files (*.mp4)|*.mp4";
+			saveMp4.RestoreDirectory = true;
 			saveMp4.FileOk += SaveMp4_FileOk;
 			// 
 			// convertMp4
 			// 
 			convertMp4.DefaultExt = "mp4";
 			convertMp4.Filter = "MP4 files (*.mp4)|*.mp4";
+			convertMp4.RestoreDirectory = true;
 			convertMp4.FileOk += ConvertMp4_FileOk;
 			// 
 			// paletteSelect

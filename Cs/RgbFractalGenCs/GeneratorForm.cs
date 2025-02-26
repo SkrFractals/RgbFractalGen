@@ -84,9 +84,15 @@ public partial class GeneratorForm : Form {
 	private double memDefaultHue, memBloom;
 	private bool performHash;
 	private bool previewMode = true;
+
+	// Config
+	// TODO implement
+	private int voidAmbientMax, voidNoiseMax, voidScaleMax, detailMax, saturateMax, brightnessMax, bloomMax, blurMax;
+	private float detailMul, threadsMul;
+
 	#endregion
 
-	#region Core
+			#region Core
 	private static bool Error(string text, string caption) {
 		_ = MessageBox.Show(text, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		return false;
@@ -136,6 +142,8 @@ public partial class GeneratorForm : Form {
 			spinSelect.MouseWheel += ComboBox_MouseWheel;
 			parallelTypeSelect.MouseWheel += ComboBox_MouseWheel;
 			encodeSelect.MouseWheel += ComboBox_MouseWheel;
+
+			//convertMp4.RestoreDirectory = saveMp4.RestoreDirectory = savePng.RestoreDirectory = saveGif.RestoreDirectory = saveFractal.RestoreDirectory = true;
 
 			// Init the generator
 			foreach (var i in generator.GetFractals())
@@ -249,6 +257,7 @@ public partial class GeneratorForm : Form {
 			editorPanel.Visible = false;
 			pointTabIndex = controlTabIndex;
 			editorPanel.Location = generatorPanel.Location;
+			LoadConfig();
 			LoadSettings();
 			FillEditor();
 
@@ -510,6 +519,38 @@ public partial class GeneratorForm : Form {
 
 		File.WriteAllText("settings.txt", file);
 	}
+	private void LoadConfig() {
+		if (!File.Exists("config.txt"))
+			return;
+		var s = File.ReadAllLines("config.txt");
+
+		//var s = File.ReadAllText("config.txt").Split('|');
+		for (var i = 0; i < s.Length - 1; i += 1) {
+			if (s[i][0] == '/' || !s[i].Contains('='))
+				continue;
+			var c = s[i].Split('=');
+			bool isN = int.TryParse(c[1], out var n);
+			if (isN) {
+				switch (c[0]) {
+					case "voidAmbientMax": voidAmbientMax = n; break;
+					case "voidNoiseMax": voidNoiseMax = n; break;
+					case "voidScaleMax": voidScaleMax = n; break;
+					case "detailMax": detailMax = n; break;
+					case "saturateMax": saturateMax = n; break;
+					case "brightnessMax": brightnessMax = n; break;
+					case "bloomMax": bloomMax = n; break;
+					case "BlurMax": blurMax = n; break;
+				}
+			}
+			bool isF = float.TryParse(c[1], out var f);
+			if (isF) {
+				switch (c[0]) {
+					case "detailMul": detailMul = n; break;
+					case "threadsMul": threadsMul = n; break;
+				}
+			}
+		}
+	}
 	private void LoadSettings() {
 		isGifReady = 0;
 		//gifButton.Enabled = false;
@@ -588,13 +629,14 @@ public partial class GeneratorForm : Form {
 				case "brightness": brightnessBox.Text = v; break;
 				case "bloom": bloomBox.Text = v; break;
 				case "blur": blurBox.Text = v; break;
+				case "child": zoomChildBox.Text = v; break;
 				case "parallel": parallelTypeSelect.SelectedIndex = Math.Min(parallelTypeSelect.Items.Count - 1, n); break;
 				case "threads": threadsBox.Text = v; break;
 				case "delay": generator.SelectedDelay = (short)n; break;
 				case "fps": generator.SelectedFps = (short)n; break;
 				case "timing": timingSelect.SelectedIndex = Math.Min(parallelTypeSelect.Items.Count - 1, n); TimingSelect_SelectedIndexChanged(null, null); break;
 				case "abort": abortBox.Text = v; break;
-				case "ani": if (p) animated = i <= 0; AnimateButton_Click(null, null); break;
+				case "ani": if (p) animated = n <= 0; AnimateButton_Click(null, null); break;
 				case "gen": if (p) encodeSelect.SelectedIndex = Math.Min(encodeSelect.Items.Count - 1, n); break;
 			}
 		}
@@ -1019,7 +1061,7 @@ public partial class GeneratorForm : Form {
 		if (Diff(newSpeed, generator.SelectedExtraHue))
 			return;
 		// hue speed is different - change the setting and if it's actually hueCycling restart generation
-		if (generator.SelectedHue is not 0 and not 1)
+		if (generator.SelectedHue != 0)
 			Apply(newSpeed, out generator.SelectedExtraHue);
 		else generator.SelectedExtraHue = newSpeed;
 	}
@@ -1246,7 +1288,7 @@ public partial class GeneratorForm : Form {
 				break;
 		}
 	}
-	private void exportSelect_SelectedIndexChanged(object sender, EventArgs e) {
+	private void ExportSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		toolTips.SetToolTip(exportButton, exportSelect.SelectedIndex switch {
 			0 => "Export the currently displayed frame into a PNG file.\nStop the animation and select the frame you wish to export with the buttons above.",
 			1 => "Export the full animation into a GIF file.\nMust use a GIF encoding generation mode like LocalGIF/GlobalGIF/AllSeedsGIF.",
@@ -1262,9 +1304,11 @@ public partial class GeneratorForm : Form {
 	/// <param name="e"></param>
 	/// <returns></returns>
 	private void SavePng_FileOk(object sender, CancelEventArgs e) {
+		BackColor = Color.FromArgb(64,64,64);
 		using var myStream = savePng.OpenFile();
 		currentBitmap.Save(myStream, System.Drawing.Imaging.ImageFormat.Png);
 		myStream.Close();
+		BackColor = Color.FromArgb(64, 64, 128);
 	}
 	/// <summary>
 	/// User input the path and name for saving GIF/Mp4
@@ -1273,6 +1317,7 @@ public partial class GeneratorForm : Form {
 	/// <param name="e"></param>
 	/// <returns></returns>
 	private void SaveGif_FileOk(object sender, CancelEventArgs e) {
+		BackColor = Color.FromArgb(64, 64, 64);
 		gifPath = ((SaveFileDialog)sender).FileName;
 		// Gif Export Task
 		//foreach (var c in MyControls)c.Enabled = false;
@@ -1304,12 +1349,15 @@ public partial class GeneratorForm : Form {
 		}
 		mp4Path = ((SaveFileDialog)sender).FileName;
 		if (isGifReady > 0) {
+			BackColor = Color.FromArgb(64, 64, 64);
 			gifPath = generator.GifTempPath;
 			mTask = Task.Run(ConvertMp4, (mCancel = new()).Token);
 			return;
 		}
-		if (gifPath != "")
-			mTask = Task.Run(ConvertMp4, (mCancel = new()).Token);
+		if (gifPath == "") 
+			return;
+		BackColor = Color.FromArgb(64, 64, 64);
+		mTask = Task.Run(ConvertMp4, (mCancel = new()).Token);
 	}
 	/// <summary>
 	/// User input the path and name for converting GIF -> Mp4
@@ -1329,6 +1377,7 @@ public partial class GeneratorForm : Form {
 				"Unavailable");
 			return;
 		}
+		BackColor = Color.FromArgb(64, 64, 64);
 		mp4Path = ((SaveFileDialog)sender).FileName;
 		mTask = Task.Run(ExportMp4, (mCancel = new()).Token);
 	}
