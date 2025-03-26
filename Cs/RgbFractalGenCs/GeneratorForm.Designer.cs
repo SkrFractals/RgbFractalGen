@@ -83,12 +83,24 @@ namespace RgbFractalGenCs {
 			brightnessBox = new TextBox();
 			zoomSelect = new ComboBox();
 			restartButton = new Button();
-			encodeSelect = new ComboBox();
+			generationSelect = new ComboBox();
 			debugBox = new CheckBox();
 			debugLabel = new Label();
 			generatorPanel = new Panel();
 			exportSelect = new ComboBox();
 			panel1 = new Panel();
+			updateBatchButton = new Button();
+			encodePngLabel = new Label();
+			encodePngSelect = new ComboBox();
+			encodeGifLabel = new Label();
+			encodeGifSelect = new ComboBox();
+			generationModeLabel = new Label();
+			batchBox = new TextBox();
+			batchLabel = new Label();
+			saveBatchButton = new Button();
+			loadBatchButton = new Button();
+			addBatchButton = new Button();
+			runBatchButton = new Button();
 			timingSelect = new ComboBox();
 			label2 = new Label();
 			timingLabel = new Label();
@@ -123,12 +135,14 @@ namespace RgbFractalGenCs {
 			removeAngleButton = new Button();
 			removeColorButton = new Button();
 			saveMp4 = new SaveFileDialog();
-			convertMp4 = new SaveFileDialog();
 			paletteSelect = new ComboBox();
 			paletteLabel = new Label();
 			addPalette = new Button();
 			removePalette = new Button();
 			paletteDialog = new ColorDialog();
+			loadBatch = new OpenFileDialog();
+			saveBatch = new SaveFileDialog();
+			runBatch = new SaveFileDialog();
 			helpPanel.SuspendLayout();
 			generatorPanel.SuspendLayout();
 			panel1.SuspendLayout();
@@ -259,7 +273,7 @@ namespace RgbFractalGenCs {
 			// 
 			resSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			resSelect.FormattingEnabled = true;
-			resSelect.Items.AddRange(new object[] { "80x80", "Custom:", "256x256", "512x512", "640x480", "1024x768", "1280x720", "720x1280", "1920x1080", "1080x1920", "1600x900", "900x1600", "2560x1440", "1440x2560", "3840x2160", "2160x3840", "5120x2880", "2880x5120", "7680x4320", "4320x7680" });
+			resSelect.Items.AddRange(new object[] { "80x80", "Custom:" });
 			resSelect.Location = new System.Drawing.Point(125, 130);
 			resSelect.Margin = new Padding(4, 3, 4, 3);
 			resSelect.Name = "resSelect";
@@ -404,7 +418,7 @@ namespace RgbFractalGenCs {
 			// 
 			infoLabel.AutoSize = true;
 			infoLabel.ForeColor = System.Drawing.Color.White;
-			infoLabel.Location = new System.Drawing.Point(88, 352);
+			infoLabel.Location = new System.Drawing.Point(129, 352);
 			infoLabel.Margin = new Padding(4, 0, 4, 0);
 			infoLabel.Name = "infoLabel";
 			infoLabel.Size = new System.Drawing.Size(28, 15);
@@ -607,7 +621,7 @@ namespace RgbFractalGenCs {
 			saturateBox.Name = "saturateBox";
 			saturateBox.Size = new System.Drawing.Size(59, 23);
 			saturateBox.TabIndex = 22;
-			saturateBox.Text = "10";
+			saturateBox.Text = "100";
 			saturateBox.TextChanged += SaturateBox_TextChanged;
 			// 
 			// detailBox
@@ -687,16 +701,16 @@ namespace RgbFractalGenCs {
 			restartButton.UseVisualStyleBackColor = false;
 			restartButton.Click += RestartButton_Click;
 			// 
-			// encodeSelect
+			// generationSelect
 			// 
-			encodeSelect.DropDownStyle = ComboBoxStyle.DropDownList;
-			encodeSelect.FormattingEnabled = true;
-			encodeSelect.Items.AddRange(new object[] { "Only Image", "Animation RAM", "Animation Mp4", "Local GIF", "Global GIF", "All Seeds GIF", "All Seeds Mp4" });
-			encodeSelect.Location = new System.Drawing.Point(162, 349);
-			encodeSelect.Name = "encodeSelect";
-			encodeSelect.Size = new System.Drawing.Size(108, 23);
-			encodeSelect.TabIndex = 51;
-			encodeSelect.SelectedIndexChanged += EncodeSelect_SelectedIndexChanged;
+			generationSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+			generationSelect.FormattingEnabled = true;
+			generationSelect.Items.AddRange(new object[] { "Only Image", "Animation", "All Seeds" });
+			generationSelect.Location = new System.Drawing.Point(115, 546);
+			generationSelect.Name = "generationSelect";
+			generationSelect.Size = new System.Drawing.Size(108, 23);
+			generationSelect.TabIndex = 51;
+			generationSelect.SelectedIndexChanged += GenerationSelect_SelectedIndexChanged;
 			// 
 			// debugBox
 			// 
@@ -726,7 +740,6 @@ namespace RgbFractalGenCs {
 			generatorPanel.Controls.Add(panel1);
 			generatorPanel.Controls.Add(exportButton);
 			generatorPanel.Controls.Add(infoLabel);
-			generatorPanel.Controls.Add(encodeSelect);
 			generatorPanel.Controls.Add(statusLabel);
 			generatorPanel.Controls.Add(restartButton);
 			generatorPanel.Controls.Add(animateButton);
@@ -742,7 +755,7 @@ namespace RgbFractalGenCs {
 			// 
 			exportSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			exportSelect.FormattingEnabled = true;
-			exportSelect.Items.AddRange(new object[] { "Current PNG", "GIF", "GIF->MP4", "PNGs->MP4" });
+			exportSelect.Items.AddRange(new object[] { "Current PNG", "PNGs", "MP4", "Selected GIF", "GIF->MP4" });
 			exportSelect.Location = new System.Drawing.Point(162, 381);
 			exportSelect.Name = "exportSelect";
 			exportSelect.Size = new System.Drawing.Size(108, 23);
@@ -753,6 +766,19 @@ namespace RgbFractalGenCs {
 			// 
 			panel1.AutoScroll = true;
 			panel1.BackColor = System.Drawing.Color.Black;
+			panel1.Controls.Add(updateBatchButton);
+			panel1.Controls.Add(encodePngLabel);
+			panel1.Controls.Add(encodePngSelect);
+			panel1.Controls.Add(encodeGifLabel);
+			panel1.Controls.Add(encodeGifSelect);
+			panel1.Controls.Add(generationModeLabel);
+			panel1.Controls.Add(batchBox);
+			panel1.Controls.Add(batchLabel);
+			panel1.Controls.Add(saveBatchButton);
+			panel1.Controls.Add(loadBatchButton);
+			panel1.Controls.Add(generationSelect);
+			panel1.Controls.Add(addBatchButton);
+			panel1.Controls.Add(runBatchButton);
 			panel1.Controls.Add(timingSelect);
 			panel1.Controls.Add(label2);
 			panel1.Controls.Add(timingLabel);
@@ -796,6 +822,136 @@ namespace RgbFractalGenCs {
 			panel1.Name = "panel1";
 			panel1.Size = new System.Drawing.Size(256, 300);
 			panel1.TabIndex = 60;
+			// 
+			// updateBatchButton
+			// 
+			updateBatchButton.Location = new System.Drawing.Point(151, 603);
+			updateBatchButton.Name = "updateBatchButton";
+			updateBatchButton.Size = new System.Drawing.Size(72, 23);
+			updateBatchButton.TabIndex = 82;
+			updateBatchButton.Text = "Update";
+			updateBatchButton.UseVisualStyleBackColor = true;
+			updateBatchButton.Click += UpdateBatchButton_Click;
+			// 
+			// encodePngLabel
+			// 
+			encodePngLabel.AutoSize = true;
+			encodePngLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			encodePngLabel.ForeColor = System.Drawing.Color.White;
+			encodePngLabel.Location = new System.Drawing.Point(4, 491);
+			encodePngLabel.Margin = new Padding(4, 0, 4, 0);
+			encodePngLabel.Name = "encodePngLabel";
+			encodePngLabel.Size = new System.Drawing.Size(87, 15);
+			encodePngLabel.TabIndex = 81;
+			encodePngLabel.Text = "PNG Encoding:";
+			// 
+			// encodePngSelect
+			// 
+			encodePngSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+			encodePngSelect.FormattingEnabled = true;
+			encodePngSelect.Items.AddRange(new object[] { "No", "Yes" });
+			encodePngSelect.Location = new System.Drawing.Point(115, 488);
+			encodePngSelect.Name = "encodePngSelect";
+			encodePngSelect.Size = new System.Drawing.Size(108, 23);
+			encodePngSelect.TabIndex = 80;
+			encodePngSelect.SelectedIndexChanged += EncodePngSelect_SelectedIndexChanged;
+			// 
+			// encodeGifLabel
+			// 
+			encodeGifLabel.AutoSize = true;
+			encodeGifLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			encodeGifLabel.ForeColor = System.Drawing.Color.White;
+			encodeGifLabel.Location = new System.Drawing.Point(4, 520);
+			encodeGifLabel.Margin = new Padding(4, 0, 4, 0);
+			encodeGifLabel.Name = "encodeGifLabel";
+			encodeGifLabel.Size = new System.Drawing.Size(80, 15);
+			encodeGifLabel.TabIndex = 78;
+			encodeGifLabel.Text = "GIF Encoding:";
+			// 
+			// encodeGifSelect
+			// 
+			encodeGifSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+			encodeGifSelect.FormattingEnabled = true;
+			encodeGifSelect.Items.AddRange(new object[] { "No", "Local", "Global" });
+			encodeGifSelect.Location = new System.Drawing.Point(115, 517);
+			encodeGifSelect.Name = "encodeGifSelect";
+			encodeGifSelect.Size = new System.Drawing.Size(108, 23);
+			encodeGifSelect.TabIndex = 77;
+			encodeGifSelect.SelectedIndexChanged += EncodeGifSelect_SelectedIndexChanged;
+			// 
+			// generationModeLabel
+			// 
+			generationModeLabel.AutoSize = true;
+			generationModeLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			generationModeLabel.ForeColor = System.Drawing.Color.White;
+			generationModeLabel.Location = new System.Drawing.Point(4, 549);
+			generationModeLabel.Margin = new Padding(4, 0, 4, 0);
+			generationModeLabel.Name = "generationModeLabel";
+			generationModeLabel.Size = new System.Drawing.Size(102, 15);
+			generationModeLabel.TabIndex = 76;
+			generationModeLabel.Text = "Generation Mode:";
+			// 
+			// batchBox
+			// 
+			batchBox.Location = new System.Drawing.Point(86, 604);
+			batchBox.Margin = new Padding(4, 3, 4, 3);
+			batchBox.Name = "batchBox";
+			batchBox.Size = new System.Drawing.Size(59, 23);
+			batchBox.TabIndex = 75;
+			batchBox.Text = "0";
+			batchBox.TextChanged += BatchBox_TextChanged;
+			// 
+			// batchLabel
+			// 
+			batchLabel.AutoSize = true;
+			batchLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			batchLabel.ForeColor = System.Drawing.Color.White;
+			batchLabel.Location = new System.Drawing.Point(4, 608);
+			batchLabel.Margin = new Padding(4, 0, 4, 0);
+			batchLabel.Name = "batchLabel";
+			batchLabel.Size = new System.Drawing.Size(74, 15);
+			batchLabel.TabIndex = 74;
+			batchLabel.Text = "Select Batch:";
+			// 
+			// saveBatchButton
+			// 
+			saveBatchButton.Location = new System.Drawing.Point(151, 575);
+			saveBatchButton.Name = "saveBatchButton";
+			saveBatchButton.Size = new System.Drawing.Size(72, 23);
+			saveBatchButton.TabIndex = 73;
+			saveBatchButton.Text = "Save Batch";
+			saveBatchButton.UseVisualStyleBackColor = true;
+			saveBatchButton.Click += SaveBatchButton_Click;
+			// 
+			// loadBatchButton
+			// 
+			loadBatchButton.Location = new System.Drawing.Point(4, 575);
+			loadBatchButton.Name = "loadBatchButton";
+			loadBatchButton.Size = new System.Drawing.Size(75, 23);
+			loadBatchButton.TabIndex = 72;
+			loadBatchButton.Text = "Load Batch";
+			loadBatchButton.UseVisualStyleBackColor = true;
+			loadBatchButton.Click += LoadBatchButton_Click;
+			// 
+			// addBatchButton
+			// 
+			addBatchButton.Location = new System.Drawing.Point(85, 575);
+			addBatchButton.Name = "addBatchButton";
+			addBatchButton.Size = new System.Drawing.Size(60, 23);
+			addBatchButton.TabIndex = 71;
+			addBatchButton.Text = "+ Batch";
+			addBatchButton.UseVisualStyleBackColor = true;
+			addBatchButton.Click += AddBatchButton_Click;
+			// 
+			// runBatchButton
+			// 
+			runBatchButton.Location = new System.Drawing.Point(6, 633);
+			runBatchButton.Name = "runBatchButton";
+			runBatchButton.Size = new System.Drawing.Size(217, 23);
+			runBatchButton.TabIndex = 62;
+			runBatchButton.Text = "Run Batch";
+			runBatchButton.UseVisualStyleBackColor = true;
+			runBatchButton.Click += RunBatchButton_Click;
 			// 
 			// timingSelect
 			// 
@@ -1158,13 +1314,6 @@ namespace RgbFractalGenCs {
 			saveMp4.RestoreDirectory = true;
 			saveMp4.FileOk += SaveMp4_FileOk;
 			// 
-			// convertMp4
-			// 
-			convertMp4.DefaultExt = "mp4";
-			convertMp4.Filter = "MP4 files (*.mp4)|*.mp4";
-			convertMp4.RestoreDirectory = true;
-			convertMp4.FileOk += ConvertMp4_FileOk;
-			// 
 			// paletteSelect
 			// 
 			paletteSelect.DrawMode = DrawMode.OwnerDrawFixed;
@@ -1210,6 +1359,27 @@ namespace RgbFractalGenCs {
 			removePalette.Text = "X";
 			removePalette.UseVisualStyleBackColor = true;
 			removePalette.Click += RemovePalette_Click;
+			// 
+			// loadBatch
+			// 
+			loadBatch.DefaultExt = "btc";
+			loadBatch.Filter = "Batch files (*.btc)|*.btc";
+			loadBatch.RestoreDirectory = true;
+			loadBatch.FileOk += LoadBatch_FileOk;
+			// 
+			// saveBatch
+			// 
+			saveBatch.DefaultExt = "btc";
+			saveBatch.Filter = "Batch files (*.btc)|*.btc";
+			saveBatch.RestoreDirectory = true;
+			saveBatch.FileOk += SaveBatch_FileOk;
+			// 
+			// runBatch
+			// 
+			runBatch.DefaultExt = "png";
+			runBatch.Filter = "PNG file (*.png)|*.png";
+			runBatch.RestoreDirectory = true;
+			runBatch.FileOk += RunBatch_FileOk;
 			// 
 			// GeneratorForm
 			// 
@@ -1314,7 +1484,7 @@ namespace RgbFractalGenCs {
 		private System.Windows.Forms.TextBox brightnessBox;
 		private System.Windows.Forms.ComboBox zoomSelect;
 		private System.Windows.Forms.Button restartButton;
-		private System.Windows.Forms.ComboBox encodeSelect;
+		private System.Windows.Forms.ComboBox generationSelect;
 		private System.Windows.Forms.CheckBox debugBox;
 		private System.Windows.Forms.Label debugLabel;
 		private System.Windows.Forms.Panel generatorPanel;
@@ -1340,7 +1510,6 @@ namespace RgbFractalGenCs {
 		private System.Windows.Forms.TextBox voidBox;
 		private System.Windows.Forms.Label sizeLabel;
 		private System.Windows.Forms.SaveFileDialog saveMp4;
-		private System.Windows.Forms.SaveFileDialog convertMp4;
 		private System.Windows.Forms.Button preButton;
 		private System.Windows.Forms.Panel panel1;
 		private System.Windows.Forms.Label voidNoiseLabel;
@@ -1360,6 +1529,21 @@ namespace RgbFractalGenCs {
 		private System.Windows.Forms.ColorDialog paletteDialog;
 		private ComboBox exportSelect;
 		private ComboBox timingSelect;
+		private Button runBatchButton;
+		private Button loadBatchButton;
+		private Button addBatchButton;
+		private OpenFileDialog loadBatch;
+		private SaveFileDialog saveBatch;
+		private Button saveBatchButton;
+		private SaveFileDialog runBatch;
+		private TextBox batchBox;
+		private Label batchLabel;
+		private Label generationModeLabel;
+		private Label encodePngLabel;
+		private ComboBox encodePngSelect;
+		private Label encodeGifLabel;
+		private ComboBox encodeGifSelect;
+		private Button updateBatchButton;
 	}
 }
 

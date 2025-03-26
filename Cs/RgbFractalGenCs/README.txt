@@ -108,7 +108,7 @@ Zoom Direction:
 
 Default Zoom:
 - Beginning zoom, in counted frames
-- Will prezoom the fractal in the beginning for this number of frames
+- Will pre-zoom the fractal in the beginning for this number of frames
 - Useful for the "Only Image" option, not really significant for animations
 - If -1 it will be random after each start
 
@@ -133,7 +133,7 @@ Zoom Spin:
 
 Default Angle:
 - Beginning angle, in counted frames
-- Will prespin the fractal in the beginning for this number of degrees
+- Will pre-spin the fractal in the beginning for this number of degrees
 - Useful for the "Only Image" option, not really significant for animations
 - If -1 it will be random after each start
 
@@ -193,24 +193,67 @@ Parallelism Type:
 - Of Animation Frames: Batches each animation frame to a different thread, recommended and even faster for animations, but no boost for "Only Image"
 - Of Depth: Parallelize generation of each image at an ideal precomputed depth, making "Only Image" option a lot faster, but possible slightly corrupt like 1/1000000 pixels
 - Of Recursion: Older version of "Of Depth", but just tries to parallelize each recursive call down until a depth. More buggy, and probably not as good as "Of Depth" 
-- (as od now, OfDepth has been deprecated)
+- (as od now, OfRecursion has been deprecated and is not available anymore)
 
 Max Threads:
 - If you want to leave some resources for other task, you can reduce the maximum allowed number of parallel threads
 
 
+Timing Select:
+-Select whether you want to specify the frame timing in framerate of delay
+-Framerate is used for mp4 export and delay do GIF export. Both can be used for the preview animation.
+
 Delay:
 - A delay between animation frames in hundredths of seconds
-- Used for GIF export (and preview)
-
 
 Framerate:
 - A framerate per second
-- Used for MP4 export (and preview, whichever you set the last will update the preview delay/framerate)
 
 
 Abort Delay:
 - How long it takes for the generator to restart after you change something.
+
+
+PNG Encoding: 
+- Yes: Will export animation as PNG series, that will enable you to export the PNGS or MP4 quicker after it's finished, but not really quicker overall.
+- I am considering taking this option away because it's a little slower, but why not? Maybe you would like to wait 30+20 (generation+export) seconds instead of 15+30 for making Mp4.
+- Though it will  PNG series in that it take the like 30+5 to 31+1 for making PNG series.
+
+Gif Encoding:
+- No: Will not encode a gif, you will not be able to export a gif afterwards, but you can switch to a Local/Global later and it will not fully reset the generator, just catches up with missing frames.
+- Local: Will encode a GIF during the generation, so you could save it when finished. With a local colormap (one for each frame). Higher color precision. Slow encoding, larger GIF file size. 
+- Global: Also encodes a GIF. But with a global color map learned from a first frame. Not recommended for changing colors. Much faster encoding, smaller GIF file size
+
+Generation Mode:
+- Only Image: Will only render one still image. Cannot export PNG animation, or GIF animation, only a single image, the first one from a zoom animation.
+- Animation: Will render the animation as set up by your settings.
+- All Seeds: Will not zoom/spin/shift at all, but instead cycle through all the available CutFunction seeds.
+- Hash Seeds: Same as All Seeds, but will also export a file with all detected unique seeds. (Only really useful for the developer, to hide the repeating seeds)
+
+
+Load Batch
+- Loads a batch list from a batch file, which is a collection of various fractal settings, that you would like to render animation of automatically
+- The first entry gets loaded (as Select Batch gets set to 0)
+
++ Batch:
+- Adds the current fractal settings to the batch list
+
+Save Batch:
+- Saves the current batch list to a file
+
+
+Select Batch:
+- Will set the settings to the values set in that entry in the batch list.
+
+Update Batch:
+- Will update the currently selected batch list entry with current settings (good for modifying mistakes)
+
+
+Run Batch:
+- Before you click, you should set a resolution, and generation and export type. Those are not saved in batch entries, the export defines what the batching will export.
+- Clicking this button will disable all controls except the button itself, and will start generating and exporting all batch entries with your resolution one by one.
+- The button will be a Stop Button, with which you can stop the whole process.
+- Restart also keep being enabled, if your entry contains randomness you could keep restarting until you have whaty you like.
 
 
 Frame Selection (<- and ->):
@@ -223,16 +266,6 @@ RESTART
 - Will restart the generator (only useful if something goes wrong or you have random settings enabled)
 
 
-Generation Options:
-- Only Image: Will only render one still image
-- Animation RAM: Will render the animation without encoding a GIF, about 2x faster, but can't export the file afterwards
-- Local GIF: Will encode a GIF during the generation, so you could save it when finished.
-- Global GIF: Will encode a GIF while only analyzing the first frame's colors. Not recommended when shifting hues.
-- Mp4: Will encode an Mp4. (not currently available)
-- All Param: Will generate all the CutFunction seeds instead of a zoom.
-- Hash Param: Like All param, but it's used to export all the unique seeds into a file.
-
-
 Help:
 - Displays this text, you might already know this though...
 
@@ -241,9 +274,10 @@ Export:
 
 Export Select:
 - Current PNG: Saves the current displayed preview image frame into a PNG
-- GIF: Saves the finished animation to a GIF. You need to have LocalGIF, GlobalGIF, or AllSeeds generation type selected for this to be available. Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
-- GIF->MP4: Convert the temporary or exported GIF into an MP4. You need to have LocalGIF, GlobalGIF, or AllSeeds generation type selected for this to be available. You can use it before of after saving the GIF.
-- MP4: Will Export the animation as PNG series and covert those intohigh quality MP4. If you select MP4 generation type, it will export the PNGs faster in parallel.
+- Animation PNG: Exports the animation as PNG series. Use RAM (preferably) or PNG generation modes
+- GIF: Saves the finished animation to a GIF (local or global based on your GIF encoding selection). Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
+- GIF->MP4: Convert the temporary or exported GIF into an MP4. You need to have GIF encoding selected for this to be available. You can use it before of after saving the GIF.
+- MP4: Will Export the animation as PNG series and covert those into high quality MP4. Unintuitively, it's a bit faster overall with PNG encoding turned OFF.
 
 
 Debug Log:

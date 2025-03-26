@@ -2,6 +2,7 @@
 //#define CustomDebugTest
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -38,61 +39,70 @@ public partial class GeneratorForm : Form {
 	// Threading
 	private bool bInit = true;
 	private readonly List<Control>
-		myControls = [];
+		myControls = [];            // All persistent interactive controls
 	private readonly List<bool>
-		myControlsEnabled = [];
+		myControlsEnabled = [];     // Memory of which controls were enabled after we disabled all of them temporairly, to recover that alter
 	private readonly FractalGenerator
 		generator = new();          // The core of the app, the generator the generates the fractal animations
 	private CancellationTokenSource
-		gCancel, mCancel, aCancel;  // Cancellation Token Sources
-	private Task gTask;      // CPU gif thread
-	private Task mTask;
-	private Task aTask;      // Abort Task
-	private bool queueAbort;// Generator abortion queued
-	private short queueReset;   // Counting time until generator Restart
+		xCancel, aCancel;			// Cancellation Token Sources
+	private Task xTask;             // Export tasks
+	private Task aTask;             // Abort Task
+	private bool queueAbort;        // Generator abortion queued
+	private short queueReset;       // Counting time until generator Restart
 	private int isGifReady;
+	private bool isPngsSaved = false;
 
 	// Settings
 	private bool animated = true;   // Animating preview or paused? (default animating)
 	private bool
 		modifySettings = true;      // Allows for modifying settings without it triggering Aborts and Generates
 	private short width = -1, height = -1;
-	private int maxTasks;       // Maximum tasks available
+	private int maxTasks;           // Maximum tasks available
 	private short abortDelay = 500; // Set time to restart generator
 	private short restartTimer;
 	private string gifPath = "";    // Gif export path name
 	private string mp4Path = "";    // Mp4 export path name
 	private Fractal toSave;
+	private int batchIndex;
+	private string batchFolder;
 
 	// Display Variables
 	private readonly DoubleBufferedPanel
 		screenPanel;                // Display panel
 	private Bitmap
-		currentBitmap;       // Displayed Bitmap
+		currentBitmap;              // Displayed Bitmap
 	private int currentBitmapIndex; // Play frame index
 	private int fx, fy;             // Memory of window size
-	private int controlTabIndex;// Iterator for tabIndexes - to make sure all the controls tab in the correct order even as I add new ones in the middle
-	private int pointTabIndex;
+	private int controlTabIndex;    // Iterator for tabIndexes - to make sure all the controls tab in the correct order even as I add new ones in the middle
+	private int pointTabIndex;      // Iterator for tabIndexes for dynamically generated controls in editor
 	private bool notify = true, notifyExp;
 
 	// Editor
-	private readonly List<(TextBox, TextBox, TextBox, TextBox, Button)> editorPoint = [];
+	private readonly List<(TextBox, TextBox, TextBox, TextBox, Button)>
+		editorPoint = [];           // Point row buttons/textboxes in editor
 	private readonly List<Button>
-		editorSwitch = [];
-	private FractalGenerator.GenerationType memGenerate;
+		editorSwitch = [];          // Switch buttons in editor
+	private FractalGenerator.GenerationType
+		memGenerate;                // Selected gen type before wsithing to editor, to recover when switching back
+	private FractalGenerator.PngType
+		memPng;
+	private FractalGenerator.GifType
+		memGif;
 	private short memBlur, memAbort;
 	private double memDefaultHue, memBloom;
 	private bool performHash;
 	private bool previewMode = true;
 
 	// Config
-	// TODO implement
-	private int voidAmbientMax, voidNoiseMax, voidScaleMax, detailMax, saturateMax, brightnessMax, bloomMax, blurMax;
-	private float detailMul, threadsMul;
+	private short voidAmbientMax = 30, voidAmbientMul = 4, voidNoiseMax = 30, voidScaleMax = 300, detailMax = 10, saturateMax = 100, brightnessMax = 300, bloomMax = 40, blurMax = 40;
+	private float detailMul = .1f, threadsMul = 1.0f, voidNoiseMul = .1f, bloomMul = .25f;
+	private string loadedBatch;
+	private string[] runningBatch;
 
 	#endregion
 
-			#region Core
+	#region Core
 	private static bool Error(string text, string caption) {
 		_ = MessageBox.Show(text, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		return false;
@@ -141,15 +151,15 @@ public partial class GeneratorForm : Form {
 			hueSelect.MouseWheel += ComboBox_MouseWheel;
 			spinSelect.MouseWheel += ComboBox_MouseWheel;
 			parallelTypeSelect.MouseWheel += ComboBox_MouseWheel;
-			encodeSelect.MouseWheel += ComboBox_MouseWheel;
-
-			//convertMp4.RestoreDirectory = saveMp4.RestoreDirectory = savePng.RestoreDirectory = saveGif.RestoreDirectory = saveFractal.RestoreDirectory = true;
+			encodePngSelect.MouseWheel += ComboBox_MouseWheel;
+			encodeGifSelect.MouseWheel += ComboBox_MouseWheel;
+			generationSelect.MouseWheel += ComboBox_MouseWheel;
 
 			// Init the generator
 			foreach (var i in generator.GetFractals())
 				fractalSelect.Items.AddRange([i.Name]);
 			generator.SelectedFractal = -1;
-			generator.RestartGif = false;
+			//generator.RestartGif = false;
 			generator.UpdatePreview += UpdatePreview;
 
 			// Setup interactable controls (tooltips + tabIndex)
@@ -200,13 +210,20 @@ public partial class GeneratorForm : Form {
 			SetupControl(parallelTypeSelect, "Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommended for fast single images, 1 in a million pixels might be slightly wrong");
 			SetupControl(threadsBox, "The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
 			SetupControl(timingSelect, "Choose if you want to set a delay or framerate. Delay will be precisely used for GIF export, and framerate from MP4 export.");
-			SetupControl(timingBox, "");
+			SetupControl(timingBox, ""); // This one is updated dynamically based on the timingSelect selection
 			SetupControl(abortBox, "How many millisecond of pause after the last settings change until the generator restarts?");
+			SetupControl(encodePngSelect, "Yes: Will export animation as PNG series, that will enable you to export the PNGS or MP4 quicker after it's finished, but not really quicker overall.");
+			SetupControl(encodeGifSelect, "No: Will not encode a gif, you will not be able to export a gif afterwards, but you can switch to a Local/Global later and it will not fully reset the generator, just catches up with missing frames.\nLocal: Will encode a GIF during the generation, so you could save it when finished. With a local colormap (one for each frame). Higher color precision. Slow encoding, larger GIF file size.\nGlobal: Also encodes a GIF. But with a global color map learned from a first frame. Not recommended for changing colors. Much faster encoding, smaller GIF file size.");
+			SetupControl(generationSelect, "Only Image: Will only render one still image. Cannot exprt PNG animation, or GIF animation, only a single image, the first one from a zoom animation.\nAnimation: Will render the animation as sett up by your settings.\nAll Seeds: Will not zoom/spin/shift at all, but instead cycle through all the available CutFunction seeds.");
+
+			SetupControl(loadBatchButton, "");
+			SetupControl(addBatchButton, "");
+			SetupControl(saveBatchButton, "");
+
 			SetupControl(prevButton, "Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 			SetupControl(animateButton, "Toggle preview animation.\nWill seamlessly loop when the fractal is finished generating.\nClicking on the image does the same thing.");
 			SetupControl(nextButton, "Stop the animation and move to the next frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 			SetupControl(restartButton, "Restarts the generator. Maybe useful for randomized settings, but to be safe you have to click it twice in a row.");
-			SetupControl(encodeSelect, "Only Image - only generates one image\nAnimation RAM - generated an animation without GIF encoding, faster but can't save GIF afterwards\nEncode GIF - encodes GIF while generating an animation - can save a GIF afterwards");
 			SetupControl(helpButton, "Show README.txt.");
 			SetupControl(exportButton, "");
 			SetupControl(exportSelect, "Select what you want to save with the button on the left.\nHover over that button after the selection to get more info about the selection.");
@@ -242,10 +259,9 @@ public partial class GeneratorForm : Form {
 			VoidBox_TextChanged(null, null);
 			ZoomChildBox_TextChanged(null, null);
 			SetAnimate();
-			parallelTypeSelect.SelectedIndex = 0;
-			timingSelect.SelectedIndex = spinSelect.SelectedIndex = hueSelect.SelectedIndex = paletteSelect.SelectedIndex = 1;
-			exportSelect.SelectedIndex = 3;
-			encodeSelect.SelectedIndex = 2;
+			encodePngSelect.SelectedIndex = encodeGifSelect.SelectedIndex = parallelTypeSelect.SelectedIndex = 0;
+			generationSelect.SelectedIndex = timingSelect.SelectedIndex = spinSelect.SelectedIndex = hueSelect.SelectedIndex = paletteSelect.SelectedIndex = 1;
+			exportSelect.SelectedIndex = 2;
 			maxTasks = Math.Max(FractalGenerator.MinTasks, Environment.ProcessorCount - 2);
 
 			//maxTasks = 1;
@@ -258,14 +274,31 @@ public partial class GeneratorForm : Form {
 			pointTabIndex = controlTabIndex;
 			editorPanel.Location = generatorPanel.Location;
 			LoadConfig();
+
+			voidAmbientLabel.Text = "Void Ambient (0-" + voidAmbientMax + "):";
+			voidNoiseLabel.Text = "Void Noise (0-" + voidNoiseMax + "):";
+			voidScaleLabel.Text = "Void Scale (0-" + voidScaleMax + "):";
+			detailLabel.Text = "Detail (0-" + detailMax + "):";
+			saturateLabel.Text = "Saturate (0-" + saturateMax + "):";
+			brightnessLabel.Text = "Brightness (0-" + brightnessMax + "):";
+			bloomLabel.Text = "Bloom (0-" + bloomMax + "):";
+			blurLabel.Text = "Motion Blur (0-" + blurMax + "):";
+
 			LoadSettings();
 			FillEditor();
 
+
+			// TODO remove debug
+			maxTasks = 1;
+			threadsBox.Text = maxTasks.ToString();
+
+
 			// Start the generator
+			runningBatch = [];
 			modifySettings = helpPanel.Visible = false;
 			TryResize();
 			ResizeAll();
-			aTask = gTask = mTask = null;
+			aTask = xTask = null;
 			generator.StartGenerate();
 
 			// Load all extra fractal files
@@ -359,7 +392,7 @@ public partial class GeneratorForm : Form {
 		// Window Size Update
 		WindowSizeRefresh();
 		if (queueReset > 0) {
-			if (!(gTask == null && aTask == null && mTask == null))
+			if (!(xTask == null && aTask == null))
 				return;
 			if (queueAbort) {
 				aTask = Task.Run(Abort, (aCancel = new()).Token);
@@ -368,7 +401,11 @@ public partial class GeneratorForm : Form {
 			if ((queueReset -= (short)timer.Interval) > 0)
 				return;
 
-
+			runningBatch = [];
+			restartButton.Enabled = true;
+			ResetRestart();
+			//generator.RestartGif = false;
+			isPngsSaved = notifyExp = false;
 			if (performHash) {
 				// remember settings
 				short mw = generator.SelectedWidth, mh = generator.SelectedHeight;
@@ -385,18 +422,16 @@ public partial class GeneratorForm : Form {
 				generator.SelectedBloom = 0;
 				generator.SelectedParallelType = FractalGenerator.ParallelType.OfAnimation;
 				generator.SelectedWidth = generator.SelectedHeight = 20;
-				generator.SelectedGenerationType = FractalGenerator.GenerationType.HashParam;
+				generator.SelectedGenerationType = FractalGenerator.GenerationType.HashSeeds;
 
 				SetupFractal();
 				ResizeAll();
-				restartButton.Enabled = true;
-				ResetRestart();
-				generator.RestartGif = false;
+				//restartButton.Enabled = true;
+				//ResetRestart();
+				//generator.RestartGif = false;
 				generator.StartGenerate();
 				// Wait until finished
-				while (generator.GetBitmapsFinished() < generator.GetFrames()) {
-				}
-
+				while (generator.GetBitmapsFinished() < generator.GetFrames()) { }
 				// collect the hashes
 				var hash = new int[generator.Hash.Count];
 				var i = 0;
@@ -421,9 +456,6 @@ public partial class GeneratorForm : Form {
 			} else {
 				SetupFractal();
 				ResizeAll();
-				restartButton.Enabled = true;
-				ResetRestart();
-				notifyExp = generator.RestartGif = false;
 				generator.StartGenerate();
 			}
 		}
@@ -431,11 +463,8 @@ public partial class GeneratorForm : Form {
 			ResetRestart();
 		// Fetch the state of generated bitmaps
 		int bitmapsFinished = generator.GetBitmapsFinished(), bitmapsTotal = generator.GetFrames();
-
-
 		if (bitmapsTotal <= 0)
 			return;
-
 		if (bitmapsFinished < bitmapsTotal) {
 			BackColor = Color.FromArgb(64, 64, 64);
 			notify = true;
@@ -443,32 +472,61 @@ public partial class GeneratorForm : Form {
 		if (bitmapsFinished == bitmapsTotal && notify && !generator.IsCancelRequested()) {
 			BackColor = Color.FromArgb(128, 128, 64);
 			notify = false;
+			isPngsSaved = false;
+			//	or FractalGenerator.GenerationType.AllSeedsPng;
+			// Igf we're runnig batches, export immediately
+			if (runningBatch.Length > 0) {
+
+				switch (exportSelect.SelectedIndex) {
+					case 0: // PNG 
+						savePng.FileName = batchFolder + batchIndex + ".png";
+						SavePng_FileOk(savePng, null);
+						break;
+					case 1: // PNGs
+						saveMp4.DefaultExt = "png";
+						saveMp4.Filter = "PNG video (*.png)|*.png";
+						saveMp4.FileName = batchFolder + batchIndex + ".png";
+						SaveMp4_FileOk(saveMp4, null);
+						break;
+					case 2: // MP4
+						saveMp4.DefaultExt = "mp4";
+						saveMp4.Filter = "MP4 video (*.mp4)|*.mp4";
+						saveMp4.FileName = batchFolder + batchIndex + ".mp4";
+						SaveMp4_FileOk(saveMp4, null);
+						break;
+					case 3: // GIF
+						saveGif.DefaultExt = "gif";
+						saveGif.Filter = "GIF video (*.gif)|*.gif";
+						saveGif.FileName = batchFolder + batchIndex + ".gif";
+						SaveGif_FileOk(saveGif, null);
+						break;
+					case 4: // GIF->Mp4
+						saveGif.DefaultExt = "mp4";
+						saveGif.Filter = "MP4 video (*.mp4)|*.mp4";
+						saveGif.FileName = batchFolder + batchIndex + ".mp4";
+						SaveGif_FileOk(saveGif, null);
+						break;
+				}
+			}
 		}
 		if (notifyExp) {
-			BackColor = Color.FromArgb(64, 64, 128);
 			notifyExp = false;
+			FinishedExporting();
 		}
 
 		// Only Allow GIF Export when generation is finished
 		//string v = generator.selectGenerationType == FractalGenerator.GenerationType.Mp4 ? "Mp4" : "Gif";
-
-		switch (exportSelect.SelectedIndex) {
-			case 0: // PNG:
-				exportButton.Text = "Save PNG";
-				break;
-			case 1: // GIF
-				isGifReady = generator.IsGifReady();
-				exportButton.Text = gTask == null ? "Save GIF" : "Cancel Saving";
-				break;
-			case 2: // GIF->MP4
-				isGifReady = generator.IsGifReady();
-				exportButton.Text = mTask == null ? "Save MP4" : "Cancel Saving";
-				break;
-			case 3: // MP4
-				exportButton.Text = mTask == null ? "Save MP4" : "Cancel Saving";
-				break;
-		}
-
+		isGifReady = generator.IsGifReady();
+		exportButton.Text = xTask != null
+			? "Saving"
+			: exportSelect.SelectedIndex switch {
+				0 => "Save PNG",
+				1 => "Save PNGs",
+				2 => "Save MP4",
+				3 => "Save GIF",
+				4 => "Save MP4",
+				_ => "Undefined",
+			};
 
 		/*if (gTask == null) {
 			gifButton.Enabled = aTask == null && (isGifReady = generator.IsGifReady()) != 0;
@@ -485,8 +543,13 @@ public partial class GeneratorForm : Form {
 			statusLabel.Text = "Generating: ";
 			infoText = bitmapsFinished + infoText;
 		} else {
-			statusLabel.Text = "Finished: ";
-			infoText = currentBitmapIndex + infoText;
+			if (xTask != null) {
+				statusLabel.Text = "Saving: ";
+				infoText = generator.GetPngFinished() + infoText;
+			} else {
+				statusLabel.Text = "Finished: ";
+				infoText = currentBitmapIndex + infoText;
+			}
 		}
 		infoLabel.Text = infoText;
 		//gifButton.Text = gTask == null ? "Save GIF" : "Saving";
@@ -515,7 +578,8 @@ public partial class GeneratorForm : Form {
 			+ "|child|" + zoomChildBox.Text
 			+ "|parallel|" + parallelTypeSelect.SelectedIndex + "|threads|" + threadsBox.Text
 			+ "|delay|" + generator.SelectedDelay + "|fps|" + generator.SelectedFps + "|timing|" + timingSelect.SelectedIndex + "|abort|" + abortBox.Text
-			+ "|ani|" + (animated ? 1 : 0) + "|gen|" + encodeSelect.SelectedIndex;
+			+ "|png|" + encodePngSelect.SelectedIndex + "|gif|" + encodeGifSelect.SelectedIndex + "|gen|" + generationSelect.SelectedIndex 
+			+ "|ani|" + (animated ? 1 : 0) + "|exp|" + exportSelect.SelectedIndex;
 
 		File.WriteAllText("settings.txt", file);
 	}
@@ -525,28 +589,41 @@ public partial class GeneratorForm : Form {
 		var s = File.ReadAllLines("config.txt");
 
 		//var s = File.ReadAllText("config.txt").Split('|');
-		for (var i = 0; i < s.Length - 1; i += 1) {
+		for (var i = 0; i < s.Length; i += 1) {
 			if (s[i][0] == '/' || !s[i].Contains('='))
 				continue;
 			var c = s[i].Split('=');
-			bool isN = int.TryParse(c[1], out var n);
+			if (c[0] == "resolution") {
+				// skip and continue if the resolution is not a valid format <int>x<int>
+				if (!c[1].Contains('x'))
+					continue;
+				var r = c[1].Split('x');
+				if (r.Length != 2 || !(int.TryParse(r[0], out _) && int.TryParse(r[1], out _)))
+					continue;
+				_ = resSelect.Items.Add(c[1]);
+				continue;
+			}
+			bool isN = short.TryParse(c[1], out var n);
 			if (isN) {
 				switch (c[0]) {
 					case "voidAmbientMax": voidAmbientMax = n; break;
+					case "voidAmbientMul": voidAmbientMul = n; break;
 					case "voidNoiseMax": voidNoiseMax = n; break;
 					case "voidScaleMax": voidScaleMax = n; break;
 					case "detailMax": detailMax = n; break;
 					case "saturateMax": saturateMax = n; break;
 					case "brightnessMax": brightnessMax = n; break;
 					case "bloomMax": bloomMax = n; break;
-					case "BlurMax": blurMax = n; break;
+					case "blurMax": blurMax = n; break;
 				}
 			}
 			bool isF = float.TryParse(c[1], out var f);
 			if (isF) {
 				switch (c[0]) {
-					case "detailMul": detailMul = n; break;
-					case "threadsMul": threadsMul = n; break;
+					case "detailMul": detailMul = f; break;
+					case "bloomMul": bloomMul = f; break;
+					case "voidNoiseMul": voidNoiseMul = f; break;
+					case "threadsMul": threadsMul = f; break;
 				}
 			}
 		}
@@ -556,7 +633,34 @@ public partial class GeneratorForm : Form {
 		//gifButton.Enabled = false;
 		if (!File.Exists("settings.txt"))
 			return;
-		var s = File.ReadAllText("settings.txt").Split('|');
+		LoadParams(File.ReadAllText("settings.txt").Split('|'));
+		if (editorPanel.Visible) {
+
+			memPng = (FractalGenerator.PngType)encodePngSelect.SelectedIndex;
+			memGif = (FractalGenerator.GifType)encodeGifSelect.SelectedIndex;
+			memGenerate = (FractalGenerator.GenerationType)generationSelect.SelectedIndex;
+			memBlur = generator.SelectedBlur;
+			memBloom = generator.SelectedBloom;
+			//mem_hue = (short)hueSelect.SelectedIndex;
+
+			generator.SelectedGenerationType = FractalGenerator.GenerationType.Animation;
+			generator.SelectedPngType = FractalGenerator.PngType.No;
+			generator.SelectedGifType = FractalGenerator.GifType.No;
+			generator.SelectedBloom = generator.SelectedBlur = 0;
+			//generator.selectHue = generator.selectDefaultHue = 0;
+			generator.SelectedPreviewMode = previewMode;
+			abortDelay = 10;
+
+			//if (short.TryParse(defaultHue.Text, out var n))
+			//	memDefaultHue = n;
+			if (short.TryParse(abortBox.Text, out var n))
+				memAbort = n;
+		} else {
+			generator.SelectedPreviewMode = false;
+		}
+		SetupFractal();
+	}
+	private void LoadParams(string[] s) {
 		for (var i = 0; i < s.Length - 1; i += 2) {
 			var v = s[i + 1];
 			var p = int.TryParse(v, out var n);
@@ -636,31 +740,13 @@ public partial class GeneratorForm : Form {
 				case "fps": generator.SelectedFps = (short)n; break;
 				case "timing": timingSelect.SelectedIndex = Math.Min(parallelTypeSelect.Items.Count - 1, n); TimingSelect_SelectedIndexChanged(null, null); break;
 				case "abort": abortBox.Text = v; break;
+				case "png": if (p) encodePngSelect.SelectedIndex = Math.Min(encodePngSelect.Items.Count - 1, n); break;
+				case "gif": if (p) encodeGifSelect.SelectedIndex = Math.Min(encodeGifSelect.Items.Count - 1, n); break;
+				case "gen": if (p) generationSelect.SelectedIndex = Math.Min(generationSelect.Items.Count - 1, n); break;
 				case "ani": if (p) animated = n <= 0; AnimateButton_Click(null, null); break;
-				case "gen": if (p) encodeSelect.SelectedIndex = Math.Min(encodeSelect.Items.Count - 1, n); break;
+				case "exp": if (p) exportSelect.SelectedIndex = Math.Min(exportSelect.Items.Count - 1, n); break;
 			}
 		}
-		if (editorPanel.Visible) {
-
-			memGenerate = (FractalGenerator.GenerationType)encodeSelect.SelectedIndex;
-			memBlur = generator.SelectedBlur;
-			memBloom = generator.SelectedBloom;
-			//mem_hue = (short)hueSelect.SelectedIndex;
-
-			generator.SelectedGenerationType = FractalGenerator.GenerationType.AnimationRam;
-			generator.SelectedBloom = generator.SelectedBlur = 0;
-			//generator.selectHue = generator.selectDefaultHue = 0;
-			generator.SelectedPreviewMode = previewMode;
-			abortDelay = 10;
-
-			//if (short.TryParse(defaultHue.Text, out var n))
-			//	memDefaultHue = n;
-			if (short.TryParse(abortBox.Text, out var n))
-				memAbort = n;
-		} else {
-			generator.SelectedPreviewMode = false;
-		}
-		SetupFractal();
 	}
 	#endregion
 
@@ -695,20 +781,9 @@ public partial class GeneratorForm : Form {
 		Close(e);
 	}
 	private void Close(FormClosingEventArgs e) {
-		if (gTask != null) {
+		if (xTask != null) {
 			var result = MessageBox.Show(
-				"Your GIF is still saving!\nAre you sure you want to close the application and potentially lose it?",
-				"Confirm Exit",
-				MessageBoxButtons.YesNo,
-				MessageBoxIcon.Question);
-			// Cancel closing if the user clicks "No"
-			if (result == DialogResult.No)
-				e.Cancel = true;
-			return;
-		}
-		if (mTask != null) {
-			var result = MessageBox.Show(
-				"Your MP4 is still saving!\nAre you sure you want to close the application and potentially lose it?",
+				"Your export is still saving!\nAre you sure you want to close the application and potentially lose it?",
 				"Confirm Exit",
 				MessageBoxButtons.YesNo,
 				MessageBoxIcon.Question);
@@ -720,15 +795,29 @@ public partial class GeneratorForm : Form {
 		if (isGifReady > 80) {
 			var result = MessageBox.Show(
 				"You have encoded gif available to save.\nDo you want to save it?",
-				"Confirm Exit",
+				"Confirm Save",
 				MessageBoxButtons.YesNo,
 				MessageBoxIcon.Question);
+			// Save if the user clicks "Yes"
 			if (result == DialogResult.Yes) {
-				saveGif.ShowDialog();
+				saveGif.DefaultExt = "gif";
+				saveGif.Filter = "GIF video (*.gif)|*.gif|MP4 video (*.mp4)|*.mp4";
+				_ = saveGif.ShowDialog();
 				e.Cancel = true;
 				return;
 			}
-
+		}
+		if (!isPngsSaved && MessageBox.Show(
+			"You have PNGs available to save or convert to Mp4.\nDo you want to save it?",
+			"Confirm Save",
+			MessageBoxButtons.YesNo,
+			// Save if the user clicks "Yes"
+			MessageBoxIcon.Question) == DialogResult.Yes) {
+			saveMp4.DefaultExt = "mp4";
+			saveMp4.Filter = "MP4 video (*.mp4)|*.mp4|PNG video (*.png)|*.png";
+			_ = saveMp4.ShowDialog();
+			e.Cancel = true;
+			return;
 		}
 		var saved = false;
 		foreach (var f in generator.GetFractals()) {
@@ -744,7 +833,7 @@ public partial class GeneratorForm : Form {
 				case DialogResult.Yes:
 					toSave = f;
 					saved = true;
-					saveFractal.ShowDialog();
+					_ = saveFractal.ShowDialog();
 					continue;
 				case DialogResult.No:
 					f.Edit = false;
@@ -762,11 +851,9 @@ public partial class GeneratorForm : Form {
 		}
 
 		aCancel?.Cancel();
-		gCancel?.Cancel();
-		mCancel?.Cancel();
-		gTask?.Wait();
-		mTask?.Wait();
+		xCancel?.Cancel();
 		aTask?.Wait();
+		xTask?.Wait();
 		Abort();
 		SaveSettings();
 		generator.CleanupTempFiles();
@@ -789,18 +876,39 @@ public partial class GeneratorForm : Form {
 			return;
 		if (queueReset <= 0) {
 
-			if (isGifReady > 80) {
+
+
+			if (isGifReady > 80 && xTask == null) {
 				var result = MessageBox.Show(
 					"You have encoded gif available to save.\nDo you want to save it?\nCancel will turn off gif encoding so you won't keep getting this warning again.",
 					"Save GIF",
 					MessageBoxButtons.YesNoCancel,
 					MessageBoxIcon.Question);
 				switch (result) {
-					case DialogResult.No:
-						saveGif.ShowDialog();
+					case DialogResult.Yes:
+						saveGif.DefaultExt = "gif";
+						saveGif.Filter = "GIF video (*.gif)|*.gif|MP4 video (*.mp4)|*.mp4";
+						_ = saveGif.ShowDialog();
 						break;
 					case DialogResult.Cancel:
-						encodeSelect.SelectedIndex = 1;
+						generationSelect.SelectedIndex = 1;
+						break;
+				}
+			}
+			if (!isPngsSaved && xTask == null) {
+				var result = MessageBox.Show(
+					"You have PNGs available to save or convert to Mp4.\nDo you want to save it?\nCancel will turn off mp4 encoding so you won't keep getting this warning again.",
+					"Save MP4/PNGs",
+					MessageBoxButtons.YesNoCancel,
+					MessageBoxIcon.Question);
+				switch (result) {
+					case DialogResult.Yes:
+						saveMp4.DefaultExt = "mp4";
+						saveMp4.Filter = "MP4 video (*.mp4)|*.mp4|PNG video (*.png)|*.png";
+						_ = saveMp4.ShowDialog();
+						break;
+					case DialogResult.Cancel:
+						encodePngSelect.SelectedIndex = 0;
 						break;
 				}
 			}
@@ -820,7 +928,110 @@ public partial class GeneratorForm : Form {
 		queueReset = restartTimer = 0;
 		restartButton.Text = "! RESTART !";
 	}
-	private bool TasksNotRunning() => aTask == null && gTask == null && mTask == null;
+	private bool TasksNotRunning() => aTask == null && xTask == null;
+	private void NextBatch() {
+		if (batchIndex >= runningBatch.Length) {
+			// All batches complete, unlock the controls, and stop the batching
+			for (var i = myControls.Count; 0 <= --i; myControls[i].Enabled = myControlsEnabled[i]) {
+			}
+			return;
+		}
+		isGifReady = 0;
+		LoadParams(runningBatch[batchIndex].Split('|'));
+		generator.SelectedPreviewMode = false;
+		generatorPanel.Visible = !(editorPanel.Visible = false);
+		QueueReset();
+		++batchIndex;
+	}
+	private void SetupSelects() {
+
+		if (modifySettings) {
+			FillSelects();
+			FillCutParams();
+			return;
+		}
+		modifySettings = true;
+		FillSelects();
+		FillCutParams();
+		modifySettings = false;
+		QueueReset();
+
+		return;
+
+		void FillSelects() {
+			var f = generator.GetFractal();
+			// Fill angle children definitions combobox
+			angleSelect.Items.Clear();
+			foreach (var (name, _) in f.ChildAngle)
+				angleSelect.Items.Add(name);
+			angleSelect.SelectedIndex = 0;
+			// Fill color children definitions combobox
+			colorSelect.Items.Clear();
+			foreach (var (name, _) in f.ChildColor)
+				colorSelect.Items.Add(name);
+			colorSelect.SelectedIndex = 0;
+			// Fill cutFunction definitions combobox
+			cutSelect.Items.Clear();
+			var cf = f.ChildCutFunction;
+			if (!CutSelectEnabled(cf))
+				return;
+			foreach (var (index, _) in cf)
+				cutSelect.Items.Add(Fractal.CutFunctions[index].Item1);
+			cutSelect.SelectedIndex = 0;
+		}
+	}
+	private void SetupFractal() {
+		generator.SetupFractal();
+		if (!modifySettings) {
+			modifySettings = true;
+			Parallel_Changed(null, null);
+			DetailBox_TextChanged(null, null);
+			modifySettings = false;
+		} else {
+			Parallel_Changed(null, null);
+			DetailBox_TextChanged(null, null);
+		}
+		generator.SetupCutFunction();
+	}
+	private void GetValidZoomChildren() {
+		generator.GetValidZoomChildren();
+		zoomChildBox.Text = "0";
+	}
+	private void SetupParallel(short newThreads) {
+		generator.SelectedMaxTasks = (short)(newThreads > 1 ? newThreads : FractalGenerator.MinTasks);
+		generator.SelectThreadingDepth();
+	}
+	private bool CutSelectEnabled(List<(int, int[])> cf)
+	=> cutSelect.Enabled = cf is { Count: > 0 };
+	// Query the number of seeds from the CutFunction
+	private bool CutParamBoxEnabled(Fractal.CutFunction cf)
+		=> cutparamBox.Enabled = 0 < (generator.CutParamMaximum = (int)(cf == null || cf(0, -1, generator.GetFractal()) <= 0 ? 0 : (cf(0, 1 - (1 << 30), generator.GetFractal()) + 1) / cf(0, -1, generator.GetFractal())));
+	/// <summary>
+	/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
+	/// </summary>
+	private void FillCutParams() {
+		_ = CutParamBoxEnabled(generator.GetCutFunction());
+		cutparamBox.Text = "0";
+		GetValidZoomChildren();
+	}
+	private int FillPalette() {
+		var r = 0;
+		paletteSelect.Items.Clear();
+		paletteSelect.Items.Add("Random");
+		for (var i = 0; i < generator.Colors.Count; ++i)
+			r = paletteSelect.Items.Add(generator.Colors[i].Item1);
+		return r;
+	}
+	private void MoveFrame(int move) { 
+		animated = false; 
+		var b = generator.GetBitmapsFinished(); 
+		currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b; 
+	}
+	private void SetAnimate() {
+		animateButton.Text = animated ? "Playing" : "Paused";
+		animateButton.BackColor = animated ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
+	}
+
 	private static bool Clean(TextBox box) {
 		var s = box.Text;
 		s = s.Replace(';', ' ').Replace('|', ' ').Replace(':', ' ');
@@ -890,64 +1101,6 @@ public partial class GeneratorForm : Form {
 		else if (File.Exists(fractalSelect.Text + ".fractal"))
 			_ = LoadFractal(fractalSelect.Text + ".fractal");
 	}
-	private void SetupSelects() {
-
-		if (modifySettings) {
-			FillSelects();
-			FillCutParams();
-			return;
-		}
-		modifySettings = true;
-		FillSelects();
-		FillCutParams();
-		modifySettings = false;
-		QueueReset();
-
-		return;
-
-		void FillSelects() {
-			var f = generator.GetFractal();
-			// Fill angle children definitions combobox
-			angleSelect.Items.Clear();
-			foreach (var (name, _) in f.ChildAngle)
-				angleSelect.Items.Add(name);
-			angleSelect.SelectedIndex = 0;
-			// Fill color children definitions combobox
-			colorSelect.Items.Clear();
-			foreach (var (name, _) in f.ChildColor)
-				colorSelect.Items.Add(name);
-			colorSelect.SelectedIndex = 0;
-			// Fill cutFunction definitions combobox
-			cutSelect.Items.Clear();
-			var cf = f.ChildCutFunction;
-			if (!CutSelectEnabled(cf))
-				return;
-			foreach (var (index, _) in cf)
-				cutSelect.Items.Add(Fractal.CutFunctions[index].Item1);
-			cutSelect.SelectedIndex = 0;
-		}
-	}
-	private void SetupFractal() {
-		generator.SetupFractal();
-		if (!modifySettings) {
-			modifySettings = true;
-			Parallel_Changed(null, null);
-			DetailBox_TextChanged(null, null);
-			modifySettings = false;
-		} else {
-			Parallel_Changed(null, null);
-			DetailBox_TextChanged(null, null);
-		}
-		generator.SetupCutFunction();
-	}
-	private void GetValidZoomChildren() {
-		generator.GetValidZoomChildren();
-		zoomChildBox.Text = "0";
-	}
-	private void SetupParallel(short newThreads) {
-		generator.SelectedMaxTasks = (short)(newThreads > 1 ? newThreads : FractalGenerator.MinTasks);
-		generator.SelectThreadingDepth();
-	}
 	private void AngleSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		if (DiffApply((short)Math.Max(0, angleSelect.SelectedIndex), ref generator.SelectedChildAngle))
 			return;
@@ -964,19 +1117,6 @@ public partial class GeneratorForm : Form {
 	private void CutParamBox_TextChanged(object sender, EventArgs e) {
 		if (ParseClampReTextDiffApply(cutparamBox, ref generator.SelectedCutParam, -1, generator.GetMaxCutParam()))
 			return;
-		GetValidZoomChildren();
-	}
-	private bool CutSelectEnabled(List<(int, int[])> cf)
-		=> cutSelect.Enabled = cf is { Count: > 0 };
-	// Query the number of seeds from the CutFunction
-	private bool CutParamBoxEnabled(Fractal.CutFunction cf)
-		=> cutparamBox.Enabled = 0 < (generator.CutParamMaximum = (int)(cf == null || cf(0, -1, generator.GetFractal()) <= 0 ? 0 : (cf(0, 1 - (1 << 30), generator.GetFractal()) + 1) / cf(0, -1, generator.GetFractal())));
-	/// <summary>
-	/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
-	/// </summary>
-	private void FillCutParams() {
-		_ = CutParamBoxEnabled(generator.GetCutFunction());
-		cutparamBox.Text = "0";
 		GetValidZoomChildren();
 	}
 	private void Resolution_Changed(object sender, EventArgs e) => QueueReset(TryResize());
@@ -1040,16 +1180,7 @@ public partial class GeneratorForm : Form {
 		generator.Colors.Add(("Custom palette", p));
 		paletteSelect.SelectedIndex = FillPalette();
 	}
-	private int FillPalette() {
-		var r = 0;
-		paletteSelect.Items.Clear();
-		paletteSelect.Items.Add("Random");
-		for (var i = 0; i < generator.Colors.Count; ++i)
-			r = paletteSelect.Items.Add(generator.Colors[i].Item1);
-		return r;
-	}
 	private void DefaultHue_TextChanged(object sender, EventArgs e) => DiffApply(ParseDouble(defaultHue), ref generator.SelectedDefaultHue);
-
 	private void ZoomSelect_SelectedIndexChanged(object sender, EventArgs e) => DiffApply((short)(zoomSelect.SelectedIndex - 2), ref generator.SelectedZoom);
 	private void DefaultZoom_TextChanged(object sender, EventArgs e) => ParseDiffApply(defaultZoom, ref generator.SelectedDefaultZoom);
 	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e) => ClampDiffApply((short)(spinSelect.SelectedIndex - 2), ref generator.SelectedSpin, (short)-2, (short)2);
@@ -1065,18 +1196,16 @@ public partial class GeneratorForm : Form {
 			Apply(newSpeed, out generator.SelectedExtraHue);
 		else generator.SelectedExtraHue = newSpeed;
 	}
-
-	private void AmbBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(ambBox, ref generator.SelectedAmbient, -1, 30, 4);
-	private void NoiseBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(noiseBox, ref generator.SelectedNoise, 0, 30, .1f);
-	private void SaturateBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(saturateBox, ref generator.SelectedSaturate, 0, 10, .1f);
+	private void AmbBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(ambBox, ref generator.SelectedAmbient, -1, voidAmbientMax, voidAmbientMul);
+	private void NoiseBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(noiseBox, ref generator.SelectedNoise, 0, voidNoiseMax, voidNoiseMul);
+	private void SaturateBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(saturateBox, ref generator.SelectedSaturate, 0, saturateMax, 1.0 / saturateMax);
 	private void DetailBox_TextChanged(object sender, EventArgs e) {
-		if (!ParseClampReTextMulDiffApply(detailBox, ref generator.SelectedDetail, 0, 10, .1f * generator.GetFractal().MinSize)) generator.SetMaxIterations();
+		if (!ParseClampReTextMulDiffApply(detailBox, ref generator.SelectedDetail, 0, detailMax, detailMul * generator.GetFractal().MinSize)) generator.SetMaxIterations();
 	}
-	private void BloomBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, 40, .25f);
-	private void BlurBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(blurBox, ref generator.SelectedBlur, 0, 40);
-	private void BrightnessBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(brightnessBox, ref generator.SelectedBrightness, 0, 300);
-	private void VoidBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(voidBox, ref generator.SelectedVoid, 0, 300);
-
+	private void BloomBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, bloomMax, bloomMul);
+	private void BlurBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(blurBox, ref generator.SelectedBlur, 0, blurMax);
+	private void BrightnessBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(brightnessBox, ref generator.SelectedBrightness, 0, brightnessMax);
+	private void VoidBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(voidBox, ref generator.SelectedVoid, 0, voidScaleMax);
 	private void ZoomChildBox_TextChanged(object sender, EventArgs e) {
 		var n = ParseClampReText(zoomChildBox, (short)0, (short)Math.Max(0, Math.Min(generator.MaxZoomChild, generator.GetFractal().ChildCount - 1)));
 		if (generator.SelectZoomChild(n))
@@ -1084,7 +1213,7 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 	}
 	private void Parallel_Changed(object sender, EventArgs e) {
-		SetupParallel(ParseClampReText(threadsBox, (short)FractalGenerator.MinTasks, (short)maxTasks));
+		SetupParallel(ParseClampReText(threadsBox, (short)FractalGenerator.MinTasks, (short)Math.Max(1, threadsMul * maxTasks)));
 	}
 	private void ParallelTypeSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		/*if ((FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex == FractalGenerator.ParallelType.OfDepth) {
@@ -1104,7 +1233,6 @@ public partial class GeneratorForm : Form {
 		});
 		timingBox.Text = (timingSelect.SelectedIndex == 0 ? generator.SelectedDelay : generator.SelectedFps).ToString();
 	}
-	private void AbortBox_TextChanged(object sender, EventArgs e) => abortDelay = ParseClampReText(abortBox, (short)0, (short)10000);
 	private void TimingBox_TextChanged(object sender, EventArgs e) {
 		switch (timingSelect.SelectedIndex) {
 			case 0:
@@ -1115,8 +1243,8 @@ public partial class GeneratorForm : Form {
 				generator.SelectedDelay = newDelay;
 				generator.SelectedFps = (short)(100 / generator.SelectedDelay);
 				timer.Interval = generator.SelectedDelay * 10;
-				if (generator.SelectedGenerationType is >= FractalGenerator.GenerationType.LocalGif and <= FractalGenerator.GenerationType.AllSeedsGif)
-					generator.RestartGif = true;
+				//if (generator.SelectedGifType != FractalGenerator.GifType.No)
+				//	generator.RestartGif = true;
 				break;
 			case 1:
 				var newFps = ParseClampReText(timingBox, (short)1, (short)120);
@@ -1125,20 +1253,137 @@ public partial class GeneratorForm : Form {
 				generator.SelectedFps = newFps;
 				generator.SelectedDelay = (short)(100 / newFps);
 				timer.Interval = 1000 / generator.SelectedFps;
-				if (generator.SelectedGenerationType is >= FractalGenerator.GenerationType.LocalGif and <= FractalGenerator.GenerationType.AllSeedsGif)
-					generator.RestartGif = true;
+				//if (generator.SelectedGifType != FractalGenerator.GifType.No)
+				//	generator.RestartGif = true;
 				break;
 		}
 	}
-	private void MoveFrame(int move) { animated = false; var b = generator.GetBitmapsFinished(); currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b; }
+	private void AbortBox_TextChanged(object sender, EventArgs e) => abortDelay = ParseClampReText(abortBox, (short)0, (short)10000);
+
+	private void EncodePngSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		generator.SelectedPngType = (FractalGenerator.PngType)Math.Max(0, encodePngSelect.SelectedIndex);
+	}
+	private void EncodeGifSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		var now = (FractalGenerator.GifType)Math.Max(0, encodeGifSelect.SelectedIndex);
+		if (generator.SelectedGifType == now)
+			return;
+		generator.SelectedGifType = now;
+		//generator.RestartGif = true; // different GIF encoding - make the generator restart its gif encoder
+	}
+	private void GenerationSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		if ((FractalGenerator.GenerationType)generationSelect.SelectedIndex == FractalGenerator.GenerationType.HashSeeds) {
+			_ = MessageBox.Show(
+				"This mode is not really meant for the end user, it only generates all parameters and export a hash.txt file will all the unique ones.\nIf you actually want an animation of all seeds, AllSeeds is recommended instead as that doesn't waste resources doing the hashing and encodes the animation for export.",
+				"Warning",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Warning);
+		}
+		generator.SelectedGenerationType = (FractalGenerator.GenerationType)Math.Max(0, generationSelect.SelectedIndex);
+		QueueReset();
+	}
+	private void LoadBatchButton_Click(object sender, EventArgs e) {
+		_ = loadBatch.ShowDialog();
+	}
+	private void LoadBatch_FileOk(object sender, CancelEventArgs e) {
+		loadedBatch = File.ReadAllText(loadBatch.FileName);
+	}
+	private void AddBatchButton_Click(object sender, EventArgs e) {
+		var f = generator.GetFractal();
+		if (loadedBatch != "")
+			loadedBatch += ";";
+		loadedBatch += "fractal|" + fractalSelect.Text + "|path|" + f.Path
+			+ "|angle|" + angleSelect.SelectedIndex + "|color|" + colorSelect.SelectedIndex + "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
+			+ "|paletteSelect|" + paletteSelect.SelectedIndex
+			+ "|period|" + periodBox.Text + "|periodMul|" + periodMultiplierBox.Text
+			+ "|zoom|" + zoomSelect.SelectedIndex + "|defaultZoom|" + defaultZoom.Text
+			+ "|hue|" + hueSelect.SelectedIndex + "|defaultHue|" + defaultHue.Text + "|hueMul|" + hueSpeedBox.Text
+			+ "|spin|" + spinSelect.SelectedIndex + "|defaultAngle|" + defaultAngle.Text + "|spinMul|" + spinSpeedBox.Text
+			+ "|amb|" + ambBox.Text + "|noise|" + noiseBox.Text + "|void|" + voidBox.Text
+			+ "|detail|" + detailBox.Text + "|saturate|" + saturateBox.Text + "|brightness|" + brightnessBox.Text
+			+ "|bloom|" + bloomBox.Text + "|blur|" + blurBox.Text
+			+ "|child|" + zoomChildBox.Text;
+	}
+	private void SaveBatchButton_Click(object sender, EventArgs e) {
+		_ = saveBatch.ShowDialog();
+	}
+	private void SaveBatch_FileOk(object sender, CancelEventArgs e) {
+		File.WriteAllText(saveBatch.FileName, loadedBatch);
+	}
+	private void BatchBox_TextChanged(object sender, EventArgs e) {
+		var batches = loadedBatch.Split(';');
+		if (batches.Length <= 0)
+			return;
+		ParseClampReTextDiffApply(batchBox, ref batchIndex, 0, batches.Length - 1);
+		LoadParams(batches[batchIndex].Split('|'));
+		QueueReset();
+	}
+	private void UpdateBatchButton_Click(object sender, EventArgs e) {
+		// TODO update batch entry
+	}
+	private void RunBatchButton_Click(object sender, EventArgs e) {
+		switch (exportSelect.SelectedIndex) {
+			case 0: // PNG
+				runBatch.DefaultExt = "png";
+				runBatch.Filter = "PNG file (*.png)|*.png";
+				break;
+
+			case 1: // PNGs
+				runBatch.DefaultExt = "png";
+				runBatch.Filter = "PNG video (*.png)|*.png";
+				break;
+
+			case 2: // MP4
+				if (NoFfmpeg()) {
+					_ = Error("Not Available", "Ffmpeg.exe not found, make sure you have Ffmpeg.exe in the app's root folder.");
+					return;
+				}
+				runBatch.DefaultExt = "mp4";
+				runBatch.Filter = "MP4 video (*.mp4)|*.mp4";
+				break;
+
+			case 3: // GIF
+				if(generator.SelectedGifType == FractalGenerator.GifType.No) { 
+					_ = Error("Wrong Generation Type", "You must select LocalGif or GlobalGif or AllSeedsGif generation type for this.");
+					return;
+				}
+				runBatch.DefaultExt = "gif";
+				runBatch.Filter = "GIF video (*.gif)|*.gif";
+				break;
+			case 4: // GIF->MP4
+				if (generator.SelectedGifType == FractalGenerator.GifType.No) {
+					_ = Error("Wrong Generation Type", "You must select LocalGif or GlobalGif or AllSeedsGif generation type for this.");
+					return;
+				}
+				runBatch.DefaultExt = "mp4";
+				runBatch.Filter = "MP4 video (*.mp4)|*.mp4";
+				break;
+			
+		}
+		_ = runBatch.ShowDialog();
+	}
+	private void RunBatch_FileOk(object sender, CancelEventArgs e) {
+		batchFolder = runBatch.FileName[..^4];
+		// Initiate the batch queue
+		runningBatch = loadedBatch.Split(';');
+		batchIndex = 0;
+		// Lock All Controls
+		myControlsEnabled.Clear();
+		foreach (var c in myControls) {
+			myControlsEnabled.Add(c.Enabled);
+			c.Enabled = false;
+		}
+		NextBatch();
+	}
+
+
+
+
+
+
 	private void PrevButton_Click(object sender, EventArgs e) => MoveFrame(-1);
 	private void AnimateButton_Click(object sender, EventArgs e) {
 		animated = !animated;
 		SetAnimate();
-	}
-	private void SetAnimate() {
-		animateButton.Text = animated ? "Playing" : "Paused";
-		animateButton.BackColor = animated ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
 	}
 	private void NextButton_Click(object sender, EventArgs e) => MoveFrame(1);
 	private void RestartButton_Click(object sender, EventArgs e) {
@@ -1151,30 +1396,6 @@ public partial class GeneratorForm : Form {
 		restartButton.Text = "! RESTART !";
 		restartButton.Enabled = false;
 		QueueReset();
-	}
-	private void EncodeSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		/*if ((FractalGenerator.GenerationType)encodeSelect.SelectedIndex == FractalGenerator.GenerationType.Mp4) {
-			encodeSelect.SelectedIndex = 2;
-			_ = Error("Sorry but direct Mp4 encoding is currently broken and unavailable, try again in a later release.\nFor now you can use Local GIF and then press the Save Mp4 button instead.",
-				"Unavailable");
-			return;
-		}*/
-		if ((FractalGenerator.GenerationType)encodeSelect.SelectedIndex == FractalGenerator.GenerationType.HashParam) {
-			_ = MessageBox.Show(
-				"This mode is not really meant for the end user, it only generates all parameters and export a hash.txt file will all the unique ones.\nIf you actually want an animation of all seeds, AllSeeds is recommended instead as that doesn't waste resources doing the hashing and encodes the animation for export.",
-				"Warning",
-				MessageBoxButtons.OK,
-				MessageBoxIcon.Warning);
-		}
-
-		var prev = generator.SelectedGenerationType;
-		var now = generator.SelectedGenerationType = (FractalGenerator.GenerationType)Math.Max(0, encodeSelect.SelectedIndex);
-		if (now <= FractalGenerator.GenerationType.AnimationMp4 != prev <= FractalGenerator.GenerationType.AnimationMp4)
-			QueueReset(); // changed between zooming animation and AllSeeds animation - that needs to restart the entire generator as all images will be different
-		else {
-			if (now > FractalGenerator.GenerationType.AnimationRam && prev > FractalGenerator.GenerationType.AnimationRam && now != prev)
-				generator.RestartGif = true; // different GIF encoding - make the generator restart its gif encoder
-		}
 	}
 	private void HelpButton_Click(object sender, EventArgs e) {
 		helpPanel.Visible = screenPanel.Visible;
@@ -1199,22 +1420,30 @@ public partial class GeneratorForm : Form {
 		// Faster rendering with crisp pixels
 		e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
 		// some safety code to ensure no crashes
-		byte tryAttempt = 0;
-		while (tryAttempt < 5) {
+		byte attempt = 0;
+		while (attempt < 10) {
 			try {
 				e.Graphics.DrawImage(currentBitmap, new Rectangle(0, 0, screenPanel.Width, screenPanel.Height));
-				tryAttempt = 5;
+				attempt = 10;
 			} catch (Exception) {
-				++tryAttempt;
-				Thread.Sleep(100);
+				++attempt;
+				Thread.Sleep(10 + 10 * attempt * attempt);
 			}
 		}
 	}
 	private void ExportButton_Click(object sender, EventArgs e) {
 		var b = generator.GetBitmapsFinished();
 		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+
+		if (xTask != null) {
+			var result = MessageBox.Show("Cancel saving the file(s)?", "Cancel Saving?", MessageBoxButtons.YesNo);
+			if (result == DialogResult.Yes)
+				xCancel?.Cancel();
+			return;
+		}
+
 		switch (exportSelect.SelectedIndex) {
-			case 0: // PNG
+			case 0: // Current PNG
 				if (b < 1) {
 					_ = Error("This is only a low resolution preview image, please wait until the full resolution you have selected if finished.",
 						"Please wait");
@@ -1224,76 +1453,87 @@ public partial class GeneratorForm : Form {
 				UpdateBitmap(generator.GetBitmap(currentBitmapIndex %= b));
 				_ = savePng.ShowDialog();
 				break;
-			case 1: // GIF
-				if (gTask != null) {
-					gCancel?.Cancel();
-					return;
-				}
-				if (generator.SelectedGenerationType is < FractalGenerator.GenerationType.LocalGif or > FractalGenerator.GenerationType.AllSeedsGif) {
-					_ = Error("Your selected generation mode does not encode a GIF, you will have to switch it to LocalGIF, GlobalGIF, or AllSeeds.",
-						"Not available");
-					return;
-				}
+			case 1: // Animation PNG
 				if (b < generator.GetFrames()) {
 					_ = Error("Animation is not finished generating yet.",
 						"Please wait");
 					return;
 				}
-				_ = saveGif.ShowDialog();
-				break;
-			case 2: // GIF->MP4
-				if (mTask != null) {
-					mCancel?.Cancel();
-					return;
-				}
-				if (!File.Exists(ffmpegPath)) {
-					_ = Error("ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
-						"Unavailable");
-					return;
-				}
-				if (generator.SelectedGenerationType is < FractalGenerator.GenerationType.LocalGif or > FractalGenerator.GenerationType.AllSeedsGif) {
-					_ = Error("Your selected generation mode does not encode a GIF, you will have to switch it to LocalGIF, GlobalGIF, or AllSeeds.",
-						"Not available");
-					return;
-				}
-				if (b < generator.GetFrames()) {
-					_ = Error("Animation is not finished generating yet.",
-						"Please wait");
-					return;
-				}
-				if (gTask != null) {
-					_ = Error("GIF or Mp4 is still saving, either wait until it's finished, or click this button before saving the GIF.",
-						"Unavailable");
-					return;
-				}
-				if (/*gifButtonEnabled*/ isGifReady > 0 || gifPath != "")
-					_ = convertMp4.ShowDialog();
-				break;
-			case 3: // PNGs->MP4
-				if (mTask != null) {
-					mCancel?.Cancel();
-					return;
-				}
-				if (!File.Exists(ffmpegPath)) {
-					_ = Error("ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
-						"Unavailable");
-					return;
-				}
-				if (b < generator.GetFrames()) {
-					_ = Error("Animation is not finished generating yet.",
-						"Please wait");
-					return;
-				}
+				saveMp4.DefaultExt = "png";
+				saveMp4.Filter = "PNG file (*.png)|*.png";
 				_ = saveMp4.ShowDialog();
 				break;
+			case 2: // PNGs->MP4
+				if (!File.Exists(ffmpegPath)) {
+					_ = Error("ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
+						"Unavailable");
+					return;
+				}
+				if (b < generator.GetFrames()) {
+					_ = Error("Animation is not finished generating yet.",
+						"Please wait");
+					return;
+				}
+				saveMp4.DefaultExt = "mp4";
+				saveMp4.Filter = "MP4 video (*.mp4)|*.mp4";
+				_ = saveMp4.ShowDialog();
+				break;
+			case 3: // GIF
+				
+				if (generator.SelectedGifType == FractalGenerator.GifType.No) {
+					_ = Error("You do not have GIF encoding enabled, pick a Local of Global GIF, and try again after it's done encoding.",
+						"Not selected");
+					return;
+				}
+				if (b < generator.GetFrames()) {
+					_ = Error("Animation is not finished generating yet.",
+						"Please wait");
+					return;
+				}
+				if (isGifReady == 0) {
+					_ = Error("Encoded GIF is not available.",
+						"Not available");
+					return;
+				}
+				saveGif.DefaultExt = "gif";
+				saveGif.Filter = "GIF video (*.gif)|*.gif";
+				_ = saveGif.ShowDialog();
+				break;
+			case 4: // GIF->MP4
+				if (!File.Exists(ffmpegPath)) {
+					_ = Error("ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
+						"Unavailable");
+					return;
+				}
+				if (generator.SelectedGifType == FractalGenerator.GifType.No) {
+					_ = Error("You do not have GIF encoding enabled, pick a Local of Global GIF, and try again after it's done encoding.",
+						"Not selected");
+					return;
+				}
+				if (b < generator.GetFrames()) {
+					_ = Error("Animation is not finished generating yet.",
+						"Please wait");
+					return;
+				}
+				if (isGifReady == 0 || gifPath == "") {
+					_ = Error("Encoded GIF is not available.",
+						"Not available");
+					return;
+				}
+				saveGif.DefaultExt = "mp4";
+				saveGif.Filter = "MP4 video (*.mp4)|*.mp4";
+				_ = saveGif.ShowDialog();
+				break;
+
 		}
 	}
 	private void ExportSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		toolTips.SetToolTip(exportButton, exportSelect.SelectedIndex switch {
 			0 => "Export the currently displayed frame into a PNG file.\nStop the animation and select the frame you wish to export with the buttons above.",
-			1 => "Export the full animation into a GIF file.\nMust use a GIF encoding generation mode like LocalGIF/GlobalGIF/AllSeedsGIF.",
-			2 => "Convert a GIF file into Mp4.\nMust use a GIF encoding generation mode like LocalGIF/GlobalGIF/AllSeedsGIF.",
-			3 => "Export a high quality Mp4 from an exported PNG sequence.\nUse AnimationMp4/AllSeedsMp4 generation type for faster export.",
+			1 => "Export the full animation into series of PNG files",
+			2 => "Export the full animation into MP4 video",
+			3 => "Export the full animation into a GIF file.\nMust have GIF encoding enabled.",
+			4 => "Convert a GIF file into Mp4.\nMust have GIF encoding enabled.",
 			_ => ""
 		});
 	}
@@ -1304,11 +1544,16 @@ public partial class GeneratorForm : Form {
 	/// <param name="e"></param>
 	/// <returns></returns>
 	private void SavePng_FileOk(object sender, CancelEventArgs e) {
-		BackColor = Color.FromArgb(64,64,64);
+		BackColor = Color.FromArgb(64, 64, 64);
 		using var myStream = savePng.OpenFile();
 		currentBitmap.Save(myStream, System.Drawing.Imaging.ImageFormat.Png);
 		myStream.Close();
+		FinishedExporting();
+	}
+	private void FinishedExporting() {
 		BackColor = Color.FromArgb(64, 64, 128);
+		if (runningBatch.Length > 0)
+			NextBatch();
 	}
 	/// <summary>
 	/// User input the path and name for saving GIF/Mp4
@@ -1317,47 +1562,45 @@ public partial class GeneratorForm : Form {
 	/// <param name="e"></param>
 	/// <returns></returns>
 	private void SaveGif_FileOk(object sender, CancelEventArgs e) {
-		BackColor = Color.FromArgb(64, 64, 64);
-		gifPath = ((SaveFileDialog)sender).FileName;
-		// Gif Export Task
-		//foreach (var c in MyControls)c.Enabled = false;
-		gTask = Task.Run(ExportGif, (gCancel = new()).Token);
-	}
-	/// <summary>
-	/// User input the path and name for converting GIF -> Mp4
-	/// </summary>
-	/// <param name="sender"></param>
-	/// <param name="e"></param>
-	/// <returns></returns>
-	private void ConvertMp4_FileOk(object sender, CancelEventArgs e) {
-		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
-		if (!File.Exists(ffmpegPath)) {
-			_ = Error("ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
-				"Unavailable");
+
+		if (xTask != null) {
+			_ = Error("Export is still saving, either wait until it's finished, or click this button before saving a GIF.",
+				"Please wait");
 			return;
 		}
-		if (gTask != null) {
-			_ = Error("GIF is still saving, either wait until it's finished, or click this button before saving the GIF.",
-				"Unavailable");
-			encodeSelect.SelectedIndex = 3;
+		string ext = saveMp4.FileName[^3..];
+		if (ext == "gif") {
+			// save gif:
+			BackColor = Color.FromArgb(64, 64, 64);
+			gifPath = ((SaveFileDialog)sender).FileName;
+			// Gif Export Task
+			//foreach (var c in MyControls)c.Enabled = false;
+			xTask = Task.Run(ExportGif, (xCancel = new()).Token);
 			return;
 		}
-		if (mTask != null) {
-			_ = Error("Mp4 is still saving, wait until it's finished.",
-				"Unavailable");
+		// convert gif->mp4
+		if (NoFfmpeg())
 			return;
-		}
 		mp4Path = ((SaveFileDialog)sender).FileName;
 		if (isGifReady > 0) {
 			BackColor = Color.FromArgb(64, 64, 64);
 			gifPath = generator.GifTempPath;
-			mTask = Task.Run(ConvertMp4, (mCancel = new()).Token);
+			xTask = Task.Run(ConvertMp4, (xCancel = new()).Token);
 			return;
 		}
-		if (gifPath == "") 
+		if (gifPath == "")
 			return;
 		BackColor = Color.FromArgb(64, 64, 64);
-		mTask = Task.Run(ConvertMp4, (mCancel = new()).Token);
+		xTask = Task.Run(ConvertMp4, (xCancel = new()).Token);
+	}
+	private static bool NoFfmpeg() {
+		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+		if (!File.Exists(ffmpegPath)) {
+			_ = Error("ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
+				"Unavailable");
+			return true;
+		}
+		return false;
 	}
 	/// <summary>
 	/// User input the path and name for converting GIF -> Mp4
@@ -1366,20 +1609,30 @@ public partial class GeneratorForm : Form {
 	/// <param name="e"></param>
 	/// <returns></returns>
 	private void SaveMp4_FileOk(object sender, CancelEventArgs e) {
+		if (xTask != null) {
+			_ = Error("Export is still saving, wait until it's finished.",
+				"Please wait");
+			return;
+		}
+		string ext = saveMp4.FileName[^3..];
+		if (ext == "png") {
+			// TODO save PNGs
+			// save pngs:
+			BackColor = Color.FromArgb(64, 64, 64);
+			mp4Path = ((SaveFileDialog)sender).FileName;
+			xTask = Task.Run(ExportPngs, (xCancel = new()).Token);
+			return;
+		}
+		// save mp4:
 		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 		if (!File.Exists(ffmpegPath)) {
 			_ = Error("ffmpeg.exe not found. Are you sure you have downloaded the full release with ffmpeg included?",
 				"Unavailable");
 			return;
 		}
-		if (mTask != null) {
-			_ = Error("Mp4 is still saving, wait until it's finished.",
-				"Unavailable");
-			return;
-		}
 		BackColor = Color.FromArgb(64, 64, 64);
 		mp4Path = ((SaveFileDialog)sender).FileName;
-		mTask = Task.Run(ExportMp4, (mCancel = new()).Token);
+		xTask = Task.Run(ExportMp4, (xCancel = new()).Token);
 	}
 	/// <summary>
 	/// Exports the animation into a GIF file
@@ -1388,12 +1641,12 @@ public partial class GeneratorForm : Form {
 	/// <returns></returns>
 	private void ExportGif() {
 		var attempt = 0;
-		while (++attempt <= 10 && !gCancel.Token.IsCancellationRequested && generator.SaveGif(gifPath) > 0)
-			Thread.Sleep(1000);
-		if (!gCancel.Token.IsCancellationRequested)
+		while (++attempt <= 10 && !xCancel.Token.IsCancellationRequested && generator.SaveGif(gifPath) > 0)
+			Thread.Sleep(10 + 10 * attempt * attempt);
+		if (!xCancel.Token.IsCancellationRequested)
 			isGifReady = 0;
 		notifyExp = true;
-		gTask = null;
+		xTask = null;
 	}
 	/// <summary>
 	/// Exports the animation into a MP4 file
@@ -1401,15 +1654,40 @@ public partial class GeneratorForm : Form {
 	/// </summary>
 	/// <returns></returns>
 	private void ConvertMp4() {
-		var attempt = 0;
-		while (++attempt <= 10 && !mCancel.Token.IsCancellationRequested && generator.ConvertMp4(gifPath, mp4Path) > 0)
-			Thread.Sleep(1000);
-		if (!mCancel.Token.IsCancellationRequested)
+		string result = generator.SaveGifToMp4(gifPath, mp4Path);
+		if (xCancel.Token.IsCancellationRequested) {
+			xTask = null;
+			return;
+		}
+		if (result == "") {
 			isGifReady = 0;
-		notifyExp = true;
-		gifPath = "";
-		mp4Path = "";
-		mTask = null;
+			notifyExp = true;
+			gifPath = "";
+			mp4Path = "";
+			xTask = null;
+			return;
+		}
+		_ = Error(result, "Failed GIF export");
+	}
+	/// <summary>
+	/// Exports the animation into a MP4 file
+	/// Actually - it just exports PNG series and converts those into MP4
+	/// </summary>
+	/// <returns></returns>
+	private void ExportPngs() {
+		string result = generator.SavePngs(mp4Path);
+		if (xCancel.Token.IsCancellationRequested) {
+			xTask = null;
+			return;
+		}
+		if (result == "") {
+			notifyExp = true;
+			mp4Path = "";
+			isPngsSaved = true;
+			xTask = null;
+			return;
+		}
+		_ = Error(result, "Failed PNGs export");
 	}
 	/// <summary>
 	/// Exports the animation into a MP4 file
@@ -1417,12 +1695,19 @@ public partial class GeneratorForm : Form {
 	/// </summary>
 	/// <returns></returns>
 	private void ExportMp4() {
-		var attempt = 0;
-		while (++attempt <= 10 && !mCancel.Token.IsCancellationRequested && generator.SaveMp4(mp4Path) > 0)
-			Thread.Sleep(1000);
-		notifyExp = true;
-		mp4Path = "";
-		mTask = null;
+		string result = generator.SavePngsToMp4(mp4Path);
+		if (xCancel.Token.IsCancellationRequested) {
+			xTask = null;
+			return;
+		}
+		if (result == "") {
+			notifyExp = true;
+			mp4Path = "";
+			isPngsSaved = true;
+			xTask = null;
+			return;
+		}
+		_ = Error(result, "Failed MP4 export");
 	}
 	#endregion
 
@@ -1848,6 +2133,8 @@ public partial class GeneratorForm : Form {
 			generator.SelectedBlur = memBlur;
 			generator.SelectedBloom = memBloom;
 			generator.SelectedGenerationType = memGenerate;
+			generator.SelectedPngType = memPng;
+			generator.SelectedGifType = memGif;
 			//generator.selectHue = mem_hue;
 			generator.SelectedDefaultHue = memDefaultHue;
 			abortDelay = memAbort;
@@ -1856,12 +2143,16 @@ public partial class GeneratorForm : Form {
 		} else {
 			memBlur = generator.SelectedBlur;
 			memBloom = generator.SelectedBloom;
+			memPng = generator.SelectedPngType;
+			memGif = generator.SelectedGifType;
 			memGenerate = generator.SelectedGenerationType;
 			//mem_hue = generator.selectHue;
 			memDefaultHue = generator.SelectedDefaultHue;
 			memAbort = abortDelay;
 			abortDelay = 10;
-			generator.SelectedGenerationType = FractalGenerator.GenerationType.AnimationRam;
+			generator.SelectedPngType = FractalGenerator.PngType.No;
+			generator.SelectedGifType = FractalGenerator.GifType.No;
+			generator.SelectedGenerationType = FractalGenerator.GenerationType.Animation;
 			generator.SelectedBloom = generator.SelectedBlur = generator.SelectedHue = 0;// generator.selectDefaultHue = 0;
 			generator.SelectedPreviewMode = previewMode;
 		}

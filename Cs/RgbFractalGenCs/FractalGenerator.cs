@@ -5,8 +5,6 @@
 
 //#define SmoothnessDebugDetail
 
-#define MultiDepth
-
 using Gif.Components;
 using System;
 using System.Collections.Generic;
@@ -19,48 +17,51 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
+using System.IO.Pipes;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal class FractalGenerator {
 
-	public const int MinTasks = 1;
-	public const bool UseOfDepthForPreview = true;
+	public const int MinTasks = 1, MaxPngFails = 200;
 
+	#region Enums
 	private enum BitmapState : byte {
 		Queued = 0,				// Hasn't even started generating the dots yet (and it might stay this way if OnlyImage)
 		Dots = 1,				// Started Generating Dots
 		Void = 2,				// Started Dijkstra of the Void
 		Drawing = 3,			// Started drawing
 		DrawingFinished = 4,	// Finished drawing
-		UnlockedRam = 5,        // Unlocked bitmap without encoding
-		UnlockingPng = 6,       // Saving bitmap PNG
-		UnlockedPng = 7,        // Unlocked bitmap without encoding and saved PNG
-		Encoding = 8,			// Started Encoding
-		EncodingFinished = 9,	// Finished encoding
-		FinishedBitmap = 10,	// Finished bitmap (finished drawing if not encodeGIF, or finished encoding if encodeGIF)
-		Unlocked = 11,			// Unlocked bitmap
-		Error = 12				// Unused, unless error obviously
+		Unlocked = 5,			// Unlocked bitmap without encoding
+		Error = 6				// Unused, unless error obviously
 	}
 	private enum TaskState : byte {
-		Free = 0,	// The task has not been started yet, or already finished and joined and ready to be started again
-		Done = 1,	// The task if finished and ready to join without waiting
-		Running = 2 // The task is running
+		Free = 0,		// The task has not been started yet, or already finished and joined and ready to be started again
+		Done = 1,		// The task if finished and ready to join without waiting
+		Running = 2		// The task is running
 	}
 	public enum ParallelType : byte {
 		OfAnimation = 0,// Parallel batching of each animation image into its own single thread. No pixel conflicts, and more likely to use all the threads consistently. Recommended for animations.
 		OfDepth = 1     // Parallelism of each single image, generates the single next image faster, but there might be rare conflicts of accessing pixels, and it's a bit slower overall if generating an animation. Used automatically for OnlyImage.
 	}
 	public enum GenerationType : byte {
-		OnlyImage = 0,      // Only generates the first single image, and then halts. Or stops generating animation, if selected during an animation generation and at least one frame has already been finished.
-		AnimationRam = 1,   // Will only generate the animation for preview, faster than encoding GIF, but cannot save the GIF when finished.
-		AnimationMp4 = 2,   // Will export PNG series for a high quality MP4 export
-		LocalGif = 3,       // Will encode a GIF while generating the animation, will be slower than generating the animation without GIF.
-		GlobalGif = 4,      // Will encode a gif but only analyze the first frame for a color map, much faster, but not recommended for shifting hues or if you want the highest possible quality
-		AllSeedsGif = 5,	// Will generate one image for every CutFunction parameter seed, ignoring zooming, spinning etc.
-		AllSeedsMp4 = 6,	// Like AllSeedsGIF, but instead of encoding a GIF, it will export PNG series for direct high quality MP4 export, like the AnimationMp4 does
-		HashParam = 7		// Like AllSeeds, but without GIF encoding, and will export a hast.txt containing all unique seeds.
+		OnlyImage = 0,  // Will only render one still image. Cannot export PNG animation, or GIF animation, only a single image, the first one from a zoom animation.
+		Animation = 1,  // Will render the animation as set up by your settings.
+		AllSeeds = 2,   // Will not zoom/spin/shift at all, but instead cycle through all the available CutFunction seeds.
+		HashSeeds = 3   // Same as All Seeds, but will also export a file with all detected unique seeds. (Only really useful for the developer, to hide the repeating seeds)
 	}
+	public enum PngType : byte {
+		No = 0,			// Will not encode PNGs durign the generation, but will encode them just as fast if not faster when you do an export
+		Yes = 1			// Will export animation as PNG series, that will enable you to export the PNGS or MP4 quicker after it's finished, but not really quicker overall.
+	}
+	public enum GifType : byte {
+		No = 0,			// Will not encode a gif, you will not be able to export a gif afterwards, but you can switch to a Local/Global later and it will not fully reset the generator, just catches up with missing frames.
+		Local = 1,		// Will encode a GIF during the generation, so you could save it when finished. With a local colormap (one for each frame). Higher color precision. Slow encoding, larger GIF file size. 
+		Global = 2		// Also encodes a GIF. But with a global color map learned from a first frame. Not recommended for changing colors. Much faster encoding, smaller GIF file size
+	}
+
+	#endregion
 
 	private class FractalTask {
 		private Task task;				// Parallel Animation Tasks
@@ -123,14 +124,13 @@ internal class FractalGenerator {
 		}
 	}
 
+	#region Variables
 #if CustomDebug
 	// Debug variables
 	private string logString;						// Debug log
 	Stopwatch startTime;							// Start Stopwatch
 	private double initTimes, iterTimes, voidTimes, drawTimes, gifsTimes;
 #endif
-
-	#region Variables
 	// Definitions
 	private readonly List<Fractal> 
 		fractals;					// Fractal definitions
@@ -160,7 +160,7 @@ internal class FractalGenerator {
 	private Bitmap[] bitmap;            // Prerender as an array of bitmaps
 	private BitmapState[] bitmapState;	// 0 - not exists, 1 - generating and not exists, 2 - spawned and locked, 3 - finished drawing locked, 4 - started gif locked, 5 - finished unlocked
 	private BitmapData[] bitmapData;    // Locked Bits for bitmaps
-	private bool[] mp4Png;				// Was a PNG of this frame exported?
+	
 	private short finalPeriodMultiplier;// How much will the period get finally stretched? (calculated for seamless + user multiplier)
 	private short debug;				// Debug frame count override
 	private int bitmapsFinished;        // How many bitmaps are completely finished generating? (ready to display, encoded if possible)
@@ -171,7 +171,18 @@ internal class FractalGenerator {
 	private short applyMaxIterations;
 	private double applyDetail;
 	private short applyExtraSpin;
+	private short applyDelay;
 	private GenerationType applyGenerationType;
+	private PngType applyPngType;
+	private GifType applyGifType;		
+	private short pngFailed;			// how many attempts to write a png have failed?
+	private int encodedMp4;             // report of how many mp4 frames have been encoded
+	private byte[] encodedGif;          // 0 - not encoded, 1 - encoding, 2 - encoded, 3 - written
+	private byte[] encodedPng;          // 0 - not encoded, 1 - encoding, 2 - encoded
+	private bool[] lockedBmp;
+	private int tryPng;					// how many sequential Pngs have been exported?
+	private int tryGif;                 // how many sequential gif frames have been exported
+	private MemoryStream[] msPngs;
 
 	// Color
 	public readonly List<(string, Vector3[])> Colors = [
@@ -209,9 +220,7 @@ internal class FractalGenerator {
 		random = new();         // Random generator
 
 	// Threading
-#if MultiDepth
 	private Vector3[][][] buffer;  // Buffer for points to print into bmp - separated for OfDepth
-#endif
 	private FractalTask[] tasks;
 	private ParallelType 
 		applyParallelType;			// Safely copy parallelType in here, so it doesn't change in the middle of generation
@@ -234,8 +243,8 @@ internal class FractalGenerator {
 		isFinishingBitmaps = 2;     // counter and lock to try finishing bitmaps once every 2 threads
 	private (short, (double, double), (double, double), short, long, byte)[] 
 		tuples;                     // Queue struct for GenerateDots_OfDepth ((x,y), angle, aa, color, -cutParam, depth);
-	private Queue<(short, (double, double), (double, double), short, long, byte)>
-		ofDepthQueue = new(), ofDepth00 = new(), ofDepth01 = new(), ofDepth10 = new(), ofDepth11 = new();
+	//private Queue<(short, (double, double), (double, double), short, long, byte)>
+	//	ofDepthQueue = new(), ofDepth00 = new(), ofDepth01 = new(), ofDepth10 = new(), ofDepth11 = new();
 
 	internal event Action UpdatePreview;
 
@@ -243,10 +252,10 @@ internal class FractalGenerator {
 	private AnimatedGifEncoder 
 		gifEncoder;						// Export GIF encoder
 	//private Mp4Encoder mp4Encoder;
-	private int gifSuccess;				// Temp GIF file "gif.tmp" successfully created
-	private bool gifThread;
+	private int gifSuccess;             // Temp GIF file "gif.tmp" successfully created
+	//private bool mp4Success;
+	//private bool gifThread;
 	internal string GifTempPath;        // Temporary GIF file name
-	private int tryPng;
 	private Rectangle 
 		rect;							// Bitmap rectangle TODO implement
 
@@ -284,19 +293,24 @@ internal class FractalGenerator {
 	internal short SelectedMaxTasks,	// Maximum allowed total tasks
 		SelectedDelay,					// Animation frame delay
 		SelectedFps = 1;
-	internal GenerationType 
-		SelectedGenerationType;			// 0 = Only Image, 1 = Animation, 2 = Animation + GIF
+	internal GenerationType
+		SelectedGenerationType;         // 0 = Only Image, 1 = Animation, 2 = Animation + GIF
+	internal PngType
+		SelectedPngType;				// 0 = No, 1 = Yes
+	internal GifType
+		SelectedGifType;				// 0 = No, 1 = Local, 2 = Global
+
 	internal int CutParamMaximum;       // Maximum seed for the selected CutFunction
 	internal bool
 		SelectedPreviewMode = false;    // Preview mode only renders a single smaller fractal with only one color shift at the highest level - for definition editor
-	internal bool 
-		RestartGif;						// Makes me restart the gif encoder (called when delay is changed, which should restart the encoder, but not toss the finished bitmaps)
+	//internal bool 
+	//	RestartGif;						// Makes me restart the gif encoder (called when delay is changed, which should restart the encoder, but not toss the finished bitmaps)
 	
 	
 	// Debug
 	internal bool DebugMode = false;
 	internal string DebugString = "";
-	private readonly short[] counter = new short[12];
+	private readonly short[] counter = new short[7];
 
 	private readonly string filePrefix;
 
@@ -306,7 +320,9 @@ internal class FractalGenerator {
 	internal FractalGenerator() {
 		filePrefix = "guid" + Guid.NewGuid().ToString("N");
 		SelectedParallelType = ParallelType.OfAnimation;
-		SelectedGenerationType = GenerationType.LocalGif;
+		SelectedGenerationType = GenerationType.Animation;
+		SelectedPngType = PngType.No;
+		SelectedGifType = GifType.No;
 		SelectedDefaultHue = SelectedCutParam = SelectedDefaultZoom = SelectedDefaultAngle = SelectedExtraSpin = SelectedExtraHue = debug = 0;
 		SelectedZoom = 1;
 		allocatedFrames = SelectedSpin = SelectedHue = SelectedFractal = SelectedChildColor = SelectedChildAngle = SelectedCut = allocatedWidth = allocatedHeight = allocatedTasks =  -1;
@@ -815,30 +831,32 @@ internal class FractalGenerator {
 						  ( // Cancel Request forbids any new threads to start
 							  !mainLoop || SelectedMaxTasks == applyMaxTasks &&
 							  applyParallelType == SelectedParallelType &&
-							  SelectedGenerationType ==
-							  applyGenerationType // changing these settings should exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
+							  SelectedGenerationType == applyGenerationType &&// changing these settings should exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
+							  SelectedGifType == applyGifType
 						  ) &&
-						  (mainLoop && (TryWriteBitmaps(task) || TryFinishBitmaps(task) || TryPngBitmaps(task)) ||
+						  (mainLoop && (TryWriteGifFrames(task) || TryFinishBitmaps(task) || TryPngBitmaps(task)) ||
 						   lambda(t)); // in the main loop we try Bitmap finishing and writing secondary threads (onDepth loop would get stuck )
 				}
 				if (tasksRemaining)
 					i = 3;
+				if (pngFailed >= MaxPngFails)
+					applyPngType = PngType.No;
 			}
-			ApplyGenerationType();
+			//_ = ApplyGenerationType();
 		}
 	}
-	bool TryWriteBitmaps(FractalTask task) {
+	bool TryWriteGifFrames(FractalTask task) {
 		if (token.IsCancellationRequested // Do not write gid frames when cancelled
 			|| gifEncoder == null // ...or if gifEncoder doesn't exist
 			|| gifEncoder.IsFinished() // ...or if it's finished
-			|| applyGenerationType is < GenerationType.LocalGif or > GenerationType.AllSeedsGif // ...or we are not supposed to encode a gif
+			|| applyGifType == GifType.No// ...or we are not supposed to encode a gif
 			|| isWritingBitmaps <= 0 // ...or this task is already running
 			|| --isWritingBitmaps > 0) // ...or we have already run it not too long ago
 			return false;
-		task.Start(-1, () => TryWriteBitmap(task.TaskIndex));
+		task.Start(-1, () => TryWriteGifFrame(task.TaskIndex));
 		return true;
 	}
-	void TryWriteBitmap(int taskIndex) {
+	void TryWriteGifFrame(int taskIndex) {
 		while (!token.IsCancellationRequested) {
 			if (bitmapsFinished >= bitmap.Length && !gifEncoder.IsFinished())
 				gifEncoder.Finish();
@@ -855,8 +873,15 @@ internal class FractalGenerator {
 					return;
 				case TryWrite.FinishedFrame:
 					// mark the bitmap state as fully finished
-					bitmapState[unlock + previewFrames] = BitmapState.FinishedBitmap;
+					encodedGif[unlock + previewFrames] = 3;
+					if (unlock + previewFrames + 1 == bitmap.Length)
+						FinishGif();
 					break;
+				/*case TryWrite.FinishedAnimation:
+					FinishGif();
+					isWritingBitmaps = 2;
+					tasks[taskIndex].State = TaskState.Done;
+					return;*/
 				default:
 					// waiting or finished animation
 					isWritingBitmaps = 2;
@@ -868,23 +893,41 @@ internal class FractalGenerator {
 		isWritingBitmaps = 2;
 		tasks[taskIndex].State = TaskState.Done;
 	}
+	BitmapData LockBits(int index, Rectangle rect) {
+		if (lockedBmp[index])
+			return bitmapData[index];
+		lockedBmp[index] = true;
+		return bitmapData[index] = bitmap[index].LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format24bppRgb);
+		
+	}
+	void UnlockBits(int index) {
+		if (!lockedBmp[index])
+			return;
+		bitmap[index].UnlockBits(bitmapData[index]);
+		lockedBmp[index] = false;
+	}
 	bool TryFinishBitmaps(FractalTask task) {
 		if (token.IsCancellationRequested)
 			return false;
-		var gif = applyGenerationType is >= GenerationType.LocalGif and <= GenerationType.AllSeedsGif;
-		if (gif && bitmapsFinished < bitmap.Length && bitmapsFinished >= previewFrames && !gifThread) {
-			var tryEncode = bitmapsFinished;
-			var maxTry = Math.Min(bitmap.Length, bitmapsFinished + applyMaxTasks);
-			while (tryEncode < maxTry) {
-				if (bitmapState[tryEncode] is >= BitmapState.DrawingFinished and <= BitmapState.UnlockedPng) {
-					if (bitmapState[tryEncode] is >= BitmapState.UnlockedRam and <= BitmapState.UnlockedPng)
-						bitmapData[tryEncode] = bitmap[tryEncode].LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
-					bitmapState[tryEncode] = BitmapState.Encoding;
-					gifThread = false;//applyGenerationType == GenerationType.Mp4;
-					task.Start(tryEncode, () => GenerateGif(task));
-					return true;
+		var gif = applyGifType != GifType.No && gifEncoder != null;
+
+		if (gif) {
+			if (tryGif < previewFrames)
+				tryGif = previewFrames;
+			while (tryGif < bitmap.Length && encodedGif[tryGif] >= 1)
+				++tryGif;
+			if (tryGif < bitmap.Length) {
+				var tryEncode = tryGif;
+				var maxTry = Math.Min(bitmap.Length, bitmapsFinished + applyMaxTasks);
+				while (tryEncode < maxTry) {
+					if (bitmapState[tryEncode] >= BitmapState.DrawingFinished && encodedGif[tryEncode] == 0) {
+						_ = LockBits(tryEncode, rect);
+						encodedGif[tryEncode] = 1;
+						task.Start(tryEncode, () => GenerateGif(task));
+						return true;
+					}
+					++tryEncode;
 				}
-				++tryEncode;
 			}
 		}
 		if (token.IsCancellationRequested // Do not write gid frames when cancelled
@@ -898,9 +941,9 @@ internal class FractalGenerator {
 	void TryFinishBitmap(bool gif, short taskIndex) {
 		Monitor.Enter(taskLock);
 		try {
-			while (!token.IsCancellationRequested && bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] >= (gif || bitmapState[bitmapsFinished] == BitmapState.Encoding ? BitmapState.FinishedBitmap : BitmapState.DrawingFinished)) {
-				bitmapState[bitmapsFinished] = gif || bitmapsFinished < previewFrames ? BitmapState.Unlocked : BitmapState.UnlockedRam;
-				if (applyGenerationType == GenerationType.HashParam) {
+			while (!token.IsCancellationRequested && bitmapsFinished < bitmap.Length && bitmapState[bitmapsFinished] == BitmapState.DrawingFinished && (!gif || encodedGif[bitmapsFinished] == 3)) {
+				bitmapState[bitmapsFinished] = BitmapState.Unlocked;
+				if (applyGenerationType == GenerationType.HashSeeds) {
 					using var sha256 = SHA256.Create();
 					unchecked {
 						unsafe {
@@ -912,15 +955,18 @@ internal class FractalGenerator {
 								Buffer.MemoryCopy((void*)bitmapData[bitmapsFinished].Scan0, dest, byteNum, byteNum);
 							}
 							var key = BitConverter.ToString(SHA256.HashData(pixelData));
-							Hash.TryAdd(key, bitmapsFinished);
+							_ = Hash.TryAdd(key, bitmapsFinished);
 						}
 					}
+					// Finish hash file
+					if (bitmapsFinished == bitmap.Length - 1) {
+						var output = "";
+						foreach (var i in Hash)
+							output += "," + i.Value;
+						File.WriteAllText("hash.txt", output);
+					}
 				}
-				bitmap[bitmapsFinished].UnlockBits(bitmapData[bitmapsFinished]);
-				// If not exporting PNGs just mark the PNG export as finished
-				if (applyGenerationType is not GenerationType.AnimationMp4 and not GenerationType.AllSeedsMp4)
-					bitmapState[bitmapsFinished] = BitmapState.UnlockedPng;
-
+				UnlockBits(bitmapsFinished);
 				// Let the form know it's ready
 				if (bitmapsFinished++ <= previewFrames && !token.IsCancellationRequested)
 					UpdatePreview?.Invoke();
@@ -933,40 +979,35 @@ internal class FractalGenerator {
 		isFinishingBitmaps = 2;
 	}
 	bool TryPngBitmaps(FractalTask task) {
-		if (token.IsCancellationRequested || bitmapsFinished < previewFrames) // Do not write gid frames when cancelled
+		if (token.IsCancellationRequested || bitmapsFinished < previewFrames) // Do not write when cancelled
 			return false;
 		if (tryPng < 0) {
 			tryPng = previewFrames;
 			CleanupTempFiles();
 		}
-		if (applyGenerationType is not GenerationType.AnimationMp4 and not GenerationType.AllSeedsMp4) {
-			tryPng = bitmapsFinished;
+		if (applyPngType == PngType.No) {
+			//tryPng = bitmapsFinished;
 			return false;
 		}
-		while (tryPng < bitmap.Length && bitmapState[tryPng] >= BitmapState.UnlockingPng)
+		while (tryPng < bitmap.Length && encodedPng[tryPng] >= 1)
 			++tryPng;
 		if (tryPng >= bitmap.Length)
 			return false;
 		//var task = tasks[taskIndex];
 		var bitmapIndex = tryPng;
-		for (var mx = Math.Min(bitmap.Length, tryPng + applyMaxTasks); bitmapIndex < mx && bitmapState[bitmapIndex] != BitmapState.UnlockedRam; ++bitmapIndex) { }
-		if (bitmapState[bitmapIndex] != BitmapState.UnlockedRam)
+		for (var mx = Math.Min(bitmap.Length, tryPng + applyMaxTasks); bitmapIndex < mx && encodedPng[bitmapIndex] >= 1; ++bitmapIndex) { }
+		if (encodedPng[bitmapIndex] >= 1 || bitmapIndex >= bitmap.Length || bitmapState[bitmapIndex] < BitmapState.Unlocked)
 			return false;
-		bitmapState[bitmapIndex] = BitmapState.UnlockingPng;
-		if (token.IsCancellationRequested) // Do not write gid frames when cancelled
+		encodedPng[bitmapIndex] = 1;
+		if (token.IsCancellationRequested) // Do not write gif frames when cancelled
 			return false;
 		task.Start(-3, () => TryPngBitmap(task.TaskIndex, bitmapIndex));
 		return true;
 	}
 	void TryPngBitmap(short taskIndex, int bitmapIndex) {
-		var n = 1;
-		for (var number = bitmap.Length - previewFrames; number >= 10; number /= 10)
-			++n;
-		var d = "D" + n;
-		if (SaveMp4Png(bitmapIndex - previewFrames, d)) {
+		(_, _, var d) = GetPngFormat();
+		if (SavePng(bitmapIndex - previewFrames, d)) 
 			tryPng = bitmapIndex;
-			bitmapState[bitmapIndex] = BitmapState.UnlockedRam;
-		} else bitmapState[bitmapIndex] = BitmapState.UnlockedPng;
 		tasks[taskIndex].State = TaskState.Done;
 	}
 	void GenerateGif(FractalTask task) {
@@ -989,16 +1030,15 @@ internal class FractalGenerator {
 			}
 		} else {*/
 		if (gifEncoder != null) {
-			bitmapState[task.BitmapIndex] = BitmapState.Encoding; // Start encoding Frame to a temp GIF	
 			unsafe {
 				var d = bitmapData[task.BitmapIndex];
 				var ptr = (byte*)(void*)d.Scan0;
 				gifEncoder.AddFrameParallel(ptr, d.Stride, gifToken, task.BitmapIndex - previewFrames);
-				bitmapState[task.BitmapIndex] = BitmapState.EncodingFinished;
+				encodedGif[task.BitmapIndex] = 2;
 			}
 		} else {
 			StopGif(task);
-			bitmapState[task.BitmapIndex] = BitmapState.DrawingFinished;
+			encodedGif[task.BitmapIndex] = 0;
 		}
 		//}
 #if CustomDebug
@@ -1010,8 +1050,6 @@ internal class FractalGenerator {
 				Log(ref logString, threadString);
 			} finally { Monitor.Exit(taskLock); }
 #endif
-		//if (applyGenerationType == GenerationType.Mp4) bitmapState[task.bitmapIndex] = BitmapState.FinishedBitmap;
-		gifThread = false;
 		task.State = TaskState.Done;
 	}
 	#endregion
@@ -1030,6 +1068,7 @@ internal class FractalGenerator {
 	
 	private int GetGenerateLength() => applyGenerationType > GenerationType.OnlyImage && !applyPreviewMode ? bitmap.Length : previewFrames + 1;
 	private void GenerateAnimation() {
+
 		#region GeneralAnimation_Implementation
 #if CustomDebug
 		// Start a new DebugLog
@@ -1038,7 +1077,8 @@ internal class FractalGenerator {
 		startTime = new();
 		startTime.Start();
 #endif
-		RestartGif = false;
+		//mp4Success = 
+		//RestartGif = false;
 		applyPalette = Colors[(short)(SelectedPaletteType < 0 ? random.Next(0, Colors.Count) : SelectedPaletteType)].Item2;
 		applyPalette2 = 2 * applyPalette.Length;
 		var cc = f.ChildColor[SelectedChildColor].Item2;
@@ -1096,28 +1136,36 @@ internal class FractalGenerator {
 		//);
 
 		// setup bitmap data
-		bitmapsFinished = nextBitmap = 0;
+		bitmapsFinished = nextBitmap = pngFailed = 0;
 		tryPng = -1;
+		applyGifType = SelectedGifType;
+		applyPngType = SelectedPngType;
 		var frames = (applyGenerationType = SelectedGenerationType) switch {
-			GenerationType.AllSeedsGif => GetMaxCutParam() + 1,
-			GenerationType.AllSeedsMp4 => GetMaxCutParam() + 1,
-			GenerationType.HashParam => CutParamMaximum + 1,
+			GenerationType.AllSeeds => GetMaxCutParam() + 1,
+			GenerationType.HashSeeds => CutParamMaximum + 1,
 			_ => (short)(debug > 0 ? debug : SelectedPeriod * finalPeriodMultiplier)
 		};
+
+		if (msPngs != null)
+			for (int i = 0; i < msPngs.Length;++i)
+				msPngs[i]?.Dispose();
+
 		if ((frames += previewFrames = Math.Max(0, (int)Math.Log2(Math.Min(SelectedWidth, SelectedHeight)) - 2)) != allocatedFrames) {
 			bitmap = new Bitmap[allocatedFrames = frames];
 			bitmapData = new BitmapData[frames];
 			bitmapState = new BitmapState[frames + 1];
-			
-		}
-		// Setup reset PNG export states
-		if (mp4Png == null || mp4Png.Length != frames - previewFrames)
-			mp4Png = new bool[frames - previewFrames];
-		else
-			for (var i = frames - previewFrames; 0 <= --i; mp4Png[i] = false)
-			{
+			encodedPng = new byte[frames];
+			encodedGif = new byte[frames];
+			lockedBmp = new bool[frames];
+			msPngs = new MemoryStream[frames];
+		} else {
+			for (var i = frames; 0 <= --i; encodedPng[i] = 0) {
 			}
-
+			for (var i = frames; 0 <= --i; encodedGif[i] = 0) {
+			}
+			for (var i = frames; 0 <= --i; lockedBmp[i] = false) {
+			}
+		}
 		// Setup reset BitmapStates
 		for (var b = frames; b >= 0; bitmapState[b--] = BitmapState.Queued)
 		{
@@ -1136,7 +1184,7 @@ internal class FractalGenerator {
 			var w = Math.Max(SelectedWidth, SelectedHeight) * f.MaxSize * 0.1;
 			size = w * f.ChildSize * .9;
 		}
-		var toFinishAnimation = true;
+		//var toFinishAnimation = true;
 		for (var i = SelectedDefaultZoom < 0
 			     ? random.Next(0, SelectedPeriod * finalPeriodMultiplier)
 			     : SelectedDefaultZoom % (SelectedPeriod * finalPeriodMultiplier);
@@ -1146,7 +1194,7 @@ internal class FractalGenerator {
 		}
 
 		// Pre-generate color blends
-		if (applyGenerationType < GenerationType.AllSeedsGif) 
+		if (applyGenerationType < GenerationType.AllSeeds) 
 			PreGenerateParam(0, colorBlends, out startCutParam);
 		applyDetail = SelectedDetail;
 #if SmoothnessDebugDetail
@@ -1155,7 +1203,12 @@ internal class FractalGenerator {
 		// Generate the images
 		while (!token.IsCancellationRequested) {
 
-			toFinishAnimation |= ApplyGenerationType();
+			if (SelectedGifType != applyGifType || SelectedDelay != applyDelay) {
+				FinishTasks(true, true, _ => false);
+				StopGif(null);
+				StartGif();
+			}
+			/*toFinishAnimation |= ApplyGenerationType();
 			if (RestartGif) {
 				RestartGif = false;
 				toFinishAnimation = true;
@@ -1163,93 +1216,84 @@ internal class FractalGenerator {
 				FinishTasks(true, true, _ => false);
 				StopGif(null);
 				StartGif();
+			}*/
+			//if (tryPng < bitmap.Length || tryGif < bitmap.Length || bitmapsFinished < bitmap.Length) {
+			// Use the selected ParallelType, or OfDepth if OnlyImage (if you want a GenerateDots_SingleTask like OfAnimation with OnlyImage, set the maxTasks to <= MinTasks)
+			applyParallelType = SelectedParallelType;
+			// Initialize buffers (delete and reset if size changed)
+			if ((applyMaxTasks = Math.Max((short)MinTasks, SelectedMaxTasks)) != allocatedTasks) {
+				if (allocatedTasks >= 0)
+					for (var t = 0; t < allocatedTasks; ++t) //{
+						tasks[t].Join();
+				/*var task = tasks[t];
+				if (task.taskStarted)
+					task.Join();
+			}*/
+				rect = new(0, 0, allocatedWidth = SelectedWidth, allocatedHeight = SelectedHeight);
+				tasks = new FractalTask[allocatedTasks = applyMaxTasks];
+				tuples = new (short, (double, double), (double, double), short, long, byte)[applyMaxTasks * DepthDiv];
+				applyVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
+				int vw = SelectedWidth / applyVoid + 2, vh = SelectedHeight / applyVoid + 2;
+				// Regular NeBuffer
+				for (var t = applyMaxTasks; 0 <= --t;) {
+					var task = tasks[t] = new FractalTask();
+					task.TaskIndex = t;
+					NewBuffer(task, vw, vh);
+				}
+				SetMaxIterations();
 			}
-			if (tryPng < bitmap.Length) {
-				// Use the selected ParallelType, or OfDepth if OnlyImage (if you want a GenerateDots_SingleTask like OfAnimation with OnlyImage, set the maxTasks to <= MinTasks)
-				applyParallelType = SelectedParallelType;
-				// Initialize buffers (delete and reset if size changed)
-				if ((applyMaxTasks = Math.Max((short)MinTasks, SelectedMaxTasks)) != allocatedTasks) {
-					if (allocatedTasks >= 0)
-						for (var t = 0; t < allocatedTasks; ++t) //{
-							tasks[t].Join();
-							/*var task = tasks[t];
-							if (task.taskStarted)
-								task.Join();
-						}*/
-					rect = new(0, 0, allocatedWidth = SelectedWidth, allocatedHeight = SelectedHeight);
-					tasks = new FractalTask[allocatedTasks = applyMaxTasks];
-					tuples = new (short, (double, double), (double, double), short, long, byte)[applyMaxTasks * DepthDiv];
-					applyVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
-#if MultiDepth
-					if (applyMaxTasks > MinTasks && (applyParallelType == ParallelType.OfDepth || previewFrames > 0)) NewOfDepthBuffer(true, true);
-#endif
-					int vw = SelectedWidth / applyVoid + 2, vh = SelectedHeight / applyVoid + 2;
-					// Regular NeBuffer
-					for (var t = applyMaxTasks; 0 <= --t;) {
-						var task = tasks[t] = new FractalTask();
-						task.TaskIndex = t;
-						NewBuffer(task, vw, vh);
-					}
-					SetMaxIterations();	
+			if (SelectedHeight != allocatedHeight) {
+				applyVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
+				int vw = SelectedWidth / applyVoid + 2, vh = SelectedHeight / applyVoid + 2;
+				for (short t = 0; t < applyMaxTasks; NewBuffer(tasks[t++], vw, vh)) { }
+				rect = new(0, 0, allocatedWidth = SelectedWidth, allocatedHeight = SelectedHeight);
+			}
+			if (SelectedWidth != allocatedWidth) {
+				applyVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
+				int vw = SelectedWidth / applyVoid + 2, vh = SelectedHeight / applyVoid + 2;
+				for (short t = 0; t < applyMaxTasks; ++t) {
+					var task = tasks[t];
+					var buffT = task.Buffer;
+					var voidT = task.VoidDepth;
+					var noiseT = task.VoidNoise;
+					for (short y = 0; y < SelectedHeight; voidT[y++] = new short[SelectedWidth])
+						buffT[y] = new Vector3[SelectedWidth];
+					for (short y = 0; y < vh; noiseT[y++] = new Vector3[vw]) { }
 				}
-				if (SelectedHeight != allocatedHeight) {
-					applyVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
-#if MultiDepth
-					if (applyMaxTasks > MinTasks && (applyParallelType == ParallelType.OfDepth || previewFrames > 0)) NewOfDepthBuffer(false, true);
-#endif
-					int vw = SelectedWidth / applyVoid + 2, vh = SelectedHeight / applyVoid + 2;
-					for (short t = 0; t < applyMaxTasks; NewBuffer(tasks[t++], vw, vh)) {}
-					rect = new(0, 0, allocatedWidth = SelectedWidth, allocatedHeight = SelectedHeight);
+				rect = new(0, 0, allocatedWidth = SelectedWidth, SelectedHeight);
+			}
+			// reallocate noise buffer if the noise resolution has changed
+			if (applyVoid != SelectedVoid + 1) {
+				applyVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
+				int vw = SelectedWidth / applyVoid + 2, vh = SelectedHeight / applyVoid + 2;
+				for (short t = 0; t < applyMaxTasks; t++) {
+					var noiseT = tasks[t].VoidNoise = new Vector3[vh][];
+					for (var y = 0; y < vh; noiseT[y++] = new Vector3[vw]) { }
 				}
-				if (SelectedWidth != allocatedWidth) {
-					applyVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
-#if MultiDepth
-					if (applyMaxTasks > MinTasks && (applyParallelType == ParallelType.OfDepth || previewFrames > 0)) NewOfDepthBuffer(false, false);
-#endif
-					int vw = SelectedWidth / applyVoid + 2, vh = SelectedHeight / applyVoid + 2;
-					for (short t = 0; t < applyMaxTasks; ++t) {
-						var task = tasks[t];
-						var buffT = task.Buffer;
-						var voidT = task.VoidDepth;
-						var noiseT = task.VoidNoise;
-						for (short y = 0; y < SelectedHeight; voidT[y++] = new short[SelectedWidth])
-							buffT[y] = new Vector3[SelectedWidth];
-						for (short y = 0; y < vh; noiseT[y++] = new Vector3[vw]) {}
-					}
-					rect = new(0, 0, allocatedWidth = SelectedWidth, SelectedHeight);
-				}
-				// reallocate noise buffer if the noise resolution has changed
-				if (applyVoid != SelectedVoid + 1) {
-					applyVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
-					int vw = SelectedWidth / applyVoid + 2, vh = SelectedHeight / applyVoid + 2;
-					for (short t = 0; t < applyMaxTasks; t++) {
-						var noiseT = tasks[t].VoidNoise = new Vector3[vh][];
-						for (var y = 0; y < vh; noiseT[y++] = new Vector3[vw]) {}
-					}
-				}
-				applyMaxIterations = selectMaxIterations;
-				// Wait if no more frames to generate
-				if (tryPng >= GetGenerateLength()) {
-					Thread.Sleep(50);
-					continue;
-				}
-				FinishTasks(false, true, taskIndex => {
-					if (nextBitmap >= GetGenerateLength())
-						return false;// The task is finished, no need to wait for this one
-					var bmp = nextBitmap++;
-					double tempSize = bmp < previewFrames ? size / (1 << (previewFrames - bmp - 1)) : size, tempAngle = angle;
-					var tempHueAngle = hueAngle;
-					var tempSpin = spin;
-					//bitmapState[nextBitmap] = BitmapState.Dots; // i was getting queued state tasks, this solved that, so that just means they take a while to get started, not an error
-					if (applyParallelType > ParallelType.OfAnimation || applyMaxTasks <= MinTasks || (bmp < previewFrames && UseOfDepthForPreview))
-						GenerateDots(bmp, (short)(-taskIndex - 1), tempSize, tempAngle, tempSpin, 0, tempHueAngle);
-					else tasks[taskIndex].Start(bmp, () => GenerateDots(bmp, (short)(taskIndex + 1), tempSize, tempAngle, tempSpin, 0, tempHueAngle));
-					if (bmp >= previewFrames)
-						IncFrameParameters(ref size, ref angle, ref hueAngle, spin, 1);
-					return true; // A task finished, but started another one - keep checking before new master loop
-				}
-				);
-			} else if (toFinishAnimation) {
+			}
+			applyMaxIterations = selectMaxIterations;
+			// Wait if no more frames to generate
+			if (tryPng >= GetGenerateLength()) {
+				Thread.Sleep(50);
+				continue;
+			}
+			FinishTasks(false, true, taskIndex => {
+				if (nextBitmap >= GetGenerateLength())
+					return false;// The task is finished, no need to wait for this one
+				var bmp = nextBitmap++;
+				double tempSize = bmp < previewFrames ? size / (1 << (previewFrames - bmp - 1)) : size, tempAngle = angle;
+				var tempHueAngle = hueAngle;
+				var tempSpin = spin;
+				//bitmapState[nextBitmap] = BitmapState.Dots; // i was getting queued state tasks, this solved that, so that just means they take a while to get started, not an error
+				if (applyParallelType > ParallelType.OfAnimation || applyMaxTasks <= MinTasks || bmp < previewFrames)
+					GenerateDots(bmp, (short)(-taskIndex - 1), tempSize, tempAngle, tempSpin, 0, tempHueAngle);
+				else tasks[taskIndex].Start(bmp, () => GenerateDots(bmp, (short)(taskIndex + 1), tempSize, tempAngle, tempSpin, 0, tempHueAngle));
+				if (bmp >= previewFrames)
+					IncFrameParameters(ref size, ref angle, ref hueAngle, spin, 1);
+				return true; // A task finished, but started another one - keep checking before new master loop
+			}
+			);
+			/*} else if (toFinishAnimation) {
 				toFinishAnimation = false;
 				FinishAnimation();
 #if CustomDebug
@@ -1262,7 +1306,7 @@ internal class FractalGenerator {
 			+ "\n" + logString;
 		File.WriteAllText("log.txt", logString);
 #endif
-			}
+			}*/
 		}
 		mainTask = null;
 		return;
@@ -1278,32 +1322,31 @@ internal class FractalGenerator {
 				buffT[y] = new Vector3[SelectedWidth];
 			for (var y = 0; y < vh; noiseT[y++] = new Vector3[vw]) {}
 		}
-#if MultiDepth
 		void NewOfDepthBuffer(bool newTasks, bool newHeight) {
 			if (newTasks)
 				buffer = new Vector3[applyMaxTasks][][];
 			for (var t = applyMaxTasks; 0 <= --t;) {
-				var buffT = newHeight ? buffer[t] = new Vector3[SelectedHeight][] : buffer[t];
+				var buffT = newHeight ? buffer[t] = new Vector3[allocatedHeight][] : buffer[t];
 				for (var y = 0; y < SelectedHeight; ++y) 
-					buffT[y] = new Vector3[SelectedWidth];
+					buffT[y] = new Vector3[allocatedWidth];
 			}
 		}
-#endif
 		#endregion
+
 		#region GenerateTasks
 		void PreviewResolution(FractalTask task) {
 			if (task.BitmapIndex < previewFrames) {
 				// bitmaps from previewFrames back to zero have increasingly halved resolution
 				var div = 1 << (applyParallelType == ParallelType.OfDepth ? previewFrames - task.BitmapIndex : previewFrames - task.BitmapIndex - 1);
-				task.ApplyWidth = (short)(SelectedWidth / div);
-				task.ApplyHeight = (short)(SelectedHeight / div);
+				task.ApplyWidth = (short)(allocatedWidth / div);
+				task.ApplyHeight = (short)(allocatedHeight / div);
 				// bloom gets halved too so the visible blur radius stays the same
 				task.Bloom0 = SelectedBloom / div;
 			} else {
 				// full resolution
 				task.Bloom0 = SelectedBloom;
-				task.ApplyWidth = SelectedWidth;
-				task.ApplyHeight = SelectedHeight;
+				task.ApplyWidth = allocatedWidth;
+				task.ApplyHeight = allocatedHeight;
 			}
 			// scaling constants
 			task.WidthBorder = (short)(task.ApplyWidth - 2);
@@ -1318,10 +1361,9 @@ internal class FractalGenerator {
 			int[] seeds;
 			startParam = applyGenerationType switch {
 				// AllSeeds cutFunction seed selection - increments the set of unique seeds through bitmapIndex
-				GenerationType.AllSeedsGif => f.ChildCutFunction != null && (seeds = f.ChildCutFunction[SelectedCut].Item2) != null && seeds.Length > 0 && seeds[0] >= 0 ? -seeds[bitmapIndex] : -bitmapIndex,
-				GenerationType.AllSeedsMp4 => f.ChildCutFunction != null && (seeds = f.ChildCutFunction[SelectedCut].Item2) != null && seeds.Length > 0 && seeds[0] >= 0 ? -seeds[bitmapIndex] : -bitmapIndex,
+				GenerationType.AllSeeds => f.ChildCutFunction != null && (seeds = f.ChildCutFunction[SelectedCut].Item2) != null && seeds.Length > 0 && seeds[0] >= 0 ? -seeds[Math.Max(0, bitmapIndex - previewFrames)] : -Math.Max(0, bitmapIndex - previewFrames),
 				// HashParam - increments the set of all seeds through bitmapIndex
-				GenerationType.HashParam => -bitmapIndex,
+				GenerationType.HashSeeds => -Math.Max(0,bitmapIndex-previewFrames),
 				// Regular render - a single seed selected from the unique set through the user parameter
 				_ => f.ChildCutFunction != null && (seeds = f.ChildCutFunction[SelectedCut].Item2) != null && seeds.Length > 0 && seeds[0] >= 0 ? -seeds[applyCutParam] : -applyCutParam
 			};
@@ -1400,14 +1442,19 @@ internal class FractalGenerator {
 			// prepare the resolution and scaling constants
 			PreviewResolution(task);
 			// Init buffer with zeroes
-			var ofDepth = applyMaxTasks > MinTasks && (applyParallelType == ParallelType.OfDepth || bitmapIndex < previewFrames && UseOfDepthForPreview);
+			var ofDepth = applyMaxTasks > MinTasks && (applyParallelType == ParallelType.OfDepth || bitmapIndex < previewFrames);
 			for (var y = 0; y < task.ApplyHeight; ++y) {
 				var buffY = buffT[y];
 				for (var x = 0; x < task.ApplyWidth; buffY[x++] = Vector3.Zero) {}
 			}
-#if MultiDepth
-			// Init OfDepth buffer with zeroes
-			if (ofDepth) {
+			// Init MultiDepth OfDepth buffer with zeroes for non-preview images
+			if (ofDepth && bitmapIndex >= previewFrames) {
+				if(buffer == null || buffer.Length != applyMaxTasks)
+					NewOfDepthBuffer(true, true);
+				else if (buffer[0].Length != allocatedHeight)
+					NewOfDepthBuffer(false, true);
+				else if (buffer[0][0].Length != allocatedWidth)
+					NewOfDepthBuffer(false, false);
 				for (var t = 0; t < applyMaxTasks; ++t) {
 					var tempBuffT = buffer[t];
 					for (var y = 0; y < task.ApplyHeight; ++y) {
@@ -1416,7 +1463,6 @@ internal class FractalGenerator {
 					}
 				}
 			}
-#endif
 
 #if CustomDebug
 			initTime.Stop();
@@ -1439,10 +1485,7 @@ internal class FractalGenerator {
 				long startParam;
 				//task.H = applyGenerationType >= GenerationType.AllSeeds ? task.F : colorBlends;
 				// if we are doing all params we will need to do this step fresh locally for each frame
-
-
-
-				if (applyGenerationType >= GenerationType.AllSeedsGif)
+				if (applyGenerationType >= GenerationType.AllSeeds)
 					PreGenerateParam(bitmapIndex, task.ColorBlends, out startParam);
 				else {
 					task.ColorBlends = [];
@@ -1509,41 +1552,37 @@ internal class FractalGenerator {
 				var sY = zoomSize * (sinFinal * infiniteSum.Real + cosFinal * infiniteSum.Imaginary);
 				// We will use OfDepth, if generating previews, or if we selected so and have enough allowed threads for that
 				if (ofDepth) {
-#if MultiDepth
+					// This was for the Grid implementation attempts, which ultimately didn't turn out to be faster than MultiDepth as I hoped for
+					//ofDepthQueue.Clear();
+					//ofDepthQueue.Enqueue((task.TaskIndex, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startParam, 0));
 					tuples[0] = (task.TaskIndex, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startParam, 0);
-#else
-					ofDepthQueue.Clear();
-					ofDepthQueue.Enqueue((task.TaskIndex, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startParam, 0));
-#endif
-					GenerateDotsOfDepth(bitmapIndex);
-#if MultiDepth
-					// OfDepth buffer merge
-					var maxGenerationTasks = (short)Math.Max(1, applyMaxTasks - 1);
-					var po = new ParallelOptions {
-						MaxDegreeOfParallelism = maxGenerationTasks,
-						CancellationToken = token
-					};
-					try
-					{
-						Parallel.For(0, task.ApplyHeight, po, y =>
-						{
-							//for (var y = 0; y < task.applyHeight; ++y) {
-							for (var t = 0; t < applyMaxTasks; ++t)
-							{
-								var tempBuffY = buffer[t][y];
-								var buffY = buffT[y];
-								for (var x = 0; x < task.ApplyWidth; ++x)
-									buffY[x] += tempBuffY[x];
-							}
-						});
-					}
-					catch (Exception)
-					{
-						if (state != null)
-							state.State = TaskState.Done;
-						return;
-					}
-#endif
+					if (bitmapIndex >= previewFrames) {
+						// Use a slightly slower but pixel perfect MultiDepth variant of OfDepth for final resolution images
+						GenerateDotsOfDepth(bitmapIndex, true);
+						// OfDepth buffer merge
+						var maxGenerationTasks = (short)Math.Max(1, applyMaxTasks - 1);
+						var po = new ParallelOptions {
+							MaxDegreeOfParallelism = maxGenerationTasks,
+							CancellationToken = token
+						};
+						try {
+							var result = Parallel.For(0, task.ApplyHeight, po, y => {
+								//for (var y = 0; y < task.applyHeight; ++y) {
+								for (var t = 0; t < applyMaxTasks; ++t) {
+									var tempBuffY = buffer[t][y];
+									var buffY = buffT[y];
+									for (var x = 0; x < task.ApplyWidth; ++x)
+										buffY[x] += tempBuffY[x];
+								}
+							});
+							while (!result.IsCompleted)
+								Thread.Sleep(10);
+						} catch (Exception) {
+							if (state != null)
+								state.State = TaskState.Done;
+							return;
+						}
+					} else GenerateDotsOfDepth(bitmapIndex, false); // Use a faster pixel racing variant of OfDepth for low-res previews
 				} else GenerateDotsSingleTask(dotsTaskIndex, buffT, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startParam, 0);
 				// Increment the animation parameters (rotate and zoom a little further), but only for the actual animation, not between previews
 				if (bitmapIndex >= previewFrames)
@@ -1597,6 +1636,7 @@ internal class FractalGenerator {
 				return Math.Min(dotsX, dotsY) + testSize > dotsTask.UpLeftStart && dotsX - testSize < dotsTask.RightEnd && dotsY - testSize < dotsTask.DownEnd;
 			}
 			#endregion
+
 			#region GenerateDots
 			void GenerateDotsSingleTask(short taskIndex, Vector3[][] dotsBuffT,
 				(double, double) dotsXy, (double, double) dotsAngle, short dotsColor, long dotsFlags, byte dotsDepth
@@ -1641,91 +1681,7 @@ internal class FractalGenerator {
 							applyPreviewMode && dotsDepth > 1 ? dotsColor : (short)((dotsColor + ChildColor[i]) % applyPalette2), newFlags, dotsDepth);
 				}
 			}
-#if MultiDepth
-			/*void GenerateDotsOfDepth(int dotsBitmapIndex) {
-				int depth = -1, count = ofDepthQueue.Count, maxGenerationTasks = applyMaxTasks-1;
-				// keep splitting parents until we have a queue DivDepth * maxTasks large:
-				while (count > 0) {
-					// take a parent form the queue to split into move parent to put back into the queue
-					var (tupleIndex, tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth) = ofDepthQueue.Dequeue();
-					var tupleTask = tasks[tupleIndex];
-					var preIterated = tupleTask.PreIterate[tupleDepth];
-					var newPreIterated = tupleTask.PreIterate[++tupleDepth];
-					// Draw Dots
-					if (newPreIterated.Item1 < tupleTask.ApplyDetail) {
-						// we are deep enough that the parent is within a pixel, so just split it one last time and draw its children as dots
-						for (var i = 0; i < f.ChildCount; ++i) {
-							if (token.IsCancellationRequested)
-								return;
-							// Special Cutoff
-							var newFlags = CalculateFlags(i, tupleFlags);
-							if (newFlags < 0)
-								continue;
-							// Outside View
-							var xy = preIterated.Item3[i];
-							var newXy = NewXy(tupleXy, xy, tupleAngle.Item1);
-							if (TestSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
-								ApplyDot(tupleTask, tupleTask.Buffer, i + f.ChildCount * (newFlags & ((1 << f.ChildCount) - 1)), newXy.Item1, newXy.Item2,
-									applyPreviewMode && tupleDepth > 1 ? tupleColor : (short)((tupleColor + ChildColor[i]) % applyPalette2));
-						}
-						count = ofDepthQueue.Count;
-						continue;
-					}
-					// Split parent deeper into new smaller parents
-					for (var i = 0; i < f.ChildCount; ++i) {
-						if (token.IsCancellationRequested)
-							return;
-						// Special Cutoff
-						var newFlags = CalculateFlags(i, tupleFlags);
-						if (newFlags < 0)
-							continue;
-						// Outside View
-						var xy = preIterated.Item3[i];
-						var newXy = NewXy(tupleXy, xy, tupleAngle.Item1);
-						if (!TestSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
-							continue;
-						ofDepthQueue.Enqueue(
-							(tupleIndex, newXy,
-							i == 0 ? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2) : (tupleAngle.Item1 + ChildAngle[i], tupleAngle.Item2),
-							applyPreviewMode && tupleDepth > 1 ? tupleColor : (short)((tupleColor + ChildColor[i]) % applyPalette2), newFlags, tupleDepth));
-					}
-
-					var p = ofDepthQueue.Peek();
-					if (p.Item6 > depth) {
-						depth = p.Item6;
-						count = ofDepthQueue.Count;
-						if (count >= applyMaxTasks * DepthDiv)
-							break;
-					} else count = ofDepthQueue.Count;
-				}
-				int d = count / maxGenerationTasks;
-				var m = count % maxGenerationTasks;
-				int t = maxGenerationTasks;
-				// we now have a nice number of tasks to perform in parallel, so do that:
-				// false argument makes sure that we only finish processing these iteration tasks, we can exit if other kinds of tasks are still running as we don't need to wait for these here
-				FinishTasks(false, false, taskIndex => {
-					// until the queue is empty
-					if (0 > --t)
-						return false;
-					int q = t < m ? d + 1 : d;
-					var a = new (short, (double, double), (double, double), short, long, byte)[q];
-					while (0 <= --q)
-						a[q] = ofDepthQueue.Dequeue();
-					// take a parent from queue and iterate it normally with single task code, but as its own parallel task
-					tasks[taskIndex].Start(dotsBitmapIndex, () => {
-					foreach (var (tupleBufferIndex, tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth) in a) {
-							GenerateDotsSingleTask(tupleBufferIndex, buffer[taskIndex], tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth);
-							if (--count == 0)
-								break;
-						}
-						tasks[taskIndex].State = TaskState.Done;
-					});
-					return true;
-				});
-			}*/
-
-
-			void GenerateDotsOfDepth(int dotsBitmapIndex) {
+			void GenerateDotsOfDepth(int dotsBitmapIndex, bool MultiDepth) {
 					int index = 0, insertTo = 1,
 					max = applyMaxTasks * DepthDiv,
 					maxCount = max - f.ChildCount - 1,
@@ -1790,7 +1746,7 @@ internal class FractalGenerator {
 					var tempTupleIndex = index++;
 					tasks[taskIndex].Start(dotsBitmapIndex, () => {
 						var (tupleBufferIndex, tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth) = tuples[tempTupleIndex];
-						GenerateDotsSingleTask(tupleBufferIndex, buffer[taskIndex], tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth);
+						GenerateDotsSingleTask(tupleBufferIndex, MultiDepth ? buffer[taskIndex] : task.Buffer, tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth);
 						tasks[taskIndex].State = TaskState.Done;
 					});
 					index %= max;
@@ -1798,7 +1754,12 @@ internal class FractalGenerator {
 					return true;
 				});
 			}
-#else
+
+			// Grid OfDepth implementations attempted to make fast OfDepth without racing pixel conditions by smartly separating the bitmap into cells.
+			// It did work, but was ultimately still not as fast as simmply using the MultiDepth Solution
+			#region OfDepth_FailedGridoptimizations
+
+			// This implementation tries to separate odd and even rows/collumns of cells into concurrent tasks and combine the same cells into the same task
 			/*void GenerateDotsOfDepth(int dotsBitmapIndex) {
 				// calculate the number of cells where each 1/4 batch could match the max number of threads
 				var cellSize = MathF.Sqrt(task.ApplyWidth * task.ApplyHeight / (applyMaxTasks * 4.0f));
@@ -1898,6 +1859,7 @@ internal class FractalGenerator {
 				}
 			}*/
 
+			// This implementation tries to lock 2x2 cells
 			/*void GenerateDotsOfDepth(int dotsBitmapIndex) {
 				var cellSize = MathF.Sqrt(task.ApplyWidth * task.ApplyHeight / (applyMaxTasks * 4.0f));
 				var cellsX = MathF.Ceiling(task.ApplyWidth / cellSize);
@@ -1985,7 +1947,9 @@ internal class FractalGenerator {
 					return true;
 				});
 			}*/
-			void GenerateDotsOfDepth(int dotsBitmapIndex) {
+
+			// This implementation tries to group subtasks in the same cell regions to their own single thread, and lock 2x2 cells
+			/*void GenerateDotsOfDepth(int dotsBitmapIndex) {
 				var cellSize = MathF.Sqrt(task.ApplyWidth * task.ApplyHeight / (applyMaxTasks * 4.0f));
 				var cellsX = MathF.Ceiling(task.ApplyWidth / cellSize);
 				var cellsY = MathF.Ceiling(task.ApplyHeight / cellSize);
@@ -2076,8 +2040,92 @@ internal class FractalGenerator {
 					});
 					return true;
 				});
-			}
-#endif
+			}*/
+
+			// This implementation attempted to combine the Grid and MultiDepth ideas, it still wasn't as fast as just MultiDepth
+			/*void GenerateDotsOfDepth(int dotsBitmapIndex) {
+				int depth = -1, count = ofDepthQueue.Count, maxGenerationTasks = applyMaxTasks-1;
+				// keep splitting parents until we have a queue DivDepth * maxTasks large:
+				while (count > 0) {
+					// take a parent form the queue to split into move parent to put back into the queue
+					var (tupleIndex, tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth) = ofDepthQueue.Dequeue();
+					var tupleTask = tasks[tupleIndex];
+					var preIterated = tupleTask.PreIterate[tupleDepth];
+					var newPreIterated = tupleTask.PreIterate[++tupleDepth];
+					// Draw Dots
+					if (newPreIterated.Item1 < tupleTask.ApplyDetail) {
+						// we are deep enough that the parent is within a pixel, so just split it one last time and draw its children as dots
+						for (var i = 0; i < f.ChildCount; ++i) {
+							if (token.IsCancellationRequested)
+								return;
+							// Special Cutoff
+							var newFlags = CalculateFlags(i, tupleFlags);
+							if (newFlags < 0)
+								continue;
+							// Outside View
+							var xy = preIterated.Item3[i];
+							var newXy = NewXy(tupleXy, xy, tupleAngle.Item1);
+							if (TestSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+								ApplyDot(tupleTask, tupleTask.Buffer, i + f.ChildCount * (newFlags & ((1 << f.ChildCount) - 1)), newXy.Item1, newXy.Item2,
+									applyPreviewMode && tupleDepth > 1 ? tupleColor : (short)((tupleColor + ChildColor[i]) % applyPalette2));
+						}
+						count = ofDepthQueue.Count;
+						continue;
+					}
+					// Split parent deeper into new smaller parents
+					for (var i = 0; i < f.ChildCount; ++i) {
+						if (token.IsCancellationRequested)
+							return;
+						// Special Cutoff
+						var newFlags = CalculateFlags(i, tupleFlags);
+						if (newFlags < 0)
+							continue;
+						// Outside View
+						var xy = preIterated.Item3[i];
+						var newXy = NewXy(tupleXy, xy, tupleAngle.Item1);
+						if (!TestSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+							continue;
+						ofDepthQueue.Enqueue(
+							(tupleIndex, newXy,
+							i == 0 ? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2) : (tupleAngle.Item1 + ChildAngle[i], tupleAngle.Item2),
+							applyPreviewMode && tupleDepth > 1 ? tupleColor : (short)((tupleColor + ChildColor[i]) % applyPalette2), newFlags, tupleDepth));
+					}
+
+					var p = ofDepthQueue.Peek();
+					if (p.Item6 > depth) {
+						depth = p.Item6;
+						count = ofDepthQueue.Count;
+						if (count >= applyMaxTasks * DepthDiv)
+							break;
+					} else count = ofDepthQueue.Count;
+				}
+				int d = count / maxGenerationTasks;
+				var m = count % maxGenerationTasks;
+				int t = maxGenerationTasks;
+				// we now have a nice number of tasks to perform in parallel, so do that:
+				// false argument makes sure that we only finish processing these iteration tasks, we can exit if other kinds of tasks are still running as we don't need to wait for these here
+				FinishTasks(false, false, taskIndex => {
+					// until the queue is empty
+					if (0 > --t)
+						return false;
+					int q = t < m ? d + 1 : d;
+					var a = new (short, (double, double), (double, double), short, long, byte)[q];
+					while (0 <= --q)
+						a[q] = ofDepthQueue.Dequeue();
+					// take a parent from queue and iterate it normally with single task code, but as its own parallel task
+					tasks[taskIndex].Start(dotsBitmapIndex, () => {
+					foreach (var (tupleBufferIndex, tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth) in a) {
+							GenerateDotsSingleTask(tupleBufferIndex, buffer[taskIndex], tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth);
+							if (--count == 0)
+								break;
+						}
+						tasks[taskIndex].State = TaskState.Done;
+					});
+					return true;
+				});
+			}*/
+			#endregion
+
 			#endregion
 		}
 		void GenerateImage(FractalTask task) {
@@ -2163,13 +2211,9 @@ internal class FractalGenerator {
 #endif
 			// Draw the generated pixel to bitmap data
 			unsafe {
-
 				// Make a locked bitmap, remember the locked state
-				var p = (byte*)(void*)(bitmapData[task.BitmapIndex] = (bitmap[task.BitmapIndex] = new(task.ApplyWidth, task.ApplyHeight)).LockBits( // make a new bitmaps and lock its bits
-						(applyParallelType == ParallelType.OfDepth ? task.BitmapIndex : task.BitmapIndex + 1) < previewFrames ? new Rectangle(0, 0, task.ApplyWidth, task.ApplyHeight) : rect, // The rectangle (use a new smaller one for smaller previews)
-						ImageLockMode.ReadWrite, // Writing now, possibly reading for encoding gif later
-						PixelFormat.Format24bppRgb // BGR format (no alpha, if the gif is transparent, the transparency is just the color black)
-					)).Scan0;
+				bitmap[task.BitmapIndex] = new(task.ApplyWidth, task.ApplyHeight);
+				var p = (byte*)(void*)LockBits(task.BitmapIndex, (applyParallelType == ParallelType.OfDepth ? task.BitmapIndex : task.BitmapIndex + 1) < previewFrames ? new Rectangle(0, 0, task.ApplyWidth, task.ApplyHeight) : rect).Scan0;
 				bitmapState[task.BitmapIndex] = BitmapState.Drawing;
 				// Draw the bitmap with the buffer that we calculated with GenerateFractal and Calculate void
 				// Switch between th selected settings such as saturation, noise, image parallelism...
@@ -2178,7 +2222,7 @@ internal class FractalGenerator {
 				var stride = bitmapData[task.BitmapIndex].Stride;
 				byte* rp;
 				// Single Threaded
-				if (ambNoise > 0 && applyGenerationType != GenerationType.HashParam) {
+				if (ambNoise > 0 && applyGenerationType != GenerationType.HashSeeds) {
 					for (var y = 0; y < task.ApplyHeight / applyVoid + 2; ++y) {
 						var v = task.VoidNoise[y];
 						for (var x = 0; x < wv; ++x)
@@ -2315,20 +2359,21 @@ internal class FractalGenerator {
 				Log(ref logString, threadString);
 			} finally { Monitor.Exit(taskLock); }
 #endif
+			bitmapState[task.BitmapIndex] = BitmapState.DrawingFinished;
 			if (task.BitmapIndex < previewFrames) {
-				bitmapState[task.BitmapIndex] = BitmapState.FinishedBitmap;
 				TryFinishBitmap(false, task.TaskIndex);
 				task.State = TaskState.Done;
 			} else {
-				if (applyGenerationType is >= GenerationType.LocalGif and <= GenerationType.AllSeedsGif)
+				if (applyGifType != GifType.No) {
+					encodedGif[task.BitmapIndex] = 1;
 					GenerateGif(task);
-				else {
-					bitmapState[task.BitmapIndex] = BitmapState.DrawingFinished;
+				} else {
 					task.State = TaskState.Done;
 				}
 			}
 		}
-#endregion
+		#endregion
+
 		#region AnimationParams
 		void ModFrameParameters(short width, short height, ref double refSize, ref double refAngle, ref short refSpin, ref short refColor, ref double refHueAngle) {
 			var w = Math.Max(width, height) * f.MaxSize;
@@ -2381,7 +2426,7 @@ internal class FractalGenerator {
 			}
 		}
 		void IncFrameParameters(ref double refSize, ref double refAngle, ref double refHueAngle, double refSpin, short blur) {
-			if (applyGenerationType is >= GenerationType.AllSeedsGif and <= GenerationType.HashParam)
+			if (applyGenerationType >= GenerationType.AllSeeds)
 				return;
 			var blurPeriod = SelectedPeriod * blur;
 			// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
@@ -2393,19 +2438,20 @@ internal class FractalGenerator {
 		void IncFrameSize(ref double refSize, int period) => refSize *= Math.Pow(f.ChildSize, applyZoom * 1.0 / period);
 		#endregion
 	}
-	private bool ApplyGenerationType() {
+	/*private bool ApplyGenerationType() {
 		if (applyGenerationType == SelectedGenerationType)
 			return false;
 
-		if (applyGenerationType is <= GenerationType.AnimationMp4 or >= GenerationType.AllSeedsMp4 && SelectedGenerationType is >= GenerationType.LocalGif and <= GenerationType.AllSeedsGif) {
-			bitmapsFinished = Math.Min(previewFrames, bitmapsFinished);
+		//if (applyGenerationType is <= GenerationType.AnimationPng or >= GenerationType.AllSeedsPng && SelectedGenerationType is >= GenerationType.LocalGif and <= GenerationType.AllSeedsGif) {
+		if(applyGifType != SelectedGifType) { 
+			//bitmapsFinished = Math.Min(previewFrames, bitmapsFinished);
 			if (gifEncoder == null)
 				StartGif();
 		}
 		applyGenerationType = SelectedGenerationType;
 		return true;
-	}
-	private void FinishAnimation() {
+	}*/
+	/*private void FinishAnimation() {
 		// Wait for threads to finish
 		var tasksRunning = true;
 		while (tasksRunning) {
@@ -2414,10 +2460,10 @@ internal class FractalGenerator {
 			for (var t = allocatedTasks; 0 <= --t; tasksRunning |= tasks[t].State != TaskState.Free) {}
 		}
 		// Unlock unfinished bitmaps:
-		for (var b = 0; b < bitmap.Length; ++b)
-			if (bitmapState[b] is >= BitmapState.Drawing and < BitmapState.UnlockedRam) 
-				bitmap[b]?.UnlockBits(bitmapData[b]);
+		for (var b = 0; b < bitmap.Length; UnlockBits(b++)) {
+		}
 		FinishGif();
+		//mp4Success = true;//applyGenerationType is GenerationType.AnimationMp4 or GenerationType.AllSeedsMp4;
 		MakeDebugString();
 		if (applyGenerationType != GenerationType.HashParam)
 			return;
@@ -2425,21 +2471,21 @@ internal class FractalGenerator {
 		foreach (var i in Hash)
 			output += "," + i.Value;
 		File.WriteAllText("hash.txt", output);
-	}
+	}*/
 	private void StartGif() {
 		// Open a temp file to pre-save GIF to - Use AnimatedGifEncoder
 		gifSuccess = 0;
 		gifEncoder = null;
 		Hash.Clear();
 		byte gifIndex = 0;
+		tryGif = previewFrames;
 		gifToken = (gifCancel = new()).Token;
-		switch (applyGenerationType = SelectedGenerationType) {
-			case GenerationType.LocalGif:
-			case GenerationType.GlobalGif:
-			case GenerationType.AllSeedsGif:
+		applyGifType = SelectedGifType;
+		applyDelay = SelectedDelay;
+		if (applyGifType != GifType.No) {
 
 			gifEncoder = new();
-			gifEncoder.SetDelay(SelectedDelay); // Framerate
+			gifEncoder.SetDelay(applyDelay); // Framerate
 			gifEncoder.SetRepeat(0);		// Loop
 			gifEncoder.SetQuality(1);			// Highest quality
 			gifEncoder.SetTransparent(SelectedAmbient < 0 ? Color.Black : Color.Empty);
@@ -2449,39 +2495,25 @@ internal class FractalGenerator {
 			while (gifIndex < 255) {
 				GifTempPath = "temp/"+ filePrefix + "gif" + gifIndex + ".tmp";
 				if (gifEncoder.Start(SelectedWidth, SelectedHeight, GifTempPath,
-					    SelectedGenerationType == GenerationType.GlobalGif ? ColorTable.GlobalSingle : ColorTable.Local)
+					    SelectedGifType == GifType.Global ? ColorTable.GlobalSingle : ColorTable.Local)
 				   ) break;
 				++gifIndex;
 			}
 			if (gifIndex == 255)
 				gifEncoder = null;
-			break;
-			/*case GenerationType.Mp4:
-				mp4Encoder = new();
-				while (gifIndex < 255) {
-					gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
-					if (!mp4Encoder.Start(selectWidth, selectHeight, gifTempPath, selectFps)) {
-						++gifIndex;
-						continue;
-					} else break;
-				}
-				if (gifIndex == 255)
-					gifEncoder = null;
-				break;*/
 		}
 		// Flag the already encoded bitmaps to be encoded again;
 		for (var b = previewFrames; b < bitmap.Length; ++b)
-			if (bitmapState[b] >= BitmapState.Encoding) {
-				if (bitmapState[b] == BitmapState.Unlocked)
-					bitmapData[b] = bitmap[b].LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
-				bitmapState[b] = BitmapState.DrawingFinished;
+			if (encodedGif[b] >= 1) {
+				LockBits(b, rect);
+				encodedGif[b] = 0;
 			}
 		bitmapsFinished = Math.Min(previewFrames, bitmapsFinished);
 	}
 	private void FinishGif() {
 		// Save the temp GIF file
 		gifSuccess = 0;
-		if (!token.IsCancellationRequested && applyGenerationType is >= GenerationType.LocalGif and <= GenerationType.AllSeedsGif) {
+		if (!token.IsCancellationRequested && applyGifType != GifType.No) {
 			if (gifEncoder != null) {
 				if (!gifEncoder.IsFinished())
 					gifEncoder.Finish();
@@ -2516,21 +2548,23 @@ internal class FractalGenerator {
 	}
 	private void StopGif(FractalTask task) {
 		gifCancel?.Cancel();
-		applyGenerationType = GenerationType.AnimationRam;
+		applyGifType = GifType.No;
 		foreach (var t in tasks) {
 			if (t.BitmapIndex < 0) {
 				if (t != task)
 					t.Join();
-			} else if (bitmapState[t.BitmapIndex] is >= BitmapState.Encoding and <= BitmapState.EncodingFinished) {
+			} else if (encodedGif[t.BitmapIndex] is >= 1 and <= 2) {
 				if (t != task)
 					t.Join();
 				bitmapState[t.BitmapIndex] = BitmapState.DrawingFinished;
 			}
 		}
+		for (var i = 0; i < bitmap.Length; encodedGif[i++] = 0) { }
+		tryGif = previewFrames;
 		gifEncoder?.Abort();
 		gifEncoder = null;
 	}
-#endregion
+	#endregion
 
 	#region Interface_Calls
 	internal void CleanupTempFiles() {
@@ -2549,7 +2583,7 @@ internal class FractalGenerator {
 	internal void StartGenerate() => mainTask = Task.Run(GenerateAnimation, token = (cancel = new()).Token);
 	internal void GetValidZoomChildren() {
 
-		if (SelectedGenerationType >= GenerationType.AllSeedsGif || f == null) {
+		if (SelectedGenerationType >= GenerationType.AllSeeds || f == null) {
 			validZoomChildren = [MaxZoomChild = 0];
 			return;
 		}
@@ -2613,112 +2647,314 @@ internal class FractalGenerator {
 		}
 		return gifSuccess = 0;
 	}
-	internal int ConvertMp4(string gifPath, string mp4Path) {
-		try {
-			File.Delete(mp4Path);
-			var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
-			if (!File.Exists(ffmpegPath))
-				return gifSuccess = 0;
-			var gifFps = 1000.0 / (10 * SelectedDelay); // Convert to frames per second
-			var arguments = $"-y -i \"{gifPath}\" -vf \"fps={SelectedFps},setpts=PTS*({gifFps}/{SelectedFps})\" -movflags +faststart -c:v libx264 -crf 0 -preset veryslow \"{mp4Path}\"";
-			using var ffmpeg = new Process();
-			ffmpeg.StartInfo.FileName = ffmpegPath;
-			ffmpeg.StartInfo.Arguments = arguments;
-			ffmpeg.StartInfo.UseShellExecute = false;
-			ffmpeg.StartInfo.RedirectStandardError = true;
-			ffmpeg.StartInfo.RedirectStandardOutput = true;
-			ffmpeg.StartInfo.CreateNoWindow = true;
-			ffmpeg.Start();
-			// Begin reading error asynchronously
-			ffmpeg.BeginErrorReadLine();
-			// Wait for the process to exit
-			ffmpeg.WaitForExit();
-		} catch (IOException ex) {
-			var exs = "ConvertMp4: An error occurred: " + ex.Message;
-			Console.WriteLine(exs);
-#if CustomDebug
-			Log(ref logString, exs);
-#endif
-			return gifSuccess;
-		} catch (UnauthorizedAccessException ex) {
-			var exs = "ConvertMp4: Access denied: " + ex.Message;
-			Console.WriteLine(exs);
-#if CustomDebug
-			Log(ref logString, exs);
-#endif
-			return gifSuccess;
-		} catch (Exception ex) {
-			var exs = "ConvertMp4: Unexpected error: " + ex.Message;
-			Console.WriteLine(exs);
-#if CustomDebug
-			Log(ref logString, exs);
-#endif
-			return gifSuccess;
-		}
-		return gifSuccess = 0;
+
+	private (int, int, string) GetPngFormat() {
+		int n = 1, nf = bitmap.Length - previewFrames;
+		for (var number = nf; number >= 10; number /= 10)
+			++n;
+		return (n, nf, "D" + n);
 	}
-	private bool SaveMp4Png(int i, string d) {
-		if(i < 0 || mp4Png[i])
+	private bool SavePng(int i, string d) {
+		int bmp = i + previewFrames;
+		if (i < 0 || encodedPng[bmp] == 2)
 			return false;
-		mp4Png[i] = true;
+		encodedPng[bmp] = 1;
 		try {
 			MakeTemp();
-			using FileStream myStream = new("temp/"+ filePrefix + "image_" + i.ToString(d) + ".png", FileMode.Create);
-			//if (myStream == null)
-			//	return true;
-			bitmap[i + previewFrames].Save(myStream, ImageFormat.Png);
-			myStream.Close();
+			// old way of exporting to files
+			//string fname = $"temp/{filePrefix}image_{i.ToString(d)}.";
+			//using FileStream myStream = new(fname+"tmp", FileMode.Create);
+			//bitmap[bmp].Save(myStream, ImageFormat.Png);
+			//myStream.Flush();
+			//myStream.Close();
+			//File.Move(fname + "tmp", fname + "png");
+
+			// new memorystream solution
+			if (msPngs[bmp] == null)
+				msPngs[bmp] = new MemoryStream();
+			bitmap[bmp].Save(msPngs[bmp], ImageFormat.Png);
+			msPngs[bmp].Flush();
+
+			encodedPng[bmp] = 2;
 			return false;
-		} catch (Exception) {
-			mp4Png[i] = false;
+		} catch (Exception e) {
+			encodedPng[bmp] = 0;
 			return true;
 		}
 	}
-	internal int SaveMp4(string mp4Path) {
+	private int SavePngs() {
+		applyPngType = PngType.Yes; // ensures FinishTasks will want to start threads exporting PNGs
+		pngFailed = 0; // reset failure attempt counter, every png write fail will increment it, and if it reaches 1000 it will cancel the FinishTasks
+		//tryPng = previewFrames;
+
+		for (int enc = previewFrames; !token.IsCancellationRequested && enc < bitmap.Length; Thread.Sleep(100))
+			while (enc < bitmap.Length && encodedPng[enc] >= 2)
+				++enc;
+		//FinishTasks(true, true, (short _) => false); // FinishTasks will keep writing PNGs in parallel, until they are all finished (or cancel requested)
+
+		return pngFailed >= MaxPngFails ? 2 : token.IsCancellationRequested ? 1 : 0; // If the export was cancelled from outside - terminate the ffmpeg process
+	}
+	internal string SavePngs(string pngPath) {
+		FinishTasks(true, true, _ => false); // Make sure there are no bitmap generation tasks still running
+		if (SavePngs() == 2) 
+			return Fail("PNG saving failed"); // failed to save
+		if (token.IsCancellationRequested)
+			return ""; // just cancelled, return with no error
+		pngPath = pngPath[..^4]; // remove the ".png"
+		var (n, nf, d) = GetPngFormat();
+		var maxGenerationTasks = Math.Max(1, applyMaxTasks - 1); // task count
+		if (maxGenerationTasks <= 1) {
+			for (int i = 0; i < bitmap.Length - previewFrames; ++i) {
+				string /*fileFrom = $"temp/{filePrefix}image_{i.ToString(d)}.png",*/ fileTo = $"{pngPath}_{i.ToString(d)}.png";
+				for (var attempt = 0; attempt < 10; ++attempt) {
+					try {
+						// old file moving solution
+						//File.Delete(fileTo);  // Delete existing file if present
+						//File.Move(fileFrom, fileTo);
+
+						// new memory stream solution
+						using FileStream fs = new FileStream(fileTo, FileMode.OpenOrCreate, FileAccess.Write);
+						var ms = msPngs[i + previewFrames];
+						ms.Position = 0;
+						ms.CopyTo(fs);
+						fs.Flush();
+						fs.Close();
+						//fs.Dispose();
+						break;
+					} catch (Exception ex) {
+						Thread.Sleep(10 + 10 * attempt * attempt); // wait and try again 10 times if failed
+						if (attempt >= 100)
+							return Fail("Move PNG Exception: " + ex.Message);
+					}
+				}
+			}
+			return ""; // finished
+		}
+		var po = new ParallelOptions {
+			MaxDegreeOfParallelism = maxGenerationTasks,
+			CancellationToken = token
+		};
+		string fail = "";
+		var result = Parallel.For(0, bitmap.Length - previewFrames, (i, state) => {
+			string /*fileFrom = $"temp/{filePrefix}image_{i.ToString(d)}.png",*/ fileTo = $"{pngPath}_{i.ToString(d)}.png";
+			for (var attempt = 0; attempt < 10; ++attempt) {
+				try {
+					// old file moving solution
+					//File.Delete(fileTo);  // Delete existing file if present
+					//File.Move(fileFrom, fileTo);
+
+					// new memory stream solution
+					using FileStream fs = new FileStream(fileTo, FileMode.OpenOrCreate, FileAccess.Write);
+					var ms = msPngs[i + previewFrames];
+					ms.Position = 0;
+					ms.CopyTo(fs);
+					fs.Flush();
+					fs.Close();
+					//fs.Dispose();
+					break;
+				} catch (Exception ex) {
+					Thread.Sleep(10 + 10 * attempt * attempt);
+					if (attempt >= 10) {
+						fail = Fail("Move PNG Exception: " + ex.Message);
+						state.Stop();
+					}
+				}
+			}
+		});
+		while (!result.IsCompleted)
+			Thread.Sleep(100); // Wait until p.for is finished
+		return fail; // finished
+	}
+	internal string SaveGifToMp4(string gifPath, string mp4Path) {
+		try {
+			File.Delete(mp4Path);
+		} catch (Exception ex) {
+			return Fail("Delete existing Mp4: " + ex);
+		}
+			var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+		if (!File.Exists(ffmpegPath))
+			return Fail("Ffmpeg not found");
+
+		using var ffmpegProcess = new Process {
+			StartInfo = new ProcessStartInfo {
+				FileName = ffmpegPath,
+				Arguments = $"-y -i \"{gifPath}\" -vf \"fps={SelectedFps},setpts=PTS*({1000.0 / (10 * applyDelay)}/{SelectedFps})\" -movflags +faststart -c:v libx264 -profile:v high444 -level 5.2 -preset veryslow -crf 18 -pix_fmt yuv444p \"{mp4Path}\"",
+				UseShellExecute = false,
+				RedirectStandardInput = true,
+				RedirectStandardError = true,
+				//RedirectStandardOutput = true, // not needed so far
+				CreateNoWindow = true
+			}
+		};
+		string fail = "";
+		ffmpegProcess.ErrorDataReceived += (sender, e) => {
+			if (string.IsNullOrEmpty(e.Data))
+				return;
+			// Regex to detect progress output
+			if (Regex.IsMatch(e.Data, @"frame=\s*\d+") || Regex.IsMatch(e.Data, @"time=\d+:\d+:\d+\.\d+")) {
+				// Extract frame count for progress display
+				var match = Regex.Match(e.Data, @"frame=\s*(\d+)");
+				if (match.Success)
+					int.TryParse(match.Groups[1].Value, out encodedMp4);
+			} else fail += ";" + e.Data;
+		};
+		try {
+			ffmpegProcess.Start();
+			// Begin reading error asynchronously
+			ffmpegProcess.BeginErrorReadLine();
+			// Wait for the process to exit
+			ffmpegProcess.WaitForExit();
+		} catch (Exception ex) {
+			var exs = "ConvertMp4: Unexpected error: " + ex.Message;
+			Console.WriteLine(exs);
+			return Fail("Exception: " + ex);
+		}
+		return fail;
+	}
+	internal string SavePngsToMp4(string mp4Path) {
+		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+		if (!File.Exists(ffmpegPath))
+			return Fail("Ffmpeg.exe not found"); // if ffmpeg doesn't exist, return failure immediately
+		FinishTasks(true, true, _ => false); // Make sure there are no bitmap generation tasks still running
+		try {
+			File.Delete(mp4Path);  // Delete existing file if present
+		} catch (IOException ex) {
+			return Fail("Failed to delete existing file: " + ex.Message); // return failure if deletion fails
+		}
+		/*var (n, nf, d) = GetPngFormat();
+		// write the last image first to ensure the ffmpeg will not stop prematurely
+		int attempt = 0;
+		Stopwatch pngTime = new(); pngTime.Start();
+		while (SavePng(nf - 1, d)) {
+			if (++attempt > 10)
+				return Fail("Failed to write PNG"); // image failed to save after 10 attempts - return failure
+			Thread.Sleep(10 + 10 * attempt * attempt);
+		}
+		while (SavePng(0, d)) {
+			if (++attempt > 10)
+				return Fail("Failed to write PNG"); // image failed to save after 10 attempts - return failure
+			Thread.Sleep(10 + 10 * attempt * attempt);
+		}
+		pngTime.Stop();*/
+		//string args = $"-y -framerate {SelectedFps} -i temp/{filePrefix}image_%0{n}d.png -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v high444 -level 5.2 -preset veryslow -crf 18 -pix_fmt yuv444p \"{mp4Path}\"";
+		// Start FFmpeg in a parallel process to encode the PNG sequence
+		using var ffmpegProcess = new Process {
+			StartInfo = new ProcessStartInfo {
+				FileName = ffmpegPath,
+				//Arguments = $"-y -framerate {SelectedFps} -i temp/{filePrefix}image_%0{n}d.png -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v high444 -level 5.2 -preset veryslow -crf 18 -pix_fmt yuv444p -timeout {pngTime.Elapsed.TotalMilliseconds * 2000 + 2000000} \"{mp4Path}\"",
+				Arguments = $"-y -framerate {SelectedFps} -f image2pipe -vcodec png -i pipe:0 -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v high444 -level 5.2 -preset veryslow -crf 18 -pix_fmt yuv444p \"{mp4Path}\"",
+				UseShellExecute = false,
+				RedirectStandardInput = true,
+				//RedirectStandardError = true,
+				//RedirectStandardOutput = true, // not needed so far
+				CreateNoWindow = false
+			}
+		};
+		string fail = ""; // setup error listener
+		/*ffmpegProcess.ErrorDataReceived += (sender, e) => {
+			if (string.IsNullOrEmpty(e.Data))
+				return;
+			// Regex to detect progress output
+			if (Regex.IsMatch(e.Data, @"frame=\s*\d+") || Regex.IsMatch(e.Data, @"time=\d+:\d+:\d+\.\d+")) {
+				// Extract frame count for progress display
+				var match = Regex.Match(e.Data, @"frame=\s*(\d+)");
+				if (match.Success)
+					int.TryParse(match.Groups[1].Value, out encodedMp4);
+			} //else fail += ";" + e.Data;
+		};*/
+		try {
+			// start pipe:
+			//var pipeServer = new NamedPipeServerStream("mypipe", PipeDirection.Out);
+			//pipeServer.WaitForConnection();
+			
+			// start ffmpeg
+			if (!ffmpegProcess.Start())
+				return Fail("Ffmpeg failed to start");
+			//ffmpegProcess.BeginErrorReadLine();// Begin reading error asynchronously
+
+			//ffmpegProcess.BeginOutputReadLine();  // Read standard output asynchronously
+			applyPngType = PngType.Yes; // ensures FinishTasks will want to start threads exporting PNGs
+			pngFailed = 0; // reset failure attempt counter, every png write fail will increment it, and if it reaches 1000 it will cancel the FinishTasks
+			//tryPng = previewFrames; // makes sure that we reexport any missing files, with these settings, the parallel thread elsewhere will export all the pngs as tmp first then rename to png
+
+			// will check if that other parallel thread elsewhere finished exporting all the pngs into the memory streams, and will dump these streams sequentially into the ffmpeg's input
+			using (var inputStream = ffmpegProcess.StandardInput.BaseStream) {
+				for (int enc = previewFrames; !token.IsCancellationRequested && enc < bitmap.Length; Thread.Sleep(100))
+					while (enc < bitmap.Length && encodedPng[enc] >= 2) {
+						var ms = msPngs[enc++];
+						ms.Position = 0;
+						ms.CopyTo(inputStream);  // Write memory stream directly to FFmpeg's input stream
+					}
+			}
+
+			// will check if that other parallel thread elsewhere finished exporting all the pngs into the memory streams, and will dump these streams sequentially into the pipe
+			/*for (int enc = previewFrames; !token.IsCancellationRequested && enc < bitmap.Length; Thread.Sleep(100))
+				while (enc < bitmap.Length && encodedPng[enc] >= 2) {
+					var ms = msPngs[enc++];
+					ms.Position = 0;
+					ms.CopyTo(pipeServer);
+				}
+			pipeServer.Close();  // Close pipe when done
+			*/
+
+			if (pngFailed >= MaxPngFails || token.IsCancellationRequested) { // If the export was cancelled from outside - terminate the ffmpeg process
+				if (ffmpegProcess.StandardInput.BaseStream.CanWrite) {
+					ffmpegProcess.StandardInput.Write("q");  // Send 'q' to FFmpeg to terminate gracefully
+					ffmpegProcess.StandardInput.Flush();     // Ensure the command is sent
+					Thread.Sleep(500);  // Give FFmpeg some time to exit gracefully
+				}
+				if (!ffmpegProcess.HasExited) 
+					ffmpegProcess.Kill();  // Force terminate if graceful shutdown isn't possible
+			}
+			// Wait for the process to exit
+			ffmpegProcess.WaitForExit();
+		} catch (Exception ex) {
+			return Fail("Exception: " + ex.Message); // return exception error
+		}
+		if (pngFailed >= MaxPngFails)
+			fail += ";Failed to save PNGs";
+		return fail != "" ? Fail("Ffmpeg errors: " + fail) : ""; // return fail or success
+	}
+	private static string Fail(string log) {
+		Console.WriteLine(log);
+#if CustomDebug
+    Log(ref logString, log);
+#endif
+		return log;
+	}
+	/*internal int SaveMp4Old(string mp4Path) {
 		try {
 			FinishTasks(true, true, _ => false);
 			File.Delete(mp4Path);
-			int n = 1, nf = bitmap.Length - previewFrames;
-			for (var number = nf; number >= 10; number /= 10) 
-				++n;
-			var d = "D" + n;
-			var attempt = 0;
-			for (var i = 0; i < nf; ++i)
+			// If we were not exporting PNGs, then start export them now:
+			applyGenerationType = GenerationType.AnimationRam; 
+			FinishTasks(false, true, (short _) => false);
+			// Just to make sure go trhough it again if anythin's missing, and if I can't save it in 10 more attempts, then return fail
+			var (n, nf, d) = GetPngFormat();
+			for (var i = 0; i < nf; ++i) {
+				var attempt = 0;
 				while (SaveMp4Png(i, d)) {
-					if(++attempt > 10)
+					if (++attempt > 10)
 						return 0;
 					Thread.Sleep(100);
 				}
+			}
 			var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 			if (!File.Exists(ffmpegPath))
 				return 0;
-			var arguments = $"-y -framerate {SelectedFps} -i temp/{filePrefix}image_%0{n}d.png -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v main -preset veryslow -crf 18 -pix_fmt yuv420p \"{mp4Path}\"";
-			using var ffmpeg = new Process();
-			ffmpeg.StartInfo.FileName = ffmpegPath;
-			ffmpeg.StartInfo.Arguments = arguments;
-			ffmpeg.StartInfo.UseShellExecute = false;
-			ffmpeg.StartInfo.RedirectStandardError = true;
-			ffmpeg.StartInfo.RedirectStandardOutput = true;
-			ffmpeg.StartInfo.CreateNoWindow = true;
-			ffmpeg.Start();
+			var arguments = $"-y -framerate {SelectedFps} -i temp/{filePrefix}image_%0{n}d.png -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v high444 -level 5.2 -preset veryslow -crf 18 -pix_fmt yuv444p \"{mp4Path}\"";
+			using var ffmpegProcess = new Process();
+			ffmpegProcess.StartInfo.FileName = ffmpegPath;
+			ffmpegProcess.StartInfo.Arguments = arguments;
+			ffmpegProcess.StartInfo.UseShellExecute = false;
+			ffmpegProcess.StartInfo.RedirectStandardError = true;
+			ffmpegProcess.StartInfo.RedirectStandardOutput = true;
+			ffmpegProcess.StartInfo.CreateNoWindow = true;
+			ffmpegProcess.Start();
 			// Begin reading error asynchronously
-			ffmpeg.BeginErrorReadLine();
+			ffmpegProcess.BeginErrorReadLine();
 			// Wait for the process to exit
-			ffmpeg.WaitForExit();
-		} catch (IOException ex) {
-			var exs = "SaveMp4: An error occurred: " + ex.Message;
-			Console.WriteLine(exs);
-#if CustomDebug
-			Log(ref logString, exs);
-#endif
-			return 0;
-		} catch (UnauthorizedAccessException ex) {
-			var exs = "SaveMp4: Access denied: " + ex.Message;
-			Console.WriteLine(exs);
-#if CustomDebug
-			Log(ref logString, exs);
-#endif
-			return 0;
+			ffmpegProcess.WaitForExit();
 		} catch (Exception ex) {
 			var exs = "SaveMp4: Unexpected error: " + ex.Message;
 			Console.WriteLine(exs);
@@ -2727,8 +2963,9 @@ internal class FractalGenerator {
 #endif
 			return 1;
 		}
+		//mp4Success = false;
 		return 0;
-	}
+	}*/
 
 
 #if CustomDebug
@@ -2749,18 +2986,11 @@ internal class FractalGenerator {
 		while (i < applyMaxTasks) {
 			var task = tasks[i];
 			tempDebugString += "\n" + i++ + ": ";
-			switch (task.State) {
-				default:
-				case TaskState.Running:
-					tempDebugString += GetTaskState(task.BitmapIndex);
-					break;
-				case TaskState.Done:
-					tempDebugString += "DONE";
-					break;
-				case TaskState.Free:
-					tempDebugString += "FREE";
-					break;
-			}
+			tempDebugString += task.State switch {
+				TaskState.Done => "DONE",
+				TaskState.Free => "FREE",
+				_ => GetTaskState(task.BitmapIndex),
+			};
 		}
 		BitmapState state, lastState = BitmapState.Error;
 		for (var c = i = 0; c < counter.Length; counter[c++] = 0) {}
@@ -2784,7 +3014,14 @@ internal class FractalGenerator {
 			-3 => "EXPORTING PNG",
 			-2 => "FINISHING",
 			-1 => "WRITING",
-			_ => GetBitmapState(bitmapState[bmp])
+			_ => encodedGif[bmp] switch {
+				1 => "ENCODING GIF",
+				2 => "WRITING GIF",
+				_ => encodedPng[bmp] switch {
+					1 => "ENCODING PNG",
+					_ => GetBitmapState(bitmapState[bmp])
+				}
+			}
 		};
 		string GetBitmapState(BitmapState displayState) => displayState switch {
 			BitmapState.Queued => "QUEUED (NOT SPAWNED)",
@@ -2792,20 +3029,14 @@ internal class FractalGenerator {
 			BitmapState.Void => "GENERATING DIJKSTRA VOID",
 			BitmapState.Drawing => "DRAWING BITMAP (LOCKED)",
 			BitmapState.DrawingFinished => "DRAWING FINISHED (LOCKED)",
-			BitmapState.Encoding => "ENCODING (LOCKED)",
-			BitmapState.EncodingFinished => "ENCODING FINISHED (LOCKED)",
-			BitmapState.FinishedBitmap => "BITMAP FINISHED (LOCKED)",
-			BitmapState.UnlockedRam => "UNLOCKED_RAM",
-			BitmapState.UnlockingPng => "UNLOCKING_PNG",
-			BitmapState.UnlockedPng => "UNLOCKED_PNG",
-			BitmapState.Unlocked => "UNLOCKED_ENCODED",
+			BitmapState.Unlocked => "UNLOCKED",
 			_ => "ERROR! (SHOULDN'T HAPPEN)"
 		};
 	}
 	internal void DebugStart() {
 		// Need to enable the definition on top GeneratorForm.cpp to enable this
 		// if enabled you will be unable to use the settings interface!
-		SelectFractal(1);
+		_ = SelectFractal(1);
 		SelectThreadingDepth();
 		SelectedPeriod = debug = 7;
 		SelectedWidth = 8;//1920;
@@ -2818,7 +3049,7 @@ internal class FractalGenerator {
 		SelectedCut = SelectedChildAngle = SelectedChildColor = SelectedPaletteType = 0;
 		SetupCutFunction();
 	}
-	#endregion
+#endregion
 
 	#region Interface_Settings
 	internal bool SelectFractal(short selectFractal) {
@@ -2873,15 +3104,25 @@ internal class FractalGenerator {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Fractal GetFractal() => fractals[SelectedFractal];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal Bitmap GetBitmap(int index) => bitmap == null || bitmap.Length <= index || bitmapState[index] <= BitmapState.UnlockingPng ? null : bitmap[index + previewFrames];
+	internal Bitmap GetBitmap(int index) 
+		=> bitmap == null || bitmap.Length <= index || bitmapState[index] < BitmapState.Unlocked || encodedPng[index] == 1 
+		? null : bitmap[index + previewFrames];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Bitmap GetPreviewBitmap() => bitmapsFinished < 1 ? null : bitmap[bitmapsFinished-1];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal int GetFrames() => bitmap == null ? 0 : bitmap.Length - previewFrames;
+	internal int GetFrames() => bitmap == null ? 0 : SelectedGenerationType == GenerationType.OnlyImage ? 1 : bitmap.Length - previewFrames;
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal int GetPngFinished() => tryPng - previewFrames;
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal int GetGifFinished() => tryGif - previewFrames;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal int GetBitmapsFinished() => bitmapsFinished - previewFrames;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal int GetMp4Encoded() => encodedMp4; 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal int IsGifReady() => gifSuccess;
+	//[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	//internal bool IsMp4Ready() => mp4Success;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	//GetTempGif();
 	internal Fractal.CutFunction GetCutFunction() 
