@@ -264,8 +264,6 @@ public partial class GeneratorForm : Form {
 			exportSelect.SelectedIndex = 2;
 			maxTasks = Math.Max(FractalGenerator.MinTasks, Environment.ProcessorCount - 2);
 
-			//maxTasks = 1;
-
 			SetupFractal();
 			threadsBox.Text = maxTasks.ToString();
 
@@ -289,8 +287,8 @@ public partial class GeneratorForm : Form {
 
 
 			// TODO remove debug
-			maxTasks = 1;
-			threadsBox.Text = maxTasks.ToString();
+			//maxTasks = 1;
+			//threadsBox.Text = maxTasks.ToString();
 
 
 			// Start the generator
@@ -807,7 +805,7 @@ public partial class GeneratorForm : Form {
 				return;
 			}
 		}
-		if (!isPngsSaved && MessageBox.Show(
+		if (!isPngsSaved && generator.SelectedPngType == FractalGenerator.PngType.Yes && generator.GetBitmapsFinished() >= generator.GetFrames() && MessageBox.Show(
 			"You have PNGs available to save or convert to Mp4.\nDo you want to save it?",
 			"Confirm Save",
 			MessageBoxButtons.YesNo,
@@ -895,7 +893,7 @@ public partial class GeneratorForm : Form {
 						break;
 				}
 			}
-			if (!isPngsSaved && xTask == null) {
+			if (!isPngsSaved && generator.SelectedPngType == FractalGenerator.PngType.Yes && generator.GetBitmapsFinished() >= generator.GetFrames() && xTask == null) {
 				var result = MessageBox.Show(
 					"You have PNGs available to save or convert to Mp4.\nDo you want to save it?\nCancel will turn off mp4 encoding so you won't keep getting this warning again.",
 					"Save MP4/PNGs",
@@ -1237,22 +1235,23 @@ public partial class GeneratorForm : Form {
 		switch (timingSelect.SelectedIndex) {
 			case 0:
 				var newDelay = ParseClampReText(timingBox, (short)1, (short)500);
+				timer.Interval = generator.SelectedDelay * 10;
 				if (generator.SelectedDelay == newDelay)
 					return;
 				// Delay is different, change it, and restart the generation if ou were encoding a gif
 				generator.SelectedDelay = newDelay;
 				generator.SelectedFps = (short)(100 / generator.SelectedDelay);
-				timer.Interval = generator.SelectedDelay * 10;
+				
 				//if (generator.SelectedGifType != FractalGenerator.GifType.No)
 				//	generator.RestartGif = true;
 				break;
 			case 1:
 				var newFps = ParseClampReText(timingBox, (short)1, (short)120);
+				timer.Interval = 1000 / generator.SelectedFps;
 				if (generator.SelectedFps == newFps)
 					return;
 				generator.SelectedFps = newFps;
 				generator.SelectedDelay = (short)(100 / newFps);
-				timer.Interval = 1000 / generator.SelectedFps;
 				//if (generator.SelectedGifType != FractalGenerator.GifType.No)
 				//	generator.RestartGif = true;
 				break;
@@ -1568,7 +1567,7 @@ public partial class GeneratorForm : Form {
 				"Please wait");
 			return;
 		}
-		string ext = saveMp4.FileName[^3..];
+		string ext = saveGif.FileName[^3..];
 		if (ext == "gif") {
 			// save gif:
 			BackColor = Color.FromArgb(64, 64, 64);

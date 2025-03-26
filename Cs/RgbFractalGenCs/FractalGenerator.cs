@@ -18,7 +18,6 @@ using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using System.IO.Pipes;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -857,7 +856,7 @@ internal class FractalGenerator {
 		return true;
 	}
 	void TryWriteGifFrame(int taskIndex) {
-		while (!token.IsCancellationRequested) {
+		while (gifEncoder != null && !token.IsCancellationRequested) {
 			if (bitmapsFinished >= bitmap.Length && !gifEncoder.IsFinished())
 				gifEncoder.Finish();
 			//if (applyGenerationType == GenerationType.Mp4) {
