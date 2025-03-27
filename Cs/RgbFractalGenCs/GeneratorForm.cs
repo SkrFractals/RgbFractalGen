@@ -45,7 +45,7 @@ public partial class GeneratorForm : Form {
 	private readonly FractalGenerator
 		generator = new();          // The core of the app, the generator the generates the fractal animations
 	private CancellationTokenSource
-		xCancel, aCancel;			// Cancellation Token Sources
+		xCancel, aCancel;           // Cancellation Token Sources
 	private Task xTask;             // Export tasks
 	private Task aTask;             // Abort Task
 	private bool queueAbort;        // Generator abortion queued
@@ -383,7 +383,7 @@ public partial class GeneratorForm : Form {
 
 		if (bInit)
 			Init();
-		if (generator.DebugMode) {
+		if (generator.DebugTasks || generator.DebugAnim || generator.DebugPng || generator.DebugGif) {
 			debugLabel.Text = generator.DebugString;
 			SetMinimumSize();
 		}
@@ -576,7 +576,7 @@ public partial class GeneratorForm : Form {
 			+ "|child|" + zoomChildBox.Text
 			+ "|parallel|" + parallelTypeSelect.SelectedIndex + "|threads|" + threadsBox.Text
 			+ "|delay|" + generator.SelectedDelay + "|fps|" + generator.SelectedFps + "|timing|" + timingSelect.SelectedIndex + "|abort|" + abortBox.Text
-			+ "|png|" + encodePngSelect.SelectedIndex + "|gif|" + encodeGifSelect.SelectedIndex + "|gen|" + generationSelect.SelectedIndex 
+			+ "|png|" + encodePngSelect.SelectedIndex + "|gif|" + encodeGifSelect.SelectedIndex + "|gen|" + generationSelect.SelectedIndex
 			+ "|ani|" + (animated ? 1 : 0) + "|exp|" + exportSelect.SelectedIndex;
 
 		File.WriteAllText("settings.txt", file);
@@ -709,8 +709,8 @@ public partial class GeneratorForm : Form {
 				case "color": if (p) colorSelect.SelectedIndex = Math.Min(colorSelect.Items.Count - 1, n); break;
 				case "cut": if (p) cutSelect.SelectedIndex = Math.Min(cutSelect.Items.Count - 1, n); break;
 				case "seed": cutparamBox.Text = v; break;
-				case "w": if (p) width = (short)n; break;
-				case "h": if (p) height = (short)n; break;
+				case "w": if (p) resX.Text = v; break;
+				case "h": if (p) resY.Text = v; break;
 				case "res": if (p) resSelect.SelectedIndex = Math.Min(resSelect.Items.Count - 1, n); break;
 				case "paletteSelect": FillPalette(); if (p) paletteSelect.SelectedIndex = Math.Min(paletteSelect.Items.Count - 1, n); break;
 				case "defaultHue": defaultHue.Text = v; break;
@@ -860,11 +860,6 @@ public partial class GeneratorForm : Form {
 		queueAbort = false;
 		// Cancel FractalGenerator threads
 		generator.RequestCancel();
-		/*foreach (var c in MyControls)
-			c.Enabled = true;
-		CutSelectEnabled(generator.GetFractal().cutFunction);
-		FillCutParams();*/
-		//gifButton.Enabled = false;
 		isGifReady = 0;
 		currentBitmapIndex = 0;
 		aTask = null;
@@ -945,12 +940,12 @@ public partial class GeneratorForm : Form {
 
 		if (modifySettings) {
 			FillSelects();
-			FillCutParams();
+			FillCutSeeds();
 			return;
 		}
 		modifySettings = true;
 		FillSelects();
-		FillCutParams();
+		FillCutSeeds();
 		modifySettings = false;
 		QueueReset();
 
@@ -1002,13 +997,13 @@ public partial class GeneratorForm : Form {
 	private bool CutSelectEnabled(List<(int, int[])> cf)
 	=> cutSelect.Enabled = cf is { Count: > 0 };
 	// Query the number of seeds from the CutFunction
-	private bool CutParamBoxEnabled(Fractal.CutFunction cf)
-		=> cutparamBox.Enabled = 0 < (generator.CutParamMaximum = (int)(cf == null || cf(0, -1, generator.GetFractal()) <= 0 ? 0 : (cf(0, 1 - (1 << 30), generator.GetFractal()) + 1) / cf(0, -1, generator.GetFractal())));
+	private bool CutSeedBoxEnabled(Fractal.CutFunction cf)
+		=> cutparamBox.Enabled = 0 < (generator.CutSeedMaximum = (int)(cf == null || cf(0, -1, generator.GetFractal()) <= 0 ? 0 : (cf(0, 1 - (1 << 30), generator.GetFractal()) + 1) / cf(0, -1, generator.GetFractal())));
 	/// <summary>
 	/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
 	/// </summary>
-	private void FillCutParams() {
-		_ = CutParamBoxEnabled(generator.GetCutFunction());
+	private void FillCutSeeds() {
+		_ = CutSeedBoxEnabled(generator.GetCutFunction());
 		cutparamBox.Text = "0";
 		GetValidZoomChildren();
 	}
@@ -1020,10 +1015,10 @@ public partial class GeneratorForm : Form {
 			r = paletteSelect.Items.Add(generator.Colors[i].Item1);
 		return r;
 	}
-	private void MoveFrame(int move) { 
-		animated = false; 
-		var b = generator.GetBitmapsFinished(); 
-		currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b; 
+	private void MoveFrame(int move) {
+		animated = false;
+		var b = generator.GetBitmapsFinished();
+		currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b;
 	}
 	private void SetAnimate() {
 		animateButton.Text = animated ? "Playing" : "Paused";
@@ -1110,10 +1105,10 @@ public partial class GeneratorForm : Form {
 		SwitchChildColor();
 	}
 	private void CutSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (!DiffApply((short)Math.Max(0, cutSelect.SelectedIndex), ref generator.SelectedCut)) FillCutParams();
+		if (!DiffApply((short)Math.Max(0, cutSelect.SelectedIndex), ref generator.SelectedCut)) FillCutSeeds();
 	}
-	private void CutParamBox_TextChanged(object sender, EventArgs e) {
-		if (ParseClampReTextDiffApply(cutparamBox, ref generator.SelectedCutParam, -1, generator.GetMaxCutParam()))
+	private void CutSeedBox_TextChanged(object sender, EventArgs e) {
+		if (ParseClampReTextDiffApply(cutparamBox, ref generator.SelectedCutSeed, -1, generator.GetMaxCutSeed()))
 			return;
 		GetValidZoomChildren();
 	}
@@ -1232,6 +1227,7 @@ public partial class GeneratorForm : Form {
 		timingBox.Text = (timingSelect.SelectedIndex == 0 ? generator.SelectedDelay : generator.SelectedFps).ToString();
 	}
 	private void TimingBox_TextChanged(object sender, EventArgs e) {
+		// TODO try to remove the GIF restart (was bugger the last time I tried)
 		switch (timingSelect.SelectedIndex) {
 			case 0:
 				var newDelay = ParseClampReText(timingBox, (short)1, (short)500);
@@ -1241,9 +1237,11 @@ public partial class GeneratorForm : Form {
 				// Delay is different, change it, and restart the generation if ou were encoding a gif
 				generator.SelectedDelay = newDelay;
 				generator.SelectedFps = (short)(100 / generator.SelectedDelay);
-				
-				//if (generator.SelectedGifType != FractalGenerator.GifType.No)
-				//	generator.RestartGif = true;
+
+				if (generator.SelectedGifType != FractalGenerator.GifType.No)
+					QueueReset();
+
+
 				break;
 			case 1:
 				var newFps = ParseClampReText(timingBox, (short)1, (short)120);
@@ -1252,8 +1250,8 @@ public partial class GeneratorForm : Form {
 					return;
 				generator.SelectedFps = newFps;
 				generator.SelectedDelay = (short)(100 / newFps);
-				//if (generator.SelectedGifType != FractalGenerator.GifType.No)
-				//	generator.RestartGif = true;
+				if (generator.SelectedGifType != FractalGenerator.GifType.No)
+					QueueReset();
 				break;
 		}
 	}
@@ -1263,11 +1261,14 @@ public partial class GeneratorForm : Form {
 		generator.SelectedPngType = (FractalGenerator.PngType)Math.Max(0, encodePngSelect.SelectedIndex);
 	}
 	private void EncodeGifSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		var prev = generator.SelectedGifType;
 		var now = (FractalGenerator.GifType)Math.Max(0, encodeGifSelect.SelectedIndex);
 		if (generator.SelectedGifType == now)
 			return;
 		generator.SelectedGifType = now;
-		//generator.RestartGif = true; // different GIF encoding - make the generator restart its gif encoder
+		// TODO remove reset, but the last time I tried it wasw bugged
+		if (now != FractalGenerator.GifType.No && now != prev)
+			QueueReset();
 	}
 	private void GenerationSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		if ((FractalGenerator.GenerationType)generationSelect.SelectedIndex == FractalGenerator.GenerationType.HashSeeds) {
@@ -1281,12 +1282,33 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 	}
 	private void LoadBatchButton_Click(object sender, EventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		_ = loadBatch.ShowDialog();
 	}
 	private void LoadBatch_FileOk(object sender, CancelEventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		loadedBatch = File.ReadAllText(loadBatch.FileName);
 	}
 	private void AddBatchButton_Click(object sender, EventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		var f = generator.GetFractal();
 		if (loadedBatch != "")
 			loadedBatch += ";";
@@ -1303,12 +1325,33 @@ public partial class GeneratorForm : Form {
 			+ "|child|" + zoomChildBox.Text;
 	}
 	private void SaveBatchButton_Click(object sender, EventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		_ = saveBatch.ShowDialog();
 	}
 	private void SaveBatch_FileOk(object sender, CancelEventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		File.WriteAllText(saveBatch.FileName, loadedBatch);
 	}
 	private void BatchBox_TextChanged(object sender, EventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		var batches = loadedBatch.Split(';');
 		if (batches.Length <= 0)
 			return;
@@ -1317,9 +1360,23 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 	}
 	private void UpdateBatchButton_Click(object sender, EventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		// TODO update batch entry
 	}
 	private void RunBatchButton_Click(object sender, EventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		switch (exportSelect.SelectedIndex) {
 			case 0: // PNG
 				runBatch.DefaultExt = "png";
@@ -1341,7 +1398,7 @@ public partial class GeneratorForm : Form {
 				break;
 
 			case 3: // GIF
-				if(generator.SelectedGifType == FractalGenerator.GifType.No) { 
+				if (generator.SelectedGifType == FractalGenerator.GifType.No) {
 					_ = Error("Wrong Generation Type", "You must select LocalGif or GlobalGif or AllSeedsGif generation type for this.");
 					return;
 				}
@@ -1356,11 +1413,18 @@ public partial class GeneratorForm : Form {
 				runBatch.DefaultExt = "mp4";
 				runBatch.Filter = "MP4 video (*.mp4)|*.mp4";
 				break;
-			
+
 		}
 		_ = runBatch.ShowDialog();
 	}
 	private void RunBatch_FileOk(object sender, CancelEventArgs e) {
+		// TODO implement/test
+		_ = MessageBox.Show(
+				"Batching is coming soon. Still a bit of dev and testing needed.",
+				"Coming Soon",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Error);
+		return;
 		batchFolder = runBatch.FileName[..^4];
 		// Initiate the batch queue
 		runningBatch = loadedBatch.Split(';');
@@ -1401,7 +1465,23 @@ public partial class GeneratorForm : Form {
 		screenPanel.Visible = !screenPanel.Visible;
 	}
 	private void DebugBox_CheckedChanged(object sender, EventArgs e) {
-		if (!(generator.DebugMode = debugBox.Checked))
+		generator.DebugTasks = debugBox.Checked;
+		if (!(debugBox.Checked || debugAnimBox.Checked || debugPngBox.Checked || debugGifBox.Checked))
+			debugLabel.Text = "";
+	}
+	private void debugAnimBox_CheckedChanged(object sender, EventArgs e) {
+		generator.DebugAnim = debugAnimBox.Checked;
+		if (!(debugBox.Checked || debugAnimBox.Checked || debugPngBox.Checked || debugGifBox.Checked))
+			debugLabel.Text = "";
+	}
+	private void debugPngBox_CheckedChanged(object sender, EventArgs e) {
+		generator.DebugPng = debugPngBox.Checked;
+		if (!(debugBox.Checked || debugAnimBox.Checked || debugPngBox.Checked || debugGifBox.Checked))
+			debugLabel.Text = "";
+	}
+	private void debugGifBox_CheckedChanged(object sender, EventArgs e) {
+		generator.DebugGif = debugGifBox.Checked;
+		if (!(debugBox.Checked || debugAnimBox.Checked || debugPngBox.Checked || debugGifBox.Checked))
 			debugLabel.Text = "";
 	}
 	#endregion
@@ -1478,7 +1558,7 @@ public partial class GeneratorForm : Form {
 				_ = saveMp4.ShowDialog();
 				break;
 			case 3: // GIF
-				
+
 				if (generator.SelectedGifType == FractalGenerator.GifType.No) {
 					_ = Error("You do not have GIF encoding enabled, pick a Local of Global GIF, and try again after it's done encoding.",
 						"Not selected");
@@ -1527,6 +1607,11 @@ public partial class GeneratorForm : Form {
 		}
 	}
 	private void ExportSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		// TODO fix this
+		if (exportSelect.SelectedIndex == 4) {
+			_ = Error("This Export type is currently broken and wil be fixed later, or removed.\nJust use regular MP4 export that converts PNGs, it has better quality anyway.", "Not yet availble");
+			return;
+		}
 		toolTips.SetToolTip(exportButton, exportSelect.SelectedIndex switch {
 			0 => "Export the currently displayed frame into a PNG file.\nStop the animation and select the frame you wish to export with the buttons above.",
 			1 => "Export the full animation into series of PNG files",
@@ -2322,6 +2407,10 @@ public partial class GeneratorForm : Form {
 	private void PreButton_Click(object sender, EventArgs e) {
 		generator.SelectedPreviewMode = previewMode = !previewMode;
 		QueueReset();
+	}
+
+	private void GeneratorForm_Load(object sender, EventArgs e) {
+
 	}
 	#endregion
 

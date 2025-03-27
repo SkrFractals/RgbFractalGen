@@ -29,9 +29,28 @@ Terminology:
 
 ----------------------------------------------------------------------------------------------------------
 
+TODO:
+
+Known bugs, issues, and plans for new fearutes to be added/fixed later:
+BUGS: Rarelly the program crashes for various reasons, it's probably more bugs in one, and I'll try to keep fixing these as I figure out what's causing these. It's not that bad though.
+BUG: When PNG encoding is selected, the preview screen sometimes goes blank until it's refresh with a new frame. Possibly trying to display a bitmap that is activelly written to a file, but I thought I accounted for that.
+BUG: Some zoom child choices might be broken and not zoom/loop correctly (this is new and complex feature, so it still has some work to do on it)
+FEATURE: turning on a gif encoder or changing gif encoder type or delay shouldn't need to restart the whole animation generation from scratch, but if I do that it will crash, so it's restarting for now.
+FEATURE: Draw direction arrows for children angles in editor preview more
+LANGUAGE: update the C++ implementation - the current one is very obsolete, but I could never really make it perform better than C# so I'm seriously considering to just abandon it.
+
+Known bugs, issues and features I'm actively trying to fix and implement ASAP:
+BUG: Toggling PNG encoding on will not catch up with encoding the PNGs for the current animation
+BUG: Low resolution preview doesn't have the same zoom/spin as the final full resolution first frame in some cases
+FEATURE: Finish implementing the batching feature
+
+----------------------------------------------------------------------------------------------------------
+
 Settings:
 - in reading direction from top left
 - rows are separated by double new lines
+- editor background will turn golden when animation if finished generating
+- editor background will turn blue when exporting image/animation is finished 
 
 
 Fractal Select:
@@ -55,7 +74,7 @@ Cutfunction Definition Select:
 - Different variants of CutFunction implementations
 - Each one will use a different algorithm to take the seed below and use it to cut different subchildren into voids
 
-CutFunction Param Seed:
+CutFunction Seed:
 - A binary seed for the CutFuntion
 - Each power of two has one effect, sum of powers combines the effects
 - For example with pentaflake: 1 cuts the outer child, 4 cuts the diagonály inner child, 5 cuts both

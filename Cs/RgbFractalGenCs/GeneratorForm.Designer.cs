@@ -143,6 +143,10 @@ namespace RgbFractalGenCs {
 			loadBatch = new OpenFileDialog();
 			saveBatch = new SaveFileDialog();
 			runBatch = new SaveFileDialog();
+			debugsLabel = new Label();
+			debugAnimBox = new CheckBox();
+			debugPngBox = new CheckBox();
+			debugGifBox = new CheckBox();
 			helpPanel.SuspendLayout();
 			generatorPanel.SuspendLayout();
 			panel1.SuspendLayout();
@@ -247,7 +251,7 @@ namespace RgbFractalGenCs {
 			cutparamBox.Size = new System.Drawing.Size(94, 23);
 			cutparamBox.TabIndex = 5;
 			cutparamBox.Text = "0";
-			cutparamBox.TextChanged += CutParamBox_TextChanged;
+			cutparamBox.TextChanged += CutSeedBox_TextChanged;
 			// 
 			// resX
 			// 
@@ -630,7 +634,7 @@ namespace RgbFractalGenCs {
 			detailBox.Name = "detailBox";
 			detailBox.Size = new System.Drawing.Size(59, 23);
 			detailBox.TabIndex = 23;
-			detailBox.Text = "5";
+			detailBox.Text = "3";
 			detailBox.TextChanged += DetailBox_TextChanged;
 			// 
 			// blurBox
@@ -716,11 +720,11 @@ namespace RgbFractalGenCs {
 			// 
 			debugBox.AutoSize = true;
 			debugBox.ForeColor = System.Drawing.Color.White;
-			debugBox.Location = new System.Drawing.Point(17, 606);
+			debugBox.Location = new System.Drawing.Point(69, 606);
 			debugBox.Name = "debugBox";
-			debugBox.Size = new System.Drawing.Size(84, 19);
+			debugBox.Size = new System.Drawing.Size(53, 19);
 			debugBox.TabIndex = 52;
-			debugBox.Text = "Debug Log";
+			debugBox.Text = "Tasks";
 			debugBox.UseVisualStyleBackColor = true;
 			debugBox.CheckedChanged += DebugBox_CheckedChanged;
 			// 
@@ -1381,12 +1385,62 @@ namespace RgbFractalGenCs {
 			runBatch.RestoreDirectory = true;
 			runBatch.FileOk += RunBatch_FileOk;
 			// 
+			// debugsLabel
+			// 
+			debugsLabel.AutoSize = true;
+			debugsLabel.ForeColor = System.Drawing.Color.White;
+			debugsLabel.Location = new System.Drawing.Point(18, 607);
+			debugsLabel.Name = "debugsLabel";
+			debugsLabel.Size = new System.Drawing.Size(45, 15);
+			debugsLabel.TabIndex = 61;
+			debugsLabel.Text = "Debug:";
+			// 
+			// debugAnimBox
+			// 
+			debugAnimBox.AutoSize = true;
+			debugAnimBox.ForeColor = System.Drawing.Color.White;
+			debugAnimBox.Location = new System.Drawing.Point(128, 606);
+			debugAnimBox.Name = "debugAnimBox";
+			debugAnimBox.Size = new System.Drawing.Size(55, 19);
+			debugAnimBox.TabIndex = 62;
+			debugAnimBox.Text = "Anim";
+			debugAnimBox.UseVisualStyleBackColor = true;
+			debugAnimBox.CheckedChanged += debugAnimBox_CheckedChanged;
+			// 
+			// debugPngBox
+			// 
+			debugPngBox.AutoSize = true;
+			debugPngBox.ForeColor = System.Drawing.Color.White;
+			debugPngBox.Location = new System.Drawing.Point(189, 606);
+			debugPngBox.Name = "debugPngBox";
+			debugPngBox.Size = new System.Drawing.Size(50, 19);
+			debugPngBox.TabIndex = 63;
+			debugPngBox.Text = "PNG";
+			debugPngBox.UseVisualStyleBackColor = true;
+			debugPngBox.CheckedChanged += debugPngBox_CheckedChanged;
+			// 
+			// debugGifBox
+			// 
+			debugGifBox.AutoSize = true;
+			debugGifBox.ForeColor = System.Drawing.Color.White;
+			debugGifBox.Location = new System.Drawing.Point(245, 606);
+			debugGifBox.Name = "debugGifBox";
+			debugGifBox.Size = new System.Drawing.Size(43, 19);
+			debugGifBox.TabIndex = 64;
+			debugGifBox.Text = "GIF";
+			debugGifBox.UseVisualStyleBackColor = true;
+			debugGifBox.CheckedChanged += debugGifBox_CheckedChanged;
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = AutoScaleMode.Font;
 			BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
 			ClientSize = new System.Drawing.Size(1383, 1178);
+			Controls.Add(debugGifBox);
+			Controls.Add(debugPngBox);
+			Controls.Add(debugAnimBox);
+			Controls.Add(debugsLabel);
 			Controls.Add(removePalette);
 			Controls.Add(addPalette);
 			Controls.Add(paletteLabel);
@@ -1415,6 +1469,7 @@ namespace RgbFractalGenCs {
 			Name = "GeneratorForm";
 			Text = "RGB Fractal Zoom Generator C# v1.10.0";
 			FormClosing += GeneratorForm_FormClosing;
+			Load += GeneratorForm_Load;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();
 			generatorPanel.ResumeLayout(false);
@@ -1544,6 +1599,10 @@ namespace RgbFractalGenCs {
 		private Label encodeGifLabel;
 		private ComboBox encodeGifSelect;
 		private Button updateBatchButton;
+		private Label debugsLabel;
+		private CheckBox debugAnimBox;
+		private CheckBox debugPngBox;
+		private CheckBox debugGifBox;
 	}
 }
 
