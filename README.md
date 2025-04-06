@@ -12,7 +12,7 @@ RGB Self-Similar Fractal GIF Loop Generator
 ![atetra_icvs98](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_icvs98.gif?raw=true)
 ![triflake_n1](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/triflake_n1.gif?raw=true)
 ![beam_nb](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/beam_nb.gif?raw=true)
-![tetra_v](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/tetra_v.gif?raw=true)
+![tri_1](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/tri_1.gif?raw=true)
 ![carp](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/carp.gif?raw=true)
 ![penta_n6](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/penta_n6.gif?raw=true)
 ![atetra_cth24](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_cth24.gif?raw=true)
