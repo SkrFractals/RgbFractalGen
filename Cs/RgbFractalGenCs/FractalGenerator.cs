@@ -420,9 +420,13 @@ internal class FractalGenerator {
 				[0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt],
 			[
 				("RingTree",[symmetric + pi23, pi, pi + pi23, pi + pi43, 0, 0, pi23, pi23, pi43, pi43]),
-				("BeamTree_Beams", [pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43]),
-				("BeamTree_OuterJoint", [pi / 3, 0, pi23, pi43, pi + pi23, pi + pi23, pi, pi, pi + pi43, pi + pi43]),
-				("BeamTree_InnerJoint", [pi / 3, 0, pi23, pi43, pi, pi, pi, pi, pi, pi])
+				//("BeamTree_Beams", [pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43]),
+				("BeamTree_Beams", [pi / 3, 0, pi43, pi23, pi, pi, pi + pi43, pi + pi43, pi + pi23, pi + pi23]),
+				// Outer/Inner Joint are broken by switching XY
+				//("BeamTree_OuterJoint", [pi / 3, 0, pi23, pi43, pi + pi23, pi + pi23, pi, pi, pi + pi43, pi + pi43]),
+				//("BeamTree_InnerJoint", [pi / 3, 0, pi23, pi43, pi, pi, pi, pi, pi, pi])
+				//("BeamTree_OuterJoint", [pi / 3, 0, pi43, pi23, pi + pi43, pi + pi43, pi, pi, pi + pi23, pi + pi23]),
+				//("BeamTree_InnerJoint", [pi / 3, 0, pi43, pi23, pi, pi, pi, pi, pi, pi])
 			], [
 				("Center", [2, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Y", [0, 2, 2, 2, 0, 0, 0, 0, 0, 0]),
@@ -454,7 +458,10 @@ internal class FractalGenerator {
 			new("TriComb", 13, 5, .2, .1, .9,
 				[0, 0, 1.5, -1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 3, 0, -3], 
 				[0, 2 * stt, -stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, 2 * stt, -4 * stt, 2 * stt],
-			[("Classic", [pi / 3, 0, pi23, pi43, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, pi, pi43, 0, pi23])],
+			[
+				//("Classic", [pi / 3, 0, pi23, pi43, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, pi, pi43, 0, pi23])
+				("Classic", [pi / 3, 0, pi43, pi23, pi, pi + pi43, pi + pi43, pi + pi23, pi + pi23, pi, pi23, 0, pi43])
+			],
 			[
 				("Center", [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Bridges", [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2]),
