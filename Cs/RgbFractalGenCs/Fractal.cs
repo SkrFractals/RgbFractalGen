@@ -40,6 +40,7 @@ internal class Fractal {
 		ChildColor;             // Color shifts of children inside
 	internal readonly List<(int, int[])>
 		ChildCutFunction;            // Function that takes a bitarray transforms it and decides to cut some specific patterns of children
+	//internal double Hyperbolic;
 	internal string Path = "";  // where was it loaded from?
 	internal bool Edit = false; // is it edited?
 
@@ -71,7 +72,8 @@ internal class Fractal {
 		double[] childY,
 		List<(string, double[])> childAngle,
 		List<(string, short[])> childColor,
-		List<(int, int[])> childCutFunction
+		List<(int, int[])> childCutFunction//,
+		//double hyperbolic = 1.0f
 	) {
 		Name = name;
 		ChildCount = childCount;
@@ -79,11 +81,12 @@ internal class Fractal {
 		MaxSize = maxSize;
 		MinSize = minSize;
 		CutSize = cutSize;
-		this.ChildX = childX;
-		this.ChildY = childY;
+		ChildX = childX;
+		ChildY = childY;
 		ChildAngle = childAngle;
 		ChildColor = childColor;
 		ChildCutFunction = childCutFunction;
+		//Hyperbolic = hyperbolic;
 		noBackDiagBits = childCount / 2 * ((childCount - 1) / 2);
 	}
 	/// <summary>
@@ -114,6 +117,7 @@ internal class Fractal {
 		ChildAngle = childAngle ?? copy.ChildAngle;
 		ChildColor = childColor ?? copy.ChildColor;
 		ChildCutFunction = cutFunction ?? copy.ChildCutFunction;
+		//Hyperbolic = copy.Hyperbolic;
 		noBackDiagBits = childCount / 2 * ((childCount - 1) / 2);
 	}
 	public Fractal(Fractal copy) {
@@ -128,6 +132,7 @@ internal class Fractal {
 		ChildAngle = copy.ChildAngle;
 		ChildColor = copy.ChildColor;
 		ChildCutFunction = copy.ChildCutFunction;
+		//Hyperbolic = copy.Hyperbolic;
 		noBackDiagBits = ChildCount / 2 * ((ChildCount - 1) / 2);
 	}
 	/// <summary>

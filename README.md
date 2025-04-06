@@ -322,23 +322,28 @@ Debug Log:
 ---------------------------------------------------------------------------------------------------------
 
 Nice fractal setting combinations:
--as I've combined all the definition choices to allow every combination, not every choice really is supposed to work with every choice of different definitions.
--so here are those that are supposed to work together
--any other combination is at your own "risk" of turning out looking bad
--R_X - rotation Definition
--C_X - color Definition
--F_X - CutFunction Definition
+- as I've combined all the definition choices to allow every combination, not every choice really is supposed to work with every choice of different definitions.
+- so here are those that are supposed to work together
+- any other combination is at your own "risk" of turning out looking bad
+- R_X - rotation Definition
+- C_X - color Definition
+- F_X - CutFunction Definition
 
 TriTree:
--R_BeamTree_Beams + F_NoBeam
--R_BeamTree_OuterJoint + F_OuterJoint
--R_BeamTree_InnerJoint + F_InnerJoint
+- R_BeamTree_Beams + F_NoBeam
+- R_BeamTree_OuterJoint + F_OuterJoint
+- R_BeamTree_InnerJoint + F_InnerJoint
 
 TetraTriflake nice seeds:
-Symmetric: 10(In,Div) 12(In,Div) 13(In) 14(In!,Div) 21(In) 36(Div) 38(In) 48 49 53 56! 57! 58! 62 65(Div) 68(Div,In) 69(In) 70(In) 71 72 74 75 76 80(Div) 81 85 88 96 97 98(In!,Div) 99! 100(Div) 101(In) 113 132(In,Div) 149(In) 157 164(Div) 166(Div,In) 172(In) 173(In!) 174(In) 175(In) 176 177 179 180(Div) 192(Div,In) 196(Div) 209 224 225! 226! 227 270 272 273 288 289 305 320 336 352 354 388 401 416! 480
-RadHoles: 4(Div) 8 12(Div,In) 17(Div,Out) 32 96
-CornerHoles: 0 1 2(In,Div) 3! 4(Div,In) 8 33(In) 34(Div,In) 35 64 66 100
-TriangleHoles: 3(In) 7 8(In) 12 16(Div,In) 24
+ - Symmetric: 
+10(In,Div) 12(In,Div) 13(In) 14(In!,Div) 21(In) 36(Div) 38(In) 48 49 53 56! 57! 58! 62 65(Div) 68(Div,In) 69(In) 70(In) 71 72 74 75 76 80(Div) 81 85 88 96 97 98(In!,Div) 99! 100(Div) 101(In) 113
+132(In,Div) 149(In) 157 164(Div) 166(Div,In) 172(In) 173(In!) 174(In) 175(In) 176 177 179 180(Div) 192(Div,In) 196(Div) 209 224 225! 226! 227 270 272 273 288 289 305 320 336 352 354 388 401 416! 480
+ - RadHoles: 
+4(Div) 8 12(Div,In) 17(Div,Out) 32 96
+ - CornerHoles: 
+0 1 2(In,Div) 3! 4(Div,In) 8 33(In) 34(Div,In) 35 64 66 100
+ - TriangleHoles: 
+3(In) 7 8(In) 12 16(Div,In) 24
 
 
 ---------------------------------------------------------------------------------------------------------
