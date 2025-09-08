@@ -524,7 +524,7 @@ namespace RgbFractalGenCs {
 			// 
 			spinSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			spinSelect.FormattingEnabled = true;
-			spinSelect.Items.AddRange(new object[] { "Random", "Clock", "None", "Counterclock", "Antispin" });
+			spinSelect.Items.AddRange(new object[] { "Random", "Clock", "None", "Counterclock", "Antispin", "Peri Antispin" });
 			spinSelect.Location = new System.Drawing.Point(4, 111);
 			spinSelect.Name = "spinSelect";
 			spinSelect.Size = new System.Drawing.Size(86, 23);

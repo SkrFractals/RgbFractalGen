@@ -147,7 +147,9 @@ Extra hue cycling speed
 
 
 Zoom Spin:
-- Toggle the way the fractal spins as it zooms in, either no spin, clockwise/counterclockwise, or antispin (children in different directions)
+- Toggle the way the fractal spins as it zooms in, either no spin, clockwise/counterclockwise
+- Or antispin (children in different directions)
+- Or peri antispin (peripheral children spining in opposite direction to the cenral ones, giving a cog-like dynamic)
 - Beware, the antispin option can result in flashing overlapping luminosity in most fractals
 
 Default Angle:

@@ -1,0 +1,50 @@
+clicking cancel of gif save prompt doesn't actually disable the gif encoding as promised
+
+tree broken cutfunctions
+tricomb broken cutfunctions
+
+-fix gif encoder restart (right now I have made it QueueReset which is ok)
+
+convert to mp4 doesn't yet work
+
+Tests:
+/ saving non exported png animation crashes on threading
+/ test toggling png and gif
+T test PNGS export to PNGS and MP4 with and without gif
+/ test GIF export with and without png/gif
+T test GIF->MP4 export with, without GIF
+
+Restart batch (don't go to the next)
+
+Batching:
+-Batch Finished message
+-Run Batch - switch on export, error message in generation and export doesn't match
+-selectBatch - actually select it, to zero when loading one
+-update batch - button and implementation (how even?)
+
+-Add batches and generate options to tooltips
+
+Preview has messes up zoom and rotation...?
+
+/antispin2 (non center flips too) - so that the smaller centers in periphery don't all rotate in the same direction
+
+still blinking grey...?
+editor - draw arrows?
+
+Cs:
+-fs?Close() in Abort cannot access file?
+
+CLR:
+-abort freeze on bitmap64
+-return FINISHTASK
+-add the rest of definitions
+-hide Task_X(???)
+-CPP
+-Encoder stride
+-float->double
+-zoomchild
+-editor all angles/colors
+-new palettes
+-turn the edit color to a short box
+-Colors[selectPaletteType] - copy into applyPalette so deleting a palette doens't crash
+-- also copy angle (with maxchildren control)

@@ -1173,32 +1173,47 @@ public partial class GeneratorForm : Form {
 		generator.Colors.Add(("Custom palette", p));
 		paletteSelect.SelectedIndex = FillPalette();
 	}
-	private void DefaultHue_TextChanged(object sender, EventArgs e) => DiffApply(ParseDouble(defaultHue), ref generator.SelectedDefaultHue);
-	private void ZoomSelect_SelectedIndexChanged(object sender, EventArgs e) => DiffApply((short)(zoomSelect.SelectedIndex - 2), ref generator.SelectedZoom);
-	private void DefaultZoom_TextChanged(object sender, EventArgs e) => ParseDiffApply(defaultZoom, ref generator.SelectedDefaultZoom);
-	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e) => ClampDiffApply((short)(spinSelect.SelectedIndex - 2), ref generator.SelectedSpin, (short)-2, (short)2);
-	private void SpinSpeedBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(spinSpeedBox, ref generator.SelectedExtraSpin, 0, 255);
-	private void DefaultAngle_TextChanged(object sender, EventArgs e) => ParseModDiffApply(defaultAngle, ref generator.SelectedDefaultAngle, 0, 360);
-	private void HueSelect_SelectedIndexChanged(object sender, EventArgs e) => DiffApply((short)(hueSelect.SelectedIndex == 0 ? -2 : hueSelect.SelectedIndex % 3 - 1), ref generator.SelectedHue);
+	private void DefaultHue_TextChanged(object sender, EventArgs e) 
+		=> DiffApply(ParseDouble(defaultHue), ref generator.SelectedDefaultHue);
+	private void ZoomSelect_SelectedIndexChanged(object sender, EventArgs e) 
+		=> DiffApply((short)(zoomSelect.SelectedIndex - 2), ref generator.SelectedZoom);
+	private void DefaultZoom_TextChanged(object sender, EventArgs e) 
+		=> ParseDiffApply(defaultZoom, ref generator.SelectedDefaultZoom);
+	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e) 
+		=> ClampDiffApply((short)(spinSelect.SelectedIndex - 2), ref generator.SelectedSpin, (short)-2, (short)3);
+	private void SpinSpeedBox_TextChanged(object sender, EventArgs e) 
+		=> ParseClampReTextDiffApply(spinSpeedBox, ref generator.SelectedExtraSpin, 0, 255);
+	private void DefaultAngle_TextChanged(object sender, EventArgs e) 
+		=> ParseModDiffApply(defaultAngle, ref generator.SelectedDefaultAngle, 0, 360);
+	private void HueSelect_SelectedIndexChanged(object sender, EventArgs e) 
+		=> DiffApply((short)(hueSelect.SelectedIndex == 0 ? -2 : hueSelect.SelectedIndex % 3 - 1), ref generator.SelectedHue);
 	private void HueSpeedBox_TextChanged(object sender, EventArgs e) {
 		var newSpeed = ParseClampReText(hueSpeedBox, (short)0, (short)255);
 		if (Diff(newSpeed, generator.SelectedExtraHue))
 			return;
 		// hue speed is different - change the setting and if it's actually hueCycling restart generation
 		if (generator.SelectedHue != 0)
-			Apply(newSpeed, out generator.SelectedExtraHue);
+			_ = Apply(newSpeed, out generator.SelectedExtraHue);
 		else generator.SelectedExtraHue = newSpeed;
 	}
-	private void AmbBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(ambBox, ref generator.SelectedAmbient, -1, voidAmbientMax, voidAmbientMul);
-	private void NoiseBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(noiseBox, ref generator.SelectedNoise, 0, voidNoiseMax, voidNoiseMul);
-	private void SaturateBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(saturateBox, ref generator.SelectedSaturate, 0, saturateMax, 1.0 / saturateMax);
+	private void AmbBox_TextChanged(object sender, EventArgs e) 
+		=> ParseClampReTextMulDiffApply(ambBox, ref generator.SelectedAmbient, -1, voidAmbientMax, voidAmbientMul);
+	private void NoiseBox_TextChanged(object sender, EventArgs e) 
+		=> ParseClampReTextMulDiffApply(noiseBox, ref generator.SelectedNoise, 0, voidNoiseMax, voidNoiseMul);
+	private void SaturateBox_TextChanged(object sender, EventArgs e) 
+		=> ParseClampReTextMulDiffApply(saturateBox, ref generator.SelectedSaturate, 0, saturateMax, 1.0 / saturateMax);
 	private void DetailBox_TextChanged(object sender, EventArgs e) {
-		if (!ParseClampReTextMulDiffApply(detailBox, ref generator.SelectedDetail, 0, detailMax, detailMul * generator.GetFractal().MinSize)) generator.SetMaxIterations();
+		if (!ParseClampReTextMulDiffApply(detailBox, ref generator.SelectedDetail, 0, detailMax, detailMul * generator.GetFractal().MinSize)) 
+			generator.SetMaxIterations();
 	}
-	private void BloomBox_TextChanged(object sender, EventArgs e) => ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, bloomMax, bloomMul);
-	private void BlurBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(blurBox, ref generator.SelectedBlur, 0, blurMax);
-	private void BrightnessBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(brightnessBox, ref generator.SelectedBrightness, 0, brightnessMax);
-	private void VoidBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(voidBox, ref generator.SelectedVoid, 0, voidScaleMax);
+	private void BloomBox_TextChanged(object sender, EventArgs e) 
+		=> ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, bloomMax, bloomMul);
+	private void BlurBox_TextChanged(object sender, EventArgs e) 
+		=> ParseClampReTextDiffApply(blurBox, ref generator.SelectedBlur, 0, blurMax);
+	private void BrightnessBox_TextChanged(object sender, EventArgs e) 
+		=> ParseClampReTextDiffApply(brightnessBox, ref generator.SelectedBrightness, 0, brightnessMax);
+	private void VoidBox_TextChanged(object sender, EventArgs e) 
+		=> ParseClampReTextDiffApply(voidBox, ref generator.SelectedVoid, 0, voidScaleMax);
 	private void ZoomChildBox_TextChanged(object sender, EventArgs e) {
 		var n = ParseClampReText(zoomChildBox, (short)0, (short)Math.Max(0, Math.Min(generator.MaxZoomChild, generator.GetFractal().ChildCount - 1)));
 		if (generator.SelectZoomChild(n))
@@ -1255,7 +1270,8 @@ public partial class GeneratorForm : Form {
 				break;
 		}
 	}
-	private void AbortBox_TextChanged(object sender, EventArgs e) => abortDelay = ParseClampReText(abortBox, (short)0, (short)10000);
+	private void AbortBox_TextChanged(object sender, EventArgs e) 
+		=> abortDelay = ParseClampReText(abortBox, (short)0, (short)10000);
 
 	private void EncodePngSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		generator.SelectedPngType = (FractalGenerator.PngType)Math.Max(0, encodePngSelect.SelectedIndex);

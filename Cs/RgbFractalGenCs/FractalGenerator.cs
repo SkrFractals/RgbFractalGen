@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace RgbFractalGenCs;
+
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal class FractalGenerator {
 
@@ -320,6 +321,10 @@ internal class FractalGenerator {
 
 	internal delegate (double, double) TransformXy((double, double) parentXY, (double, double) childXY, double inAngle);
 	private TransformXy UsedTransform;
+
+	private unsafe delegate void RowProcessor(FractalTask task, int y, ref byte* ptr, delegate*<Vector3, double, Vector3> saturateFunc);
+
+	private static Vector3 Identity(Vector3 v, double _) => v;
 
 	#region Init
 	internal FractalGenerator() {
@@ -1233,7 +1238,7 @@ internal class FractalGenerator {
 		var hueAngle = SelectedDefaultHue;
 		isWritingBitmaps = isFinishingBitmaps = 2;
 		ambNoise = (short)(SelectedAmbient * SelectedNoise);
-		var spin = SelectedSpin < -1 ? (short)random.Next(-2, 2) : SelectedSpin;
+		var spin = SelectedSpin < -1 ? (short)random.Next(-2, 3) : SelectedSpin;
 		applyBlur = (short)(SelectedBlur + 1);
 		applyPreviewMode = SelectedPreviewMode;
 		UsedTransform = EuclideanTransform;//f.Hyperbolic == 1.0 ? EuclideanTransform : HyperbolicTransform;
@@ -1774,7 +1779,8 @@ internal class FractalGenerator {
 						GenerateDotsSingleTask(taskIndex, dotsBuffT, newXy,
 							i == 0
 							? (dotsAngle.Item1 + ChildAngle[i] - dotsAngle.Item2, -dotsAngle.Item2)
-							: (dotsAngle.Item1 + ChildAngle[i], dotsAngle.Item2),
+							: (dotsAngle.Item1 + ChildAngle[i], SelectedSpin == 3 ? -dotsAngle.Item2 : dotsAngle.Item2),
+							//: (dotsAngle.Item1 + ChildAngle[i], dotsAngle.Item2),
 							applyPreviewMode && dotsDepth > 1 ? dotsColor : (short)((dotsColor + ChildColor[i]) % applyPalette2), newFlags, dotsDepth);
 				}
 			}
@@ -1825,7 +1831,10 @@ internal class FractalGenerator {
 							continue;
 						tuples[insertTo++] =
 							(tupleIndex, newXy,
-							i == 0 ? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2) : (tupleAngle.Item1 + ChildAngle[i], tupleAngle.Item2),
+							//i == 0 ? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2) : (tupleAngle.Item1 + ChildAngle[i], tupleAngle.Item2),
+							i == 0 
+							? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2) 
+							: (tupleAngle.Item1 + ChildAngle[i], SelectedSpin == 3 ? -tupleAngle.Item2 : tupleAngle.Item2),
 							applyPreviewMode && tupleDepth > 1 ? tupleColor : (short)((tupleColor + ChildColor[i]) % applyPalette2), newFlags, tupleDepth);
 						insertTo %= max; // we have added the new parent into the queue
 					}
@@ -2308,6 +2317,7 @@ internal class FractalGenerator {
 			// Draw the generated pixel to bitmap data
 			unsafe {
 				// Make a locked bitmap, remember the locked state
+				bitmap[task.BitmapIndex]?.Dispose();
 				bitmap[task.BitmapIndex] = new(task.ApplyWidth, task.ApplyHeight);
 				var p = (byte*)(void*)LockBits(task.BitmapIndex, (applyParallelType == ParallelType.OfDepth ? task.BitmapIndex : task.BitmapIndex + 1) < previewFrames ? new Rectangle(0, 0, task.ApplyWidth, task.ApplyHeight) : rect).Scan0;
 				bitmapState[task.BitmapIndex] = BitmapState.Drawing;
@@ -2316,53 +2326,42 @@ internal class FractalGenerator {
 				//var maxGenerationTasks = (short)Math.Max(1, applyMaxTasks - 1);
 				var wv = task.ApplyWidth / applyVoid + 2;
 				var stride = bitmapData[task.BitmapIndex].Stride;
-				byte* rp;
-				// Single Threaded
+				// switch whether we use or don't use Saturate
+				delegate*<Vector3, double, Vector3> saturateFunc = SelectedSaturate > 0.0f ? &ApplySaturate : &Identity;
+				//Func<Vector3, double, Vector3> saturateFunc = SelectedSaturate > 0.0f ? ApplySaturate : Identity;
+				// switch whether we use or don't use Noise
+				//delegate*<FractalTask, int, ref byte*, delegate*<Vector3, double, Vector3>, void> rowFunc;
+				RowProcessor rowFunc;
 				if (ambNoise > 0 && applyGenerationType != GenerationType.HashSeeds) {
+					// We are using Noise, so prepare rthe grid values for it:
 					for (var y = 0; y < task.ApplyHeight / applyVoid + 2; ++y) {
 						var v = task.VoidNoise[y];
 						for (var x = 0; x < wv; ++x)
 							v[x] = new Vector3(random.Next(ambNoise), random.Next(ambNoise), random.Next(ambNoise));
 					}
-					if (SelectedSaturate > 0.0) for (short y = 0; y < task.ApplyHeight; ++y) {
-						if (token.IsCancellationRequested)
-							break;
-						rp = p + y * stride;
-						NoiseSaturate(task, y, ref rp);
-					}
-					else for (short y = 0; y < task.ApplyHeight; ++y) {
-						if (token.IsCancellationRequested)
-							break;
-						rp = p + y * stride;
-						NoiseNoSaturate(task, y, ref rp);
-					}
-				} else {
-					if (SelectedSaturate > 0.0) for (short y = 0; y < task.ApplyHeight; ++y) {
-						if (token.IsCancellationRequested)
-							break;
-						rp = p + y * stride;
-						NoNoiseSaturate(task, y, ref rp);
-					}
-					else for (short y = 0; y < task.ApplyHeight; ++y) {
-						if (token.IsCancellationRequested)
-							break;
-						rp = p + y * stride;
-						NoNoiseNoSaturate(task, y, ref rp);
-					}
+					// and make it so we call the Noise function inside the loop, otherwise NoNoise
+					rowFunc = Noise;
+				} else rowFunc = NoNoise;
+				// Row loop (single-threaded):
+				for (short y = 0; y < task.ApplyHeight; ++y) {
+					if (token.IsCancellationRequested)
+						break;
+					byte* rp = p + y * stride;
+					rowFunc(task, y, ref rp, saturateFunc);
 				}
 				#region GenerateBitmap_Inline
-				Vector3 Normalize(Vector3 pixel, float lightNormalizer) {
+				static Vector3 Normalize(Vector3 pixel, float lightNormalizer) {
 					var max = Math.Max(pixel.X, Math.Max(pixel.Y, pixel.Z));
 					return lightNormalizer * max > 254.0f ? 254.0f / max * pixel : lightNormalizer * pixel;
 				}
-				Vector3 ApplyAmbientNoise(Vector3 rgb, float amb, float noise, Vector3 rand)
+				static Vector3 ApplyAmbientNoise(Vector3 rgb, float amb, float noise, Vector3 rand)
 					=> rgb + new Vector3(amb) + noise * rand;
-				Vector3 ApplySaturate(Vector3 rgb) {
+				static Vector3 ApplySaturate(Vector3 rgb, double selectedSaturate) {
 					// The saturation equation boosting up the saturation of the pixel (powered by the saturation slider setting)
 					float mMax, min = Math.Min(Math.Min(rgb.X, rgb.Y), rgb.Z), max = Math.Max(Math.Max(rgb.X, rgb.Y), rgb.Z);
-					return max <= min ? rgb : ((mMax = max * (float)SelectedSaturate / (max - min)) + 1 - (float)SelectedSaturate) * rgb - new Vector3(min * mMax);
+					return max <= min ? rgb : ((mMax = max * (float)selectedSaturate / (max - min)) + 1 - (float)selectedSaturate) * rgb - new Vector3(min * mMax);
 				}
-				void ApplyRgbToBytePointer(Vector3 rgb, ref byte* ptr) {
+				static void ApplyRgbToBytePointer(Vector3 rgb, ref byte* ptr) {
 					// Without gamma:
 					ptr[0] = (byte)rgb.Z;
 					ptr[1] = (byte)rgb.Y;
@@ -2375,16 +2374,13 @@ internal class FractalGenerator {
 					*/
 					ptr += 3;
 				}
-				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				void NoiseSaturate(FractalTask drawTask, int y, ref byte* ptr) {
+
+				void Noise(FractalTask drawTask, int y, ref byte* ptr, delegate*<Vector3, double, Vector3> saturateFunc) {
 					var voidY = drawTask.VoidDepth[y];
 					var buffY = drawTask.Buffer[y];
 					var fy = (float)y / applyVoid;
 					var startY = (int)Math.Floor(fy);
 					var alphaY = fy - startY;
-					//if (selectAmbient <= 0) // noise is always 0 if ambient is zero, so it shouldn't even get to this function
-					//	for (var x = 0; x < task.applyWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
-					//else 
 					for (var x = 0; x < drawTask.ApplyWidth; ++x) {
 						var voidAmb = voidY[x] / drawTask.VoidDepthMax;
 						var fx = (float)x / applyVoid;
@@ -2392,52 +2388,20 @@ internal class FractalGenerator {
 						var alphaX = fx - startX;
 						var vy0 = drawTask.VoidNoise[startY];
 						var vy1 = drawTask.VoidNoise[startY + 1];
-						ApplyRgbToBytePointer(ApplyAmbientNoise(ApplySaturate(Normalize(buffY[x], drawTask.LightNormalizer)), voidAmb * SelectedAmbient, (1.0f - voidAmb) * voidAmb,
+						ApplyRgbToBytePointer(ApplyAmbientNoise(saturateFunc(Normalize(buffY[x], drawTask.LightNormalizer), SelectedSaturate), voidAmb * SelectedAmbient, (1.0f - voidAmb) * voidAmb,
 							alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX]) + (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * vy0[startX])), ref ptr);
 					}
 				}
-				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				void NoiseNoSaturate(FractalTask drawTask, int y, ref byte* ptr) {
-					var voidY = drawTask.VoidDepth[y];
-					var buffY = drawTask.Buffer[y];
-					var fy = (float)y / applyVoid;
-					var startY = (int)Math.Floor(fy);
-					var alphaY = fy - startY;
-					//if (selectAmbient <= 0) // noise is always 0 if ambient is zero, so it shouldn't even get to this function
-					//	for (var x = 0; x < task.applyWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), ref p)) ;
-					//else 
-					for (var x = 0; x < drawTask.ApplyWidth; ++x) {
-						var voidAmb = voidY[x] / drawTask.VoidDepthMax;
-						var fx = (float)x / applyVoid;
-						var startX = (int)Math.Floor(fx);
-						var alphaX = fx - startX;
-						var vy0 = drawTask.VoidNoise[startY];
-						var vy1 = drawTask.VoidNoise[startY + 1];
-						ApplyRgbToBytePointer(ApplyAmbientNoise(Normalize(buffY[x], drawTask.LightNormalizer), voidAmb * SelectedAmbient, (1.0f - voidAmb) * voidAmb,
-							alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX]) + (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * vy0[startX])), ref ptr);
-					}
-				}
-				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				void NoNoiseSaturate(FractalTask drawTask, int y, ref byte* ptr) {
+				void NoNoise(FractalTask drawTask, int y, ref byte* ptr, delegate*<Vector3, double, Vector3> saturateFunc) {
 					var buffY = drawTask.Buffer[y];
 					if (SelectedAmbient > 0) {
 						var voidY = drawTask.VoidDepth[y];
 						for (var x = 0; x < drawTask.ApplyWidth; ++x)
-							ApplyRgbToBytePointer(new Vector3(SelectedAmbient * voidY[x] / drawTask.VoidDepthMax) + ApplySaturate(Normalize(buffY[x], drawTask.LightNormalizer)), ref ptr);
+							ApplyRgbToBytePointer(new Vector3(SelectedAmbient * voidY[x] / drawTask.VoidDepthMax) + saturateFunc(Normalize(buffY[x], drawTask.LightNormalizer), SelectedSaturate), ref ptr);
 					} else
 						for (var x = 0; x < drawTask.ApplyWidth; ++x)
-							ApplyRgbToBytePointer(ApplySaturate(Normalize(buffY[x], drawTask.LightNormalizer)),
+							ApplyRgbToBytePointer(saturateFunc(Normalize(buffY[x], drawTask.LightNormalizer), SelectedSaturate),
 								ref ptr);
-				}
-				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				void NoNoiseNoSaturate(FractalTask drawTask, int y, ref byte* ptr) {
-					var buffY = drawTask.Buffer[y];
-					if (SelectedAmbient > 0) {
-						var voidY = drawTask.VoidDepth[y];
-						for (var x = 0; x < drawTask.ApplyWidth; ++x)
-							ApplyRgbToBytePointer(new Vector3(SelectedAmbient * voidY[x] / drawTask.VoidDepthMax) + Normalize(buffY[x], drawTask.LightNormalizer), ref ptr);
-					} else for (var x = 0; x < drawTask.ApplyWidth; x++)
-							ApplyRgbToBytePointer(Normalize(buffY[x], drawTask.LightNormalizer), ref ptr);
 				}
 				#endregion
 			}
