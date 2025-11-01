@@ -113,6 +113,14 @@ Default Hue:
 - If -1 it will be random after each start
 
 
+Dithering:
+- Is temporal (probabilistic) pixel dithering enabled? Can slightly lower performance, but eliminates any possible color banding (for gradients such as in the void).
+- If showing an animation of a static gradient, it could look smooth even with a very low color depth, as there would be a different random dithering noise each frame.
+- Each subpixel value in every pixel in every frame is randomized like this.
+- Example: If the float value is 4.25, then there will be 25% chance the pixel's byte value will be 5, and 75% chance it will be 4. 
+- If disabled, the byte value of a float color if just rounded down
+
+
 Period
 - The number of frames to zoom from a parent to a child or vice versa
 - The final number of frames can be higher if the child is not identical to the parent, but some deeper child is

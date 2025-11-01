@@ -189,6 +189,7 @@ public partial class GeneratorForm : Form {
 			SetupControl(removePalette, "Removes this selected palette from the list.\nIf it's a default one, it will be restored on the next launch.");
 			SetupControl(addPalette, "Add you own custom palette to the list. You will be prompted with series of ColorDialogs, cancelling another color pick will finish the palette.");
 			SetupControl(defaultHue, "Type the initial hue angle of the first image (in degrees).");
+			SetupControl(ditherBox, "Temporal Dithering: if the real color is in-between 2 byte values, it evaluates randomly to the lower or higher one, with the probability respectively.");
 			SetupControl(periodBox, "How many frames for the self-similar center child to zoom in to the same size as the parent if you are zooming in.\nOr for the parent to zoom out to the same size as the child if you are zooming out.\nThis will equal the number of generated frames of the animation if the center child is the same color.\nOr it will be a third of the number of generated frames of the animation if the center child is a different color.");
 			SetupControl(periodMultiplierBox, "Multiplies the frame count, slowing down the rotation and hue shifts.");
 			SetupControl(zoomSelect, "Choose in which direction you want the fractal zoom.");
@@ -241,6 +242,7 @@ public partial class GeneratorForm : Form {
 			resSelect.SelectedIndex = 0;
 			zoomSelect.SelectedIndex = 3;
 			AbortBox_TextChanged(null, null);
+			DitherBox_CheckedChanged(null, null);
 			PeriodBox_TextChanged(null, null);
 			PeriodMultiplierBox_TextChanged(null, null);
 			ParallelTypeSelect_SelectedIndexChanged(null, null);
@@ -565,7 +567,7 @@ public partial class GeneratorForm : Form {
 			+ "|preview|" + (previewMode ? 1 : 0) + "|edit|" + (editorPanel.Visible ? 1 : 0)
 			+ "|angle|" + angleSelect.SelectedIndex + "|color|" + colorSelect.SelectedIndex + "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
 			+ "|w|" + resX.Text + "|h|" + resY.Text + "|res|" + resSelect.SelectedIndex
-			+ "|paletteSelect|" + paletteSelect.SelectedIndex
+			+ "|paletteSelect|" + paletteSelect.SelectedIndex + "|dithering|" + (ditherBox.Enabled ? 1 : 0)
 			+ "|period|" + periodBox.Text + "|periodMul|" + periodMultiplierBox.Text
 			+ "|zoom|" + zoomSelect.SelectedIndex + "|defaultZoom|" + defaultZoom.Text
 			+ "|hue|" + hueSelect.SelectedIndex + "|defaultHue|" + defaultHue.Text + "|hueMul|" + hueSpeedBox.Text
@@ -714,6 +716,7 @@ public partial class GeneratorForm : Form {
 				case "res": if (p) resSelect.SelectedIndex = Math.Min(resSelect.Items.Count - 1, n); break;
 				case "paletteSelect": FillPalette(); if (p) paletteSelect.SelectedIndex = Math.Min(paletteSelect.Items.Count - 1, n); break;
 				case "defaultHue": defaultHue.Text = v; break;
+				case "dithering": if(p) ditherBox.Checked = n == 1; break;
 				case "period": periodBox.Text = v; break;
 				case "periodMul": periodMultiplierBox.Text = v; break;
 				case "zoom": if (p) zoomSelect.SelectedIndex = Math.Min(zoomSelect.Items.Count - 1, n); break;
@@ -1113,6 +1116,12 @@ public partial class GeneratorForm : Form {
 		GetValidZoomChildren();
 	}
 	private void Resolution_Changed(object sender, EventArgs e) => QueueReset(TryResize());
+	private void DitherBox_CheckedChanged(object sender, EventArgs e) {
+		ditherLabel.Text = ditherBox.Checked ? "Enabled" : "Disabled";
+		generator.SelectDithering(ditherBox.Checked);
+		QueueReset();
+
+	}
 	private void PeriodBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(periodBox, ref generator.SelectedPeriod, -1, 1000);
 	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(periodMultiplierBox, ref generator.SelectedPeriodMultiplier, 1, 10);
 	private void PaletteSelect_SelectedIndexChanged(object sender, EventArgs e) {
@@ -1173,19 +1182,19 @@ public partial class GeneratorForm : Form {
 		generator.Colors.Add(("Custom palette", p));
 		paletteSelect.SelectedIndex = FillPalette();
 	}
-	private void DefaultHue_TextChanged(object sender, EventArgs e) 
+	private void DefaultHue_TextChanged(object sender, EventArgs e)
 		=> DiffApply(ParseDouble(defaultHue), ref generator.SelectedDefaultHue);
-	private void ZoomSelect_SelectedIndexChanged(object sender, EventArgs e) 
+	private void ZoomSelect_SelectedIndexChanged(object sender, EventArgs e)
 		=> DiffApply((short)(zoomSelect.SelectedIndex - 2), ref generator.SelectedZoom);
-	private void DefaultZoom_TextChanged(object sender, EventArgs e) 
+	private void DefaultZoom_TextChanged(object sender, EventArgs e)
 		=> ParseDiffApply(defaultZoom, ref generator.SelectedDefaultZoom);
-	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e) 
+	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e)
 		=> ClampDiffApply((short)(spinSelect.SelectedIndex - 2), ref generator.SelectedSpin, (short)-2, (short)3);
-	private void SpinSpeedBox_TextChanged(object sender, EventArgs e) 
+	private void SpinSpeedBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(spinSpeedBox, ref generator.SelectedExtraSpin, 0, 255);
-	private void DefaultAngle_TextChanged(object sender, EventArgs e) 
+	private void DefaultAngle_TextChanged(object sender, EventArgs e)
 		=> ParseModDiffApply(defaultAngle, ref generator.SelectedDefaultAngle, 0, 360);
-	private void HueSelect_SelectedIndexChanged(object sender, EventArgs e) 
+	private void HueSelect_SelectedIndexChanged(object sender, EventArgs e)
 		=> DiffApply((short)(hueSelect.SelectedIndex == 0 ? -2 : hueSelect.SelectedIndex % 3 - 1), ref generator.SelectedHue);
 	private void HueSpeedBox_TextChanged(object sender, EventArgs e) {
 		var newSpeed = ParseClampReText(hueSpeedBox, (short)0, (short)255);
@@ -1196,23 +1205,23 @@ public partial class GeneratorForm : Form {
 			_ = Apply(newSpeed, out generator.SelectedExtraHue);
 		else generator.SelectedExtraHue = newSpeed;
 	}
-	private void AmbBox_TextChanged(object sender, EventArgs e) 
+	private void AmbBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextMulDiffApply(ambBox, ref generator.SelectedAmbient, -1, voidAmbientMax, voidAmbientMul);
-	private void NoiseBox_TextChanged(object sender, EventArgs e) 
+	private void NoiseBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextMulDiffApply(noiseBox, ref generator.SelectedNoise, 0, voidNoiseMax, voidNoiseMul);
-	private void SaturateBox_TextChanged(object sender, EventArgs e) 
+	private void SaturateBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextMulDiffApply(saturateBox, ref generator.SelectedSaturate, 0, saturateMax, 1.0 / saturateMax);
 	private void DetailBox_TextChanged(object sender, EventArgs e) {
-		if (!ParseClampReTextMulDiffApply(detailBox, ref generator.SelectedDetail, 0, detailMax, detailMul * generator.GetFractal().MinSize)) 
+		if (!ParseClampReTextMulDiffApply(detailBox, ref generator.SelectedDetail, 0, detailMax, detailMul * generator.GetFractal().MinSize))
 			generator.SetMaxIterations();
 	}
-	private void BloomBox_TextChanged(object sender, EventArgs e) 
+	private void BloomBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, bloomMax, bloomMul);
-	private void BlurBox_TextChanged(object sender, EventArgs e) 
+	private void BlurBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(blurBox, ref generator.SelectedBlur, 0, blurMax);
-	private void BrightnessBox_TextChanged(object sender, EventArgs e) 
+	private void BrightnessBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(brightnessBox, ref generator.SelectedBrightness, 0, brightnessMax);
-	private void VoidBox_TextChanged(object sender, EventArgs e) 
+	private void VoidBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(voidBox, ref generator.SelectedVoid, 0, voidScaleMax);
 	private void ZoomChildBox_TextChanged(object sender, EventArgs e) {
 		var n = ParseClampReText(zoomChildBox, (short)0, (short)Math.Max(0, Math.Min(generator.MaxZoomChild, generator.GetFractal().ChildCount - 1)));
@@ -1270,7 +1279,7 @@ public partial class GeneratorForm : Form {
 				break;
 		}
 	}
-	private void AbortBox_TextChanged(object sender, EventArgs e) 
+	private void AbortBox_TextChanged(object sender, EventArgs e)
 		=> abortDelay = ParseClampReText(abortBox, (short)0, (short)10000);
 
 	private void EncodePngSelect_SelectedIndexChanged(object sender, EventArgs e) {
@@ -2428,6 +2437,8 @@ public partial class GeneratorForm : Form {
 	private void GeneratorForm_Load(object sender, EventArgs e) {
 
 	}
+
+
 	#endregion
 
 	/*#region Notify

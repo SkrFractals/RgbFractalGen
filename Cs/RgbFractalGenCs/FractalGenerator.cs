@@ -258,7 +258,9 @@ internal class FractalGenerator {
 	private double applyPeriodAngle;// Angle symmetry corrected for periodMultiplier
 	private long applyCutSeed;     // Applied cutSeed (selected or random)
 
+
 	// Selected Settings
+	private static Dither selectDither;
 	internal short SelectedFractal,     // Fractal definition (0-fractals.Length)
 		SelectedChildAngle,             // Child angle definition (0-childAngle.Length)
 		SelectedChildColor,             // Child color definition (0-childColor.Length)
@@ -323,6 +325,18 @@ internal class FractalGenerator {
 	private TransformXy UsedTransform;
 
 	private unsafe delegate void RowProcessor(FractalTask task, int y, ref byte* ptr, delegate*<Vector3, double, Vector3> saturateFunc);
+
+	private unsafe delegate byte Dither(float value);
+	private byte Dithering(float value) {
+		byte a = (byte)value;
+		return random.NextDouble() < value - a ? (byte)(a + 1) : a; 
+	}
+	private byte NoDithering(float value) {
+		return (byte)value;
+	}
+	internal void SelectDithering(bool enabled) {
+		selectDither = enabled ? Dithering : NoDithering;
+	}
 
 	private static Vector3 Identity(Vector3 v, double _) => v;
 
@@ -829,6 +843,7 @@ internal class FractalGenerator {
 		}
 		ChildColor = new short[maxChildren];
 		ChildAngle = new double[maxChildren];
+		selectDither = NoDithering;
 	}
 	private static void MakeTemp() {
 		if (!Directory.Exists("temp"))
@@ -2363,9 +2378,12 @@ internal class FractalGenerator {
 				}
 				static void ApplyRgbToBytePointer(Vector3 rgb, ref byte* ptr) {
 					// Without gamma:
-					ptr[0] = (byte)rgb.Z;
+					ptr[0] = selectDither(rgb.Z);
+					ptr[1] = selectDither(rgb.Y);
+					ptr[2] = selectDither(rgb.X);
+					/*ptr[0] = (byte)rgb.Z;
 					ptr[1] = (byte)rgb.Y;
-					ptr[2] = (byte)rgb.X;
+					ptr[2] = (byte)rgb.X;*/
 					// With gamma:
 					/*
 					p[0] = (byte)(255f * Math.Sqrt(rgb.Z / 255f));
