@@ -65,7 +65,7 @@ Angle Definition Select:
 - Each one will rotate different selections of children, resulting in entirely different fractal structure
 - You can toggle any number of these presets, and they will get combined together (the ones toggeld to be enabled will have a ✓ checkmark)
 - Toggling any set will also select that set for editing, editor will only display the selected set instead of the combination.
-
+- Warning: No guarantee than any mix will work correctly. There should always be one "Base" selected, others might or might not be added to that
 
 Color Definition Select:
 - Sets of different variants of child color shifts

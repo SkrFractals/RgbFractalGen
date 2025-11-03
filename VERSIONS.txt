@@ -1,3 +1,8 @@
+1.11.0
+-Set Toggling - Child Color and Angle sets are now togglable instead of selectable, allowing to make countless combinations of these 
+-PeriAntiSpin - This spin mode will spin the noncentral children in opposite direction, making it look more like cogwork
+-Dithering - Probabilistic dithering of floating RGB values to decide if the pixel will be rounded down or up
+
 1.10.0
 -added more AngleSets to TetraTriFlake
 -fixed crash when lowering max threads

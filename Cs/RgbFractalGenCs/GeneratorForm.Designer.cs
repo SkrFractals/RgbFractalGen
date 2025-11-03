@@ -89,6 +89,8 @@ namespace RgbFractalGenCs {
 			generatorPanel = new Panel();
 			exportSelect = new ComboBox();
 			panel1 = new Panel();
+			ditherBox = new CheckBox();
+			ditherLabel = new Label();
 			updateBatchButton = new Button();
 			encodePngLabel = new Label();
 			encodePngSelect = new ComboBox();
@@ -147,8 +149,6 @@ namespace RgbFractalGenCs {
 			debugAnimBox = new CheckBox();
 			debugPngBox = new CheckBox();
 			debugGifBox = new CheckBox();
-			ditherLabel = new Label();
-			ditherBox = new CheckBox();
 			helpPanel.SuspendLayout();
 			generatorPanel.SuspendLayout();
 			panel1.SuspendLayout();
@@ -831,6 +831,30 @@ namespace RgbFractalGenCs {
 			panel1.Size = new System.Drawing.Size(256, 300);
 			panel1.TabIndex = 60;
 			// 
+			// ditherBox
+			// 
+			ditherBox.AutoSize = true;
+			ditherBox.Checked = true;
+			ditherBox.CheckState = CheckState.Checked;
+			ditherBox.ForeColor = System.Drawing.Color.White;
+			ditherBox.Location = new System.Drawing.Point(72, 13);
+			ditherBox.Name = "ditherBox";
+			ditherBox.Size = new System.Drawing.Size(68, 19);
+			ditherBox.TabIndex = 84;
+			ditherBox.Text = "Enabled";
+			ditherBox.UseVisualStyleBackColor = true;
+			ditherBox.CheckedChanged += DitherBox_CheckedChanged;
+			// 
+			// ditherLabel
+			// 
+			ditherLabel.AutoSize = true;
+			ditherLabel.ForeColor = System.Drawing.Color.White;
+			ditherLabel.Location = new System.Drawing.Point(4, 12);
+			ditherLabel.Name = "ditherLabel";
+			ditherLabel.Size = new System.Drawing.Size(59, 15);
+			ditherLabel.TabIndex = 83;
+			ditherLabel.Text = "Dithering:";
+			// 
 			// updateBatchButton
 			// 
 			updateBatchButton.Location = new System.Drawing.Point(151, 638);
@@ -1435,30 +1459,6 @@ namespace RgbFractalGenCs {
 			debugGifBox.UseVisualStyleBackColor = true;
 			debugGifBox.CheckedChanged += debugGifBox_CheckedChanged;
 			// 
-			// ditherLabel
-			// 
-			ditherLabel.AutoSize = true;
-			ditherLabel.ForeColor = System.Drawing.Color.White;
-			ditherLabel.Location = new System.Drawing.Point(4, 12);
-			ditherLabel.Name = "ditherLabel";
-			ditherLabel.Size = new System.Drawing.Size(59, 15);
-			ditherLabel.TabIndex = 83;
-			ditherLabel.Text = "Dithering:";
-			// 
-			// ditherBox
-			// 
-			ditherBox.AutoSize = true;
-			ditherBox.Checked = true;
-			ditherBox.CheckState = CheckState.Checked;
-			ditherBox.ForeColor = System.Drawing.Color.White;
-			ditherBox.Location = new System.Drawing.Point(72, 13);
-			ditherBox.Name = "ditherBox";
-			ditherBox.Size = new System.Drawing.Size(68, 19);
-			ditherBox.TabIndex = 84;
-			ditherBox.Text = "Enabled";
-			ditherBox.UseVisualStyleBackColor = true;
-			ditherBox.CheckedChanged += DitherBox_CheckedChanged;
-			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -1495,7 +1495,7 @@ namespace RgbFractalGenCs {
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.10.1";
+			Text = "RGB Fractal Zoom Generator C# v1.11.0";
 			FormClosing += GeneratorForm_FormClosing;
 			Load += GeneratorForm_Load;
 			helpPanel.ResumeLayout(false);

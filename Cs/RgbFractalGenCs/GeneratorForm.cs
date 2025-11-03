@@ -728,36 +728,38 @@ public partial class GeneratorForm : Form {
 				case "preview": if (p) previewMode = n > 0; break;
 				case "edit": if (p) generatorPanel.Visible = !(generator.editorMode = editorPanel.Visible = n > 0); break;
 				case "angle": 
-					if (p) 
-						generator.SelectedChildAngle = (short)Math.Min(angleSelect.Items.Count - 1, n);
-					angleSelect.Items[0] = "Selected: " + generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
+					if (p) generator.SelectedChildAngle = (short)Math.Min(angleSelect.Items.Count - 2, n); {
+						var f = generator.GetFractal();
+						angleSelect.Items[0] = "Selected: " + f.ChildAngle[generator.SelectedChildAngle].Item1;
+					}
 					break;
 				case "color":
-					if (p) 
-						generator.SelectedChildColor = (short)Math.Min(colorSelect.Items.Count - 1, n);
-					colorSelect.Items[0] = "Selected: " + generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
+					if (p) generator.SelectedChildColor = (short)Math.Min(colorSelect.Items.Count - 2, n); {
+						var f = generator.GetFractal();
+						colorSelect.Items[0] = "Selected: " + f.ChildColor[generator.SelectedChildColor].Item1;
+					}
 					break;
 				case "angles": 
-					if (p)
-						generator.SelectedChildAngles = (uint)n; {
-						var ai = generator.SelectedChildAngles;
-						int selectI = 0;
+					if (p) generator.SelectedChildAngles = (ulong)n; {
 						var ca = generator.GetFractal().ChildAngle;
+						var ai = generator.SelectedChildAngles &= ((ulong)1 << ca.Count) - 1;
+						int selectI = 0;
 						while (ai > 0) {
-							angleSelect.Items[selectI + 1] = "✓ " + ca[selectI].Item1;
+							if ((ai & 1) == 1)
+								angleSelect.Items[selectI + 1] = "✓ " + ca[selectI].Item1;
 							++selectI;
 							ai >>= 1;
 						}
 					}
 					break;
 				case "colors":
-					if (p) 
-						generator.SelectedChildColors = (uint)n; {
-						var ai = generator.SelectedChildColors;
-						int selectI = 0;
+					if (p) generator.SelectedChildColors = (ulong)n; {
 						var cc = generator.GetFractal().ChildColor;
+						var ai = generator.SelectedChildColors &= ((ulong)1 << cc.Count) - 1;
+						int selectI = 0;
 						while (ai > 0) {
-							colorSelect.Items[selectI + 1] = "✓ " + cc[selectI].Item1;
+							if((ai & 1) == 1)
+								colorSelect.Items[selectI + 1] = "✓ " + cc[selectI].Item1;
 							++selectI;
 							ai >>= 1;
 						}
@@ -1121,11 +1123,11 @@ public partial class GeneratorForm : Form {
 		=> ReText(box, Clamp(ParseInt(box), min, max));
 	private bool DiffApply<T>(T n, ref T gen) where T : struct, IComparable<T>
 		=> Diff(n, gen) || Apply(n, out gen);
-	private bool MaskApply(short n, ref short select, ref uint mask) {
+	private bool MaskApply(short n, ref short select, ref ulong mask) {
 		if (n < 0)
 			return true;
 		select = n;
-		mask ^= (uint)(1 << n);
+		mask ^= (ulong)1 << n;
 		QueueReset();
 		return false;
 	}
