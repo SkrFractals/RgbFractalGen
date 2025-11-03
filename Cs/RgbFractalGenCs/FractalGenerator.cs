@@ -255,16 +255,18 @@ internal class FractalGenerator {
 	private GifType applyGifType;
 	private Vector3[] applyPalette;
 	private int applyPalette2;
-	private double applyPeriodAngle;// Angle symmetry corrected for periodMultiplier
-	private long applyCutSeed;     // Applied cutSeed (selected or random)
+	private double applyPeriodAngle;	// Angle symmetry corrected for periodMultiplier
+	private long applyCutSeed;			// Applied cutSeed (selected or random)
 
 
 	// Selected Settings
 	private static Dither selectDither;
 	internal short SelectedFractal,     // Fractal definition (0-fractals.Length)
-		SelectedChildAngle,             // Child angle definition (0-childAngle.Length)
-		SelectedChildColor,             // Child color definition (0-childColor.Length)
-		SelectedCut;                    // Selected CutFunction index (0-cutFunction.Length)
+		SelectedChildAngle,				// Child angle definition (0-childAngle.Length)
+		SelectedChildColor;             // Child color definition (0-childColor.Length)
+	internal short SelectedCut;         // Selected CutFunction index (0-cutFunction.Length)
+	internal uint SelectedChildAngles,   // Child angle definition (0-childAngle.Length)
+		SelectedChildColors;             // Child color definition (0-childColor.Length)
 	internal int SelectedCutSeed;		// CutSeed seed (0-maxCutSeed)
 	internal short SelectedWidth,       // Resolution width (1-X)
 		SelectedHeight,                 // Resolution height (1-X)
@@ -303,7 +305,8 @@ internal class FractalGenerator {
 
 	internal int CutSeedMaximum;        // Maximum seed for the selected CutFunction
 	internal bool
-		SelectedPreviewMode = false;    // Preview mode only renders a single smaller fractal with only one color shift at the highest level - for definition editor
+		SelectedPreviewMode = false,    // Preview mode only renders a single smaller fractal with only one color shift at the highest level - for definition editor
+		editorMode = false;				// In editor mode, we will only show the selected childColors and childAngles
 	//internal bool 
 	//	RestartGif;						// Makes me restart the gif encoder (called when delay is changed, which should restart the encoder, but not toss the finished bitmaps)
 	
@@ -368,7 +371,7 @@ internal class FractalGenerator {
 			diagonal = Math.Sqrt(2) / 3;
 
 		// X, Y
-		double[] carpetX = new double[9], carpetY = new double[9], pentaY = new double[6], pentaX = new double[6], triY = new double[4], triX = new double[4], 
+		double[] carpetX = new double[9], carpetY = new double[9], carpet5X = new double[25], carpet5Y = new double[25], pentaY = new double[6], pentaX = new double[6], triY = new double[4], triX = new double[4], 
 			//tfxE = new double[3], tfyE = new double[3], 
 			tetraY = new double[16], tetraX = new double[16], ofx = new double[9], ofy = new double[9];
 		// Carpets
@@ -379,6 +382,23 @@ internal class FractalGenerator {
 			carpetY[i * 2 + 1] = -iSin - iCos;
 			carpetX[i * 2 + 2] = iSin;
 			carpetY[i * 2 + 2] = -iCos;
+		}
+		carpet5X[0] = carpet5Y[0] = 0;
+		for (var i = 0; i < 4; ++i) {
+			double iPi = i * pi / 2, iCos = diagonal * Math.Cos(iPi), iSin = diagonal * Math.Sin(iPi), iSin2 = iSin*2, iCos2 = iCos*2;
+			carpet5X[i * 2 + 1] = -iCos + iSin;
+			carpet5Y[i * 2 + 1] = -iSin - iCos;
+			carpet5X[i * 2 + 2] = iSin;
+			carpet5Y[i * 2 + 2] = -iCos;
+
+			carpet5X[i * 4 + 9] = -iCos2 + iSin2;
+			carpet5Y[i * 4 + 9] = -iSin2 - iCos2;
+			carpet5X[i * 4 + 10] = -iCos + iSin2;
+			carpet5Y[i * 4 + 10] = -iSin - iCos2;
+			carpet5X[i * 4 + 11] = iSin2;
+			carpet5Y[i * 4 + 11] = -iCos2;
+			carpet5X[i * 4 + 12] = iCos + iSin2;
+			carpet5Y[i * 4 + 12] = iSin - iCos2;
 		}
 		// PentaFlakes
 		pentaY[0] = pentaX[0] = 0;
@@ -773,6 +793,59 @@ internal class FractalGenerator {
 				(1, [-766])
 			]),
 
+			new("SierpinskiPentaCarpet", 25, 5, 1.0, .25f, .9, carpet5X, carpet5Y,
+			[
+			("Classic", [symmetric + pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])/*,
+			("Classic", [symmetric + pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+			("H-I De Rivera O (opposites)", [symmetric + pi, 0, 0, 0, pi / 2, 0, 0, 0, pi / 2]),
+			("H-I De Rivera H (coloreds)", [symmetric + pi, 0, pi / 2, 0, 0, 0, pi / 2, 0, 0]),
+			("H-I De Rivera OH", [symmetric + pi, 0, pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2]),
+			("H-I De Rivera X (corners)", [symmetric + pi, pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2, 0]),
+			("H-I De Rivera XO", [symmetric + pi, pi / 2, 0, pi / 2, pi / 2, pi / 2, 0, pi / 2, pi / 2]),
+			("H-I De Rivera XH", [symmetric + pi, pi / 2, pi / 2, pi / 2, 0, pi / 2, pi / 2, pi / 2, 0]),
+			("H-I De Rivera / (diagonals)", [symmetric + pi, pi / 2, 0, 0, 0, pi / 2, 0, 0, 0]),
+			("H-I De Rivera C", [symmetric + pi / 2, 0, 0, 0, 0, 0, 0, 0, 0]),
+			("H-I De Rivera CO", [symmetric + pi / 2, 0, 0, 0, pi / 2, 0, 0, 0, pi / 2]),
+			("H-I De Rivera CH", [symmetric + pi / 2, 0, pi / 2, 0, 0, 0, pi / 2, 0, 0]),
+			("H-I De Rivera COH", [symmetric + pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2]),
+			("H-I De Rivera CX", [symmetric + pi / 2, pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2, 0]),
+			("H-I De Rivera CXO", [symmetric + pi / 2, pi / 2, 0, pi / 2, pi / 2, pi / 2, 0, pi / 2, pi / 2]),
+			("H-I De Rivera CXH", [symmetric + pi / 2, pi / 2, pi / 2, pi / 2, 0, pi / 2, pi / 2, pi / 2, 0]),
+			("H-I De Rivera C/", [symmetric + pi / 2, pi / 2, 0, 0, 0, pi / 2, 0, 0, 0])*/
+			], [
+				("Center",[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Quad",[0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("X",[2, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0]),
+				("X NoCenter",[0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0]),
+				("X NegCenter",[4, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0]),
+				("Windmill",[0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0]),
+				("Windmill NegCenter",[4, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0]),
+				("PlusCenter",[2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("PlusNegCenter",[4, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("PlusNoCenter",[0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Corner",[2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0]),
+				("Corner NoCenter",[0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0]),
+				("Corner NegCenter",[4, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0]),
+				("Square",[0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0, 2]),
+				("HashCorner",[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2]),
+				("HashMinus",[0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2]),
+				("Swastika",[2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0]),
+				("SwastikaNoCenter",[0, 0, 2, 0, 2, 0, 2, 0, 2, 2, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0]),
+				("SwastikaNegCenter",[4, 0, 2, 0, 2, 0, 2, 0, 2, 2, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0]),
+				("SwastikaNoCorner",[2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0]),
+				("SwastikaNoCornerNoCenter",[0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0]),
+				("SwastikaNoCornerNegCenter",[4, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0, 0, 2, 2, 0]),
+				("H-I De Rivera 5",[0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0]),
+				/*("H-I_De_Rivera", [0, 0, 2, 0, 0, 0, 2, 0, 0]),
+				("Sierpinski_Carpet_3/2",[3, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("H-I_De_Rivera_3/2", [0, 0, 3, 0, 0, 0, 3, 0, 0])*/
+			], null/*[
+				// Symmetric
+				(11, [-95]),
+				// NoChildComplex
+				(1, [-766])
+			]*/),
+
 			new("PentaFlake", 6, pentaS, .2 * pentaS, .25f, .9, pentaX, pentaY,
 			[
 				("Classic", [2 * pi / 10, 0, 0, 0, 0, 0]),
@@ -1152,16 +1225,54 @@ internal class FractalGenerator {
 		// Setup palette: selected or random
 		applyPalette = Colors[(short)(SelectedPaletteType < 0 ? random.Next(0, Colors.Count) : SelectedPaletteType)].Item2;
 		applyPalette2 = 2 * applyPalette.Length;
-		// copy childAngle and childColor sets for using (so it doens't crash if you change them mid generation)
-		var cc = f.ChildColor[SelectedChildColor].Item2;
+		// copy childAngle and childColor sets for using (so it doesn't crash if you change them mid generation)
+		
 		if (f.ChildCount > 0) {
-			var ca = f.ChildAngle[SelectedChildAngle].Item2;
-			for (var i = f.ChildCount; 0 <= --i; ChildAngle[i] = ca[i])
-			{
-			}
-
-			for (var i = f.ChildCount; 0 <= --i; ChildColor[i] = cc[i])
-			{
+			if (editorMode) {
+				var ca = f.ChildAngle[SelectedChildAngle].Item2;
+				var cc = f.ChildColor[SelectedChildColor].Item2;
+				var i = f.ChildCount;
+				while (0 <= --i) 
+					ChildAngle[i] = ca[i];
+				i = f.ChildCount;
+				while (0 <= --i) 
+					ChildColor[i] = cc[i];
+			} else {
+				// Prefill with zeroes
+				var i = f.ChildCount;
+				while (0 <= --i)
+					ChildAngle[i] = 0;
+				i = f.ChildCount;
+				while (0 <= --i)
+					ChildColor[i] = 0;
+				// Add all selected angles
+				var ai = SelectedChildAngles;
+				int selectI = 0;
+				while (ai > 0) {
+					if ((ai & 1) == 1) {
+						// This set of angles is selected, so add it
+						var ca = f.ChildAngle[selectI].Item2;
+						i = f.ChildCount;
+						while (0 <= --i)
+							ChildAngle[i] = (ChildAngle[i] + ca[i]) % (Math.PI * 4);
+					}
+					++selectI; // next set
+					ai >>= 1; // next select bit
+				}
+				// Add all selected colors
+				ai = SelectedChildColors;
+				selectI = 0;
+				while (ai > 0) {
+					if ((ai & 1) == 1) {
+						// This set of colors is selected, so add it
+						var cc = f.ChildColor[selectI].Item2;
+						i = f.ChildCount;
+						while (0 <= --i)
+							ChildColor[i] = (short)((ChildColor[i] + cc[i]) % 6);
+					}
+					++selectI; // next set
+					ai >>= 1; // next select bit
+				}
 			}
 		}
 		// make a copy or random zoom, cutsed, applyhue, gif+png encoding for the sme reason
@@ -1201,7 +1312,7 @@ internal class FractalGenerator {
 		applyExtraSpin = twice ? (short)(2 * SelectedExtraSpin) : SelectedExtraSpin;
 
 		// A complex expression to calculate the minimum needed hue shift speed to match the loop: supporting the new custom palettes:
-		var finalHueShift = finalPeriodMultiplier * cc[selectZoomChild] % applyPalette2;
+		var finalHueShift = finalPeriodMultiplier * ChildColor[selectZoomChild] % applyPalette2;
 		if (finalHueShift == 0 || applyZoom == 0) {
 			hueCycleMultiplier = (byte)applyPalette2;
 		} else {
@@ -3150,6 +3261,7 @@ internal class FractalGenerator {
 			return true;
 		// new fractal definition selected - let the form know to reset and restart me
 		SelectedFractal = selectFractal;
+		SelectedChildAngles = SelectedChildColors = 0;
 		SelectedCut = SelectedChildColor = SelectedChildAngle = 0;
 		return false;
 	}

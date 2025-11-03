@@ -10,9 +10,11 @@ using System.Drawing.Text;
 using System.Globalization;
 using System.IO;
 using System.Numerics;
+using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Xml.Linq;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -565,7 +567,9 @@ public partial class GeneratorForm : Form {
 		}
 		file += "fractal|" + fractalSelect.Text + "|path|" + f.Path
 			+ "|preview|" + (previewMode ? 1 : 0) + "|edit|" + (editorPanel.Visible ? 1 : 0)
-			+ "|angle|" + angleSelect.SelectedIndex + "|color|" + colorSelect.SelectedIndex + "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
+			+ "|angle|" + generator.SelectedChildAngle + "|color|" + generator.SelectedChildColor
+			+ "|angles|" + generator.SelectedChildAngles + "|colors|" + generator.SelectedChildColors
+			+ "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
 			+ "|w|" + resX.Text + "|h|" + resY.Text + "|res|" + resSelect.SelectedIndex
 			+ "|paletteSelect|" + paletteSelect.SelectedIndex + "|dithering|" + (ditherBox.Enabled ? 1 : 0)
 			+ "|period|" + periodBox.Text + "|periodMul|" + periodMultiplierBox.Text
@@ -634,7 +638,7 @@ public partial class GeneratorForm : Form {
 		if (!File.Exists("settings.txt"))
 			return;
 		LoadParams(File.ReadAllText("settings.txt").Split('|'));
-		if (editorPanel.Visible) {
+		if (generator.editorMode = editorPanel.Visible) {
 
 			memPng = (FractalGenerator.PngType)encodePngSelect.SelectedIndex;
 			memGif = (FractalGenerator.GifType)encodeGifSelect.SelectedIndex;
@@ -703,12 +707,62 @@ public partial class GeneratorForm : Form {
 						generator.Colors.Add((pn, c));
 					}
 					break;
+
+
+
+
+
+					/*var n = generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
+					angleSelect.Items[0] = "Selected: " + n;
+					angleSelect.Items[generator.SelectedChildAngle + 1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? "✓ " : "✕ ") + n;
+					SwitchChildAngle();
+					// rename the selected, and change the checkmark:
+					var n = generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
+					colorSelect.Items[0] = "Selected: " + n;
+					colorSelect.Items[generator.SelectedChildColor + 1] = (((generator.SelectedChildColors >> generator.SelectedChildColor) & 1) == 1 ? "✓ " : "✕ ") + n;*/
+
+
+
 				case "path": if (v != "" && File.Exists(v)) _ = LoadFractal(v); break;
 				case "fractal": if (fractalSelect.Items.Contains(v)) fractalSelect.SelectedItem = v; break;
 				case "preview": if (p) previewMode = n > 0; break;
-				case "edit": if (p) generatorPanel.Visible = !(editorPanel.Visible = n > 0); break;
-				case "angle": if (p) angleSelect.SelectedIndex = Math.Min(angleSelect.Items.Count - 1, n); break;
-				case "color": if (p) colorSelect.SelectedIndex = Math.Min(colorSelect.Items.Count - 1, n); break;
+				case "edit": if (p) generatorPanel.Visible = !(generator.editorMode = editorPanel.Visible = n > 0); break;
+				case "angle": 
+					if (p) 
+						generator.SelectedChildAngle = (short)Math.Min(angleSelect.Items.Count - 1, n);
+					angleSelect.Items[0] = "Selected: " + generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
+					break;
+				case "color":
+					if (p) 
+						generator.SelectedChildColor = (short)Math.Min(colorSelect.Items.Count - 1, n);
+					colorSelect.Items[0] = "Selected: " + generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
+					break;
+				case "angles": 
+					if (p)
+						generator.SelectedChildAngles = (uint)n; {
+						var ai = generator.SelectedChildAngles;
+						int selectI = 0;
+						var ca = generator.GetFractal().ChildAngle;
+						while (ai > 0) {
+							angleSelect.Items[selectI + 1] = "✓ " + ca[selectI].Item1;
+							++selectI;
+							ai >>= 1;
+						}
+					}
+					break;
+				case "colors":
+					if (p) 
+						generator.SelectedChildColors = (uint)n; {
+						var ai = generator.SelectedChildColors;
+						int selectI = 0;
+						var cc = generator.GetFractal().ChildColor;
+						while (ai > 0) {
+							colorSelect.Items[selectI + 1] = "✓ " + cc[selectI].Item1;
+							++selectI;
+							ai >>= 1;
+						}
+					}
+					break;
 				case "cut": if (p) cutSelect.SelectedIndex = Math.Min(cutSelect.Items.Count - 1, n); break;
 				case "seed": cutparamBox.Text = v; break;
 				case "w": if (p) resX.Text = v; break;
@@ -935,7 +989,7 @@ public partial class GeneratorForm : Form {
 		isGifReady = 0;
 		LoadParams(runningBatch[batchIndex].Split('|'));
 		generator.SelectedPreviewMode = false;
-		generatorPanel.Visible = !(editorPanel.Visible = false);
+		generatorPanel.Visible = !(generator.editorMode = editorPanel.Visible = false);
 		QueueReset();
 		++batchIndex;
 	}
@@ -958,13 +1012,15 @@ public partial class GeneratorForm : Form {
 			var f = generator.GetFractal();
 			// Fill angle children definitions combobox
 			angleSelect.Items.Clear();
+			angleSelect.Items.Add("Selected: " + f.ChildAngle[generator.SelectedChildAngle].Item1);
 			foreach (var (name, _) in f.ChildAngle)
-				angleSelect.Items.Add(name);
+				angleSelect.Items.Add("✕ " + name);
 			angleSelect.SelectedIndex = 0;
 			// Fill color children definitions combobox
 			colorSelect.Items.Clear();
+			colorSelect.Items.Add("Selected: " + f.ChildColor[generator.SelectedChildColor].Item1);
 			foreach (var (name, _) in f.ChildColor)
-				colorSelect.Items.Add(name);
+				colorSelect.Items.Add("✕ " + name);
 			colorSelect.SelectedIndex = 0;
 			// Fill cutFunction definitions combobox
 			cutSelect.Items.Clear();
@@ -1065,6 +1121,14 @@ public partial class GeneratorForm : Form {
 		=> ReText(box, Clamp(ParseInt(box), min, max));
 	private bool DiffApply<T>(T n, ref T gen) where T : struct, IComparable<T>
 		=> Diff(n, gen) || Apply(n, out gen);
+	private bool MaskApply(short n, ref short select, ref uint mask) {
+		if (n < 0)
+			return true;
+		select = n;
+		mask ^= (uint)(1 << n);
+		QueueReset();
+		return false;
+	}
 	private bool ClampDiffApply<T>(T n, ref T gen, T min, T max) where T : struct, IComparable<T>
 		=> DiffApply(Clamp(n, min, max), ref gen);
 	private bool ParseDiffApply(TextBox box, ref short gen)
@@ -1098,13 +1162,23 @@ public partial class GeneratorForm : Form {
 			_ = LoadFractal(fractalSelect.Text + ".fractal");
 	}
 	private void AngleSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (DiffApply((short)Math.Max(0, angleSelect.SelectedIndex), ref generator.SelectedChildAngle))
+		if (MaskApply((short)Math.Max(-1, angleSelect.SelectedIndex-1), ref generator.SelectedChildAngle, ref generator.SelectedChildAngles))
 			return;
+		// put selection back to 0, rename the selected, and change the checkmark:
+		angleSelect.SelectedIndex = 0;
+		var n = generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
+		angleSelect.Items[0] = "Selected: " + n;
+		angleSelect.Items[generator.SelectedChildAngle+1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? "✓ " : "✕ ") + n;
 		SwitchChildAngle();
 	}
 	private void ColorSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (DiffApply((short)Math.Max(0, colorSelect.SelectedIndex), ref generator.SelectedChildColor))
+		if (MaskApply((short)Math.Max(-1, colorSelect.SelectedIndex-1), ref generator.SelectedChildColor, ref generator.SelectedChildColors))
 			return;
+		// put selection back to 0, rename the selected, and change the checkmark:
+		colorSelect.SelectedIndex = 0;
+		var n = generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
+		colorSelect.Items[0] = "Selected: " + n;
+		colorSelect.Items[generator.SelectedChildColor + 1] = (((generator.SelectedChildColors >> generator.SelectedChildColor) & 1) == 1 ? "✓ " : "✕ ") + n;
 		SwitchChildColor();
 	}
 	private void CutSelect_SelectedIndexChanged(object sender, EventArgs e) {
@@ -2265,7 +2339,7 @@ public partial class GeneratorForm : Form {
 			generator.SelectedBloom = generator.SelectedBlur = generator.SelectedHue = 0;// generator.selectDefaultHue = 0;
 			generator.SelectedPreviewMode = previewMode;
 		}
-		editorPanel.Visible = !(generatorPanel.Visible = editorPanel.Visible);
+		generator.editorMode = editorPanel.Visible = !(generatorPanel.Visible = editorPanel.Visible);
 		QueueReset();
 	}
 	private void AddPoint_Click(object sender, EventArgs e) {
@@ -2348,7 +2422,7 @@ public partial class GeneratorForm : Form {
 			}
 		generator.GetFractal().ChildAngle.Add((angleBox.Text, new double[generator.GetFractal().ChildCount]));
 		//SetupSelects();
-		angleSelect.SelectedIndex = angleSelect.Items.Add(angleBox.Text);
+		angleSelect.SelectedIndex = angleSelect.Items.Add("✕ " + angleBox.Text);
 		generator.GetFractal().Edit = true;
 		FillEditor();
 	}
@@ -2361,6 +2435,8 @@ public partial class GeneratorForm : Form {
 		}
 		generator.GetFractal().ChildAngle.RemoveAt(generator.SelectedChildAngle);
 		generator.SelectedChildAngle = Math.Min((short)(generator.GetFractal().ChildAngle.Count - 1), generator.SelectedChildAngle);
+		generator.SelectedChildAngles = 0;
+		SetupSelects(); // this was missing here, maybe i just forgot, or did the item in the selectors got removed elsewhere?
 		SwitchChildAngle();
 		generator.GetFractal().Edit = true;
 		QueueReset();
@@ -2382,7 +2458,7 @@ public partial class GeneratorForm : Form {
 			}
 		generator.GetFractal().ChildColor.Add((colorBox.Text, new short[generator.GetFractal().ChildCount]));
 		//SetupSelects();
-		colorSelect.SelectedIndex = colorSelect.Items.Add(colorBox.Text);
+		colorSelect.SelectedIndex = colorSelect.Items.Add("✕ " + colorBox.Text);
 		generator.GetFractal().Edit = true;
 		FillEditor();
 	}
@@ -2395,6 +2471,8 @@ public partial class GeneratorForm : Form {
 		}
 		generator.GetFractal().ChildColor.RemoveAt(generator.SelectedChildColor);
 		generator.SelectedChildColor = Math.Min((short)(generator.GetFractal().ChildColor.Count - 1), generator.SelectedChildColor);
+		generator.SelectedChildColors = 0;
+		SetupSelects(); // this was missing here, maybe i just forgot, or did the item in the selectors got removed elsewhere?
 		SwitchChildColor();
 		generator.GetFractal().Edit = true;
 		QueueReset();

@@ -61,13 +61,17 @@ EDIT:
 
 
 Angle Definition Select:
-- Different variants of child angle shifts
+- Sets of different variants of child angle shifts
 - Each one will rotate different selections of children, resulting in entirely different fractal structure
+- You can toggle any number of these presets, and they will get combined together (the ones toggeld to be enabled will have a ✓ checkmark)
+- Toggling any set will also select that set for editing, editor will only display the selected set instead of the combination.
 
 
 Color Definition Select:
-- Different variants of child color shifts
+- Sets of different variants of child color shifts
 - Each one will color shift different selections of children, resulting in entirely different color structure
+- You can toggle any number of these presets, and they will get combined together (the ones toggeld to be enabled will have a ✓ checkmark)
+- Toggling any set will also select that set for editing, editor will only display the selected set instead of the combination.
 
 
 Cutfunction Definition Select:
