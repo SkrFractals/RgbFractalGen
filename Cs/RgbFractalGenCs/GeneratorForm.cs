@@ -1193,7 +1193,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void Resolution_Changed(object sender, EventArgs e) => QueueReset(TryResize());
 	private void DitherBox_CheckedChanged(object sender, EventArgs e) {
-		ditherLabel.Text = ditherBox.Checked ? "Enabled" : "Disabled";
+		ditherBox.Text = ditherBox.Checked ? "Enabled" : "Disabled";
 		generator.SelectDithering(ditherBox.Checked);
 		QueueReset();
 
