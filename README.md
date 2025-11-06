@@ -1,6 +1,39 @@
 # RgbFractalGen
 RGB Self-Similar Fractal GIF Loop Generator
 
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/trirainbow.gif?raw=true" width="256" height="256" alt="trirainbow">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/ahexa.gif?raw=true" width="256" height="256" alt="ahexa">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/apenta_18.gif?raw=true" width="256" height="256" alt="apenta_18">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_crth.gif?raw=true" width="256" height="256" alt="atetra_crth">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_dvs12.gif?raw=true" width="256" height="256" alt="atetra_dvs12">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/penta_n15.gif?raw=true" width="256" height="256" alt="penta_n15">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_icvs68.gif?raw=true" width="256" height="256" alt="atetra_icvs68">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/penta_n2.gif?raw=true" width="256" height="256" alt="penta_n2">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_icvs98.gif?raw=true" width="256" height="256" alt="atetra_icvs98">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/triflake_n1.gif?raw=true" width="256" height="256" alt="triflake_n1">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/beam_nb.gif?raw=true" width="256" height="256" alt="beam_nb">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/tri_1.gif?raw=true" width="256" height="256" alt="tri_1">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/carp.gif?raw=true" width="256" height="256" alt="carp">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/penta_n6.gif?raw=true" width="256" height="256" alt="penta_n6">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_cth24.gif?raw=true" width="256" height="256" alt="atetra_cth24">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/carp_s4.gif?raw=true" width="256" height="256" alt="carp_s4">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/circ.gif?raw=true" width="256" height="256" alt="circ">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_dcs164.gif?raw=true" width="256" height="256" alt="atetra_dcs164">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/flake.gif?raw=true" width="256" height="256" alt="flake">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/hexa_130.gif?raw=true" width="256" height="256" alt="hexa_130">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_icvs14.gif?raw=true" width="256" height="256" alt="atetra_icvs14">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/hexa_n10.gif?raw=true" width="256" height="256" alt="hexa_n10">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/atetra_dcvs68.gif?raw=true" width="256" height="256" alt="atetra_dcvs68">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/hio.gif?raw=true" width="256" height="256" alt="hio">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/penta.gif?raw=true" width="256" height="256" alt="penta">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/tetra_ivs6c6.gif?raw=true" width="256" height="256" alt="tetra_ivs6c6">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/penta_n19.gif?raw=true" width="256" height="256" alt="penta_n19">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/tetra_cr.gif?raw=true" width="256" height="256" alt="tetra_cr">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/triangle.gif?raw=true" width="256" height="256" alt="triangle">
+<img src="https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/tricomb_9.gif?raw=true" width="256" height="256" alt="tricomb_9">
+
+------------------------------
+
 ![trirainbow](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/trirainbow.gif?raw=true)
 ![ahexa](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/ahexa.gif?raw=true)
 ![apenta_18](https://github.com/SkrFractals/RgbFractalGen/blob/main/Examples/apenta_18.gif?raw=true)
