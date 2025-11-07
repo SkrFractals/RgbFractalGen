@@ -87,7 +87,9 @@ namespace RgbFractalGenCs {
 			debugBox = new CheckBox();
 			debugLabel = new Label();
 			generatorPanel = new Panel();
+			fileLabel = new Label();
 			exportSelect = new ComboBox();
+			fileBox = new ComboBox();
 			panel1 = new Panel();
 			ditherBox = new CheckBox();
 			ditherLabel = new Label();
@@ -722,7 +724,7 @@ namespace RgbFractalGenCs {
 			// 
 			debugBox.AutoSize = true;
 			debugBox.ForeColor = System.Drawing.Color.White;
-			debugBox.Location = new System.Drawing.Point(69, 606);
+			debugBox.Location = new System.Drawing.Point(69, 636);
 			debugBox.Name = "debugBox";
 			debugBox.Size = new System.Drawing.Size(53, 19);
 			debugBox.TabIndex = 52;
@@ -734,7 +736,7 @@ namespace RgbFractalGenCs {
 			// 
 			debugLabel.AutoSize = true;
 			debugLabel.ForeColor = System.Drawing.Color.White;
-			debugLabel.Location = new System.Drawing.Point(17, 628);
+			debugLabel.Location = new System.Drawing.Point(17, 658);
 			debugLabel.Name = "debugLabel";
 			debugLabel.Size = new System.Drawing.Size(73, 15);
 			debugLabel.TabIndex = 53;
@@ -742,7 +744,9 @@ namespace RgbFractalGenCs {
 			// 
 			// generatorPanel
 			// 
+			generatorPanel.Controls.Add(fileLabel);
 			generatorPanel.Controls.Add(exportSelect);
+			generatorPanel.Controls.Add(fileBox);
 			generatorPanel.Controls.Add(panel1);
 			generatorPanel.Controls.Add(exportButton);
 			generatorPanel.Controls.Add(infoLabel);
@@ -754,8 +758,19 @@ namespace RgbFractalGenCs {
 			generatorPanel.Controls.Add(helpButton);
 			generatorPanel.Location = new System.Drawing.Point(17, 187);
 			generatorPanel.Name = "generatorPanel";
-			generatorPanel.Size = new System.Drawing.Size(286, 413);
+			generatorPanel.Size = new System.Drawing.Size(286, 440);
 			generatorPanel.TabIndex = 54;
+			// 
+			// fileLabel
+			// 
+			fileLabel.AutoSize = true;
+			fileLabel.ForeColor = System.Drawing.Color.White;
+			fileLabel.Location = new System.Drawing.Point(14, 413);
+			fileLabel.Margin = new Padding(4, 0, 4, 0);
+			fileLabel.Name = "fileLabel";
+			fileLabel.Size = new System.Drawing.Size(28, 15);
+			fileLabel.TabIndex = 66;
+			fileLabel.Text = "File:";
 			// 
 			// exportSelect
 			// 
@@ -767,6 +782,18 @@ namespace RgbFractalGenCs {
 			exportSelect.Size = new System.Drawing.Size(108, 23);
 			exportSelect.TabIndex = 61;
 			exportSelect.SelectedIndexChanged += ExportSelect_SelectedIndexChanged;
+			// 
+			// fileBox
+			// 
+			fileBox.DropDownStyle = ComboBoxStyle.DropDownList;
+			fileBox.FormattingEnabled = true;
+			fileBox.Items.AddRange(new object[] { "Fractal", "Angles - A(Bitmask)", "Colors - C(Bitmask)", "Function - F(Type_Seed)", "Resolution - R(WxH)", "Hues - H(Palette_Hue_Shift_Speed)", "Period - P(Frames_Multiplier)", "Zoom - Z(Direction)", "Spin - S(Direction_Default_Speed)", "Void - V(Ambient_Noise_Scale)", "Image - I(Satur_Bright_Bloom_Blur)" });
+			fileBox.Location = new System.Drawing.Point(62, 410);
+			fileBox.Margin = new Padding(4, 3, 4, 3);
+			fileBox.Name = "fileBox";
+			fileBox.Size = new System.Drawing.Size(209, 23);
+			fileBox.TabIndex = 65;
+			fileBox.SelectedIndexChanged += FileBox_SelectedIndexChanged;
 			// 
 			// panel1
 			// 
@@ -1152,14 +1179,14 @@ namespace RgbFractalGenCs {
 			editorPanel.Controls.Add(addColorButton);
 			editorPanel.Controls.Add(removeAngleButton);
 			editorPanel.Controls.Add(removeColorButton);
-			editorPanel.Location = new System.Drawing.Point(17, 661);
+			editorPanel.Location = new System.Drawing.Point(17, 691);
 			editorPanel.Name = "editorPanel";
-			editorPanel.Size = new System.Drawing.Size(286, 413);
+			editorPanel.Size = new System.Drawing.Size(286, 440);
 			editorPanel.TabIndex = 56;
 			// 
 			// preButton
 			// 
-			preButton.Location = new System.Drawing.Point(148, 380);
+			preButton.Location = new System.Drawing.Point(148, 405);
 			preButton.Name = "preButton";
 			preButton.Size = new System.Drawing.Size(122, 27);
 			preButton.TabIndex = 58;
@@ -1182,7 +1209,7 @@ namespace RgbFractalGenCs {
 			// 
 			sizeLabel.AutoSize = true;
 			sizeLabel.ForeColor = System.Drawing.Color.White;
-			sizeLabel.Location = new System.Drawing.Point(14, 244);
+			sizeLabel.Location = new System.Drawing.Point(14, 269);
 			sizeLabel.Margin = new Padding(4, 0, 4, 0);
 			sizeLabel.Name = "sizeLabel";
 			sizeLabel.Size = new System.Drawing.Size(252, 15);
@@ -1191,7 +1218,7 @@ namespace RgbFractalGenCs {
 			// 
 			// colorBox
 			// 
-			colorBox.Location = new System.Drawing.Point(14, 320);
+			colorBox.Location = new System.Drawing.Point(14, 345);
 			colorBox.Name = "colorBox";
 			colorBox.Size = new System.Drawing.Size(101, 23);
 			colorBox.TabIndex = 68;
@@ -1199,7 +1226,7 @@ namespace RgbFractalGenCs {
 			// 
 			// angleBox
 			// 
-			angleBox.Location = new System.Drawing.Point(14, 292);
+			angleBox.Location = new System.Drawing.Point(14, 317);
 			angleBox.Name = "angleBox";
 			angleBox.Size = new System.Drawing.Size(101, 23);
 			angleBox.TabIndex = 52;
@@ -1209,7 +1236,7 @@ namespace RgbFractalGenCs {
 			// 
 			addcutLabel.AutoSize = true;
 			addcutLabel.ForeColor = System.Drawing.Color.White;
-			addcutLabel.Location = new System.Drawing.Point(14, 352);
+			addcutLabel.Location = new System.Drawing.Point(14, 377);
 			addcutLabel.Margin = new Padding(4, 0, 4, 0);
 			addcutLabel.Name = "addcutLabel";
 			addcutLabel.Size = new System.Drawing.Size(101, 15);
@@ -1218,7 +1245,7 @@ namespace RgbFractalGenCs {
 			// 
 			// maxBox
 			// 
-			maxBox.Location = new System.Drawing.Point(80, 262);
+			maxBox.Location = new System.Drawing.Point(80, 287);
 			maxBox.Name = "maxBox";
 			maxBox.Size = new System.Drawing.Size(56, 23);
 			maxBox.TabIndex = 66;
@@ -1227,7 +1254,7 @@ namespace RgbFractalGenCs {
 			// addCut
 			// 
 			addCut.FormattingEnabled = true;
-			addCut.Location = new System.Drawing.Point(121, 349);
+			addCut.Location = new System.Drawing.Point(121, 374);
 			addCut.Margin = new Padding(4, 3, 4, 3);
 			addCut.Name = "addCut";
 			addCut.Size = new System.Drawing.Size(149, 23);
@@ -1242,7 +1269,7 @@ namespace RgbFractalGenCs {
 			pointPanel.Controls.Add(addPoint);
 			pointPanel.Location = new System.Drawing.Point(14, 31);
 			pointPanel.Name = "pointPanel";
-			pointPanel.Size = new System.Drawing.Size(256, 210);
+			pointPanel.Size = new System.Drawing.Size(256, 235);
 			pointPanel.TabIndex = 59;
 			// 
 			// addPoint
@@ -1257,7 +1284,7 @@ namespace RgbFractalGenCs {
 			// 
 			// minBox
 			// 
-			minBox.Location = new System.Drawing.Point(148, 262);
+			minBox.Location = new System.Drawing.Point(148, 287);
 			minBox.Name = "minBox";
 			minBox.Size = new System.Drawing.Size(56, 23);
 			minBox.TabIndex = 65;
@@ -1265,7 +1292,7 @@ namespace RgbFractalGenCs {
 			// 
 			// saveButton
 			// 
-			saveButton.Location = new System.Drawing.Point(80, 380);
+			saveButton.Location = new System.Drawing.Point(80, 405);
 			saveButton.Name = "saveButton";
 			saveButton.Size = new System.Drawing.Size(56, 27);
 			saveButton.TabIndex = 58;
@@ -1275,7 +1302,7 @@ namespace RgbFractalGenCs {
 			// 
 			// loadButton
 			// 
-			loadButton.Location = new System.Drawing.Point(14, 380);
+			loadButton.Location = new System.Drawing.Point(14, 405);
 			loadButton.Name = "loadButton";
 			loadButton.Size = new System.Drawing.Size(56, 27);
 			loadButton.TabIndex = 57;
@@ -1285,7 +1312,7 @@ namespace RgbFractalGenCs {
 			// 
 			// cutBox
 			// 
-			cutBox.Location = new System.Drawing.Point(214, 262);
+			cutBox.Location = new System.Drawing.Point(214, 287);
 			cutBox.Name = "cutBox";
 			cutBox.Size = new System.Drawing.Size(56, 23);
 			cutBox.TabIndex = 64;
@@ -1293,7 +1320,7 @@ namespace RgbFractalGenCs {
 			// 
 			// addAngleButton
 			// 
-			addAngleButton.Location = new System.Drawing.Point(121, 291);
+			addAngleButton.Location = new System.Drawing.Point(121, 316);
 			addAngleButton.Name = "addAngleButton";
 			addAngleButton.Size = new System.Drawing.Size(122, 23);
 			addAngleButton.TabIndex = 60;
@@ -1303,7 +1330,7 @@ namespace RgbFractalGenCs {
 			// 
 			// sizeBox
 			// 
-			sizeBox.Location = new System.Drawing.Point(14, 262);
+			sizeBox.Location = new System.Drawing.Point(14, 287);
 			sizeBox.Name = "sizeBox";
 			sizeBox.Size = new System.Drawing.Size(56, 23);
 			sizeBox.TabIndex = 57;
@@ -1311,7 +1338,7 @@ namespace RgbFractalGenCs {
 			// 
 			// addColorButton
 			// 
-			addColorButton.Location = new System.Drawing.Point(121, 320);
+			addColorButton.Location = new System.Drawing.Point(121, 345);
 			addColorButton.Name = "addColorButton";
 			addColorButton.Size = new System.Drawing.Size(122, 23);
 			addColorButton.TabIndex = 61;
@@ -1321,7 +1348,7 @@ namespace RgbFractalGenCs {
 			// 
 			// removeAngleButton
 			// 
-			removeAngleButton.Location = new System.Drawing.Point(249, 291);
+			removeAngleButton.Location = new System.Drawing.Point(249, 316);
 			removeAngleButton.Name = "removeAngleButton";
 			removeAngleButton.Size = new System.Drawing.Size(21, 23);
 			removeAngleButton.TabIndex = 62;
@@ -1331,7 +1358,7 @@ namespace RgbFractalGenCs {
 			// 
 			// removeColorButton
 			// 
-			removeColorButton.Location = new System.Drawing.Point(249, 320);
+			removeColorButton.Location = new System.Drawing.Point(249, 345);
 			removeColorButton.Name = "removeColorButton";
 			removeColorButton.Size = new System.Drawing.Size(21, 23);
 			removeColorButton.TabIndex = 63;
@@ -1417,7 +1444,7 @@ namespace RgbFractalGenCs {
 			// 
 			debugsLabel.AutoSize = true;
 			debugsLabel.ForeColor = System.Drawing.Color.White;
-			debugsLabel.Location = new System.Drawing.Point(18, 607);
+			debugsLabel.Location = new System.Drawing.Point(18, 637);
 			debugsLabel.Name = "debugsLabel";
 			debugsLabel.Size = new System.Drawing.Size(45, 15);
 			debugsLabel.TabIndex = 61;
@@ -1427,7 +1454,7 @@ namespace RgbFractalGenCs {
 			// 
 			debugAnimBox.AutoSize = true;
 			debugAnimBox.ForeColor = System.Drawing.Color.White;
-			debugAnimBox.Location = new System.Drawing.Point(128, 606);
+			debugAnimBox.Location = new System.Drawing.Point(128, 636);
 			debugAnimBox.Name = "debugAnimBox";
 			debugAnimBox.Size = new System.Drawing.Size(55, 19);
 			debugAnimBox.TabIndex = 62;
@@ -1439,7 +1466,7 @@ namespace RgbFractalGenCs {
 			// 
 			debugPngBox.AutoSize = true;
 			debugPngBox.ForeColor = System.Drawing.Color.White;
-			debugPngBox.Location = new System.Drawing.Point(189, 606);
+			debugPngBox.Location = new System.Drawing.Point(189, 636);
 			debugPngBox.Name = "debugPngBox";
 			debugPngBox.Size = new System.Drawing.Size(50, 19);
 			debugPngBox.TabIndex = 63;
@@ -1451,7 +1478,7 @@ namespace RgbFractalGenCs {
 			// 
 			debugGifBox.AutoSize = true;
 			debugGifBox.ForeColor = System.Drawing.Color.White;
-			debugGifBox.Location = new System.Drawing.Point(245, 606);
+			debugGifBox.Location = new System.Drawing.Point(245, 636);
 			debugGifBox.Name = "debugGifBox";
 			debugGifBox.Size = new System.Drawing.Size(43, 19);
 			debugGifBox.TabIndex = 64;
@@ -1495,7 +1522,7 @@ namespace RgbFractalGenCs {
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.11.0";
+			Text = "RGB Fractal Zoom Generator C# v1.11.1";
 			FormClosing += GeneratorForm_FormClosing;
 			Load += GeneratorForm_Load;
 			helpPanel.ResumeLayout(false);
@@ -1633,6 +1660,8 @@ namespace RgbFractalGenCs {
 		private CheckBox debugGifBox;
 		private CheckBox ditherBox;
 		private Label ditherLabel;
+		private Label fileLabel;
+		private ComboBox fileBox;
 	}
 }
 

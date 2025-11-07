@@ -31,7 +31,7 @@ detailMul=0.1
 //saturate always has range from 0% ro 100%, this value is just what will be 100%
 saturateMax=100
 //100 is 100%, more will overexpose, but will not overflow the colors
-brightnessMax=300
+brightnessMax=500
 //maximum size of bloom
 bloomMax=40
 //one step of bloom

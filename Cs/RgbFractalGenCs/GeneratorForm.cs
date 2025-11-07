@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml.Linq;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.ScrollBar;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -97,7 +98,7 @@ public partial class GeneratorForm : Form {
 	private bool previewMode = true;
 
 	// Config
-	private short voidAmbientMax = 30, voidAmbientMul = 4, voidNoiseMax = 30, voidScaleMax = 300, detailMax = 10, saturateMax = 100, brightnessMax = 300, bloomMax = 40, blurMax = 40;
+	private short fileMask = 0, voidAmbientMax = 30, voidAmbientMul = 4, voidNoiseMax = 30, voidScaleMax = 300, detailMax = 10, saturateMax = 100, brightnessMax = 300, bloomMax = 40, blurMax = 40;
 	private float detailMul = .1f, threadsMul = 1.0f, voidNoiseMul = .1f, bloomMul = .25f;
 	private string loadedBatch;
 	private string[] runningBatch;
@@ -189,7 +190,7 @@ public partial class GeneratorForm : Form {
 			SetupControl(resSelect, "Select a rendering resolution (the second choice is the custom resolution you can type in the boxes to the left");
 			SetupControl(paletteSelect, "Choose the color palette. Then the children colors set will determine how the colors from this palette progress deep into the iteration");
 			SetupControl(removePalette, "Removes this selected palette from the list.\nIf it's a default one, it will be restored on the next launch.");
-			SetupControl(addPalette, "Add you own custom palette to the list. You will be prompted with series of ColorDialogs, cancelling another color pick will finish the palette.");
+			SetupControl(addPalette, "Add your own custom palette to the list. You will be prompted with series of ColorDialogs, cancelling another color pick will finish the palette.");
 			SetupControl(defaultHue, "Type the initial hue angle of the first image (in degrees).");
 			SetupControl(ditherBox, "Temporal Dithering: if the real color is in-between 2 byte values, it evaluates randomly to the lower or higher one, with the probability respectively.");
 			SetupControl(periodBox, "How many frames for the self-similar center child to zoom in to the same size as the parent if you are zooming in.\nOr for the parent to zoom out to the same size as the child if you are zooming out.\nThis will equal the number of generated frames of the animation if the center child is the same color.\nOr it will be a third of the number of generated frames of the animation if the center child is a different color.");
@@ -230,6 +231,7 @@ public partial class GeneratorForm : Form {
 			SetupControl(helpButton, "Show README.txt.");
 			SetupControl(exportButton, "");
 			SetupControl(exportSelect, "Select what you want to save with the button on the left.\nHover over that button after the selection to get more info about the selection.");
+			SetupControl(fileBox, "Toggle what selected propeerties should be used for a default export file name.");
 			SetupControl(debugBox, "shows a log of task and image states, to see what the generator is doing.");
 
 			// Read the README.txt for the help button
@@ -314,6 +316,8 @@ public partial class GeneratorForm : Form {
 			addCut.Items.Add("Select CutFunction to Add");
 			foreach (var c in Fractal.CutFunctions)
 				addCut.Items.Add(c.Item1);
+
+			SetFileMask();
 
 			return;
 
@@ -547,7 +551,8 @@ public partial class GeneratorForm : Form {
 		} else {
 			if (xTask != null) {
 				statusLabel.Text = "Saving: ";
-				infoText = generator.GetPngFinished() + infoText;
+				infoText = generator.GetCompleted() + infoText;
+				//infoText = generator.GetPngFinished() + infoText;
 			} else {
 				statusLabel.Text = "Finished: ";
 				infoText = currentBitmapIndex + infoText;
@@ -583,7 +588,7 @@ public partial class GeneratorForm : Form {
 			+ "|parallel|" + parallelTypeSelect.SelectedIndex + "|threads|" + threadsBox.Text
 			+ "|delay|" + generator.SelectedDelay + "|fps|" + generator.SelectedFps + "|timing|" + timingSelect.SelectedIndex + "|abort|" + abortBox.Text
 			+ "|png|" + encodePngSelect.SelectedIndex + "|gif|" + encodeGifSelect.SelectedIndex + "|gen|" + generationSelect.SelectedIndex
-			+ "|ani|" + (animated ? 1 : 0) + "|exp|" + exportSelect.SelectedIndex;
+			+ "|ani|" + (animated ? 1 : 0) + "|exp|" + exportSelect.SelectedIndex + "|file|" + fileMask;
 
 		File.WriteAllText("settings.txt", file);
 	}
@@ -712,14 +717,14 @@ public partial class GeneratorForm : Form {
 
 
 
-					/*var n = generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
-					angleSelect.Items[0] = "Selected: " + n;
-					angleSelect.Items[generator.SelectedChildAngle + 1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? "✓ " : "✕ ") + n;
-					SwitchChildAngle();
-					// rename the selected, and change the checkmark:
-					var n = generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
-					colorSelect.Items[0] = "Selected: " + n;
-					colorSelect.Items[generator.SelectedChildColor + 1] = (((generator.SelectedChildColors >> generator.SelectedChildColor) & 1) == 1 ? "✓ " : "✕ ") + n;*/
+				/*var n = generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
+				angleSelect.Items[0] = "Selected: " + n;
+				angleSelect.Items[generator.SelectedChildAngle + 1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? "✓ " : "✕ ") + n;
+				SwitchChildAngle();
+				// rename the selected, and change the checkmark:
+				var n = generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
+				colorSelect.Items[0] = "Selected: " + n;
+				colorSelect.Items[generator.SelectedChildColor + 1] = (((generator.SelectedChildColors >> generator.SelectedChildColor) & 1) == 1 ? "✓ " : "✕ ") + n;*/
 
 
 
@@ -727,7 +732,7 @@ public partial class GeneratorForm : Form {
 				case "fractal": if (fractalSelect.Items.Contains(v)) fractalSelect.SelectedItem = v; break;
 				case "preview": if (p) previewMode = n > 0; break;
 				case "edit": if (p) generatorPanel.Visible = !(generator.editorMode = editorPanel.Visible = n > 0); break;
-				case "angle": 
+				case "angle":
 					if (p) generator.SelectedChildAngle = (short)Math.Min(angleSelect.Items.Count - 2, n); {
 						var f = generator.GetFractal();
 						angleSelect.Items[0] = "Selected: " + f.ChildAngle[generator.SelectedChildAngle].Item1;
@@ -739,7 +744,7 @@ public partial class GeneratorForm : Form {
 						colorSelect.Items[0] = "Selected: " + f.ChildColor[generator.SelectedChildColor].Item1;
 					}
 					break;
-				case "angles": 
+				case "angles":
 					if (p) generator.SelectedChildAngles = (ulong)n; {
 						var ca = generator.GetFractal().ChildAngle;
 						var ai = generator.SelectedChildAngles &= ((ulong)1 << ca.Count) - 1;
@@ -758,7 +763,7 @@ public partial class GeneratorForm : Form {
 						var ai = generator.SelectedChildColors &= ((ulong)1 << cc.Count) - 1;
 						int selectI = 0;
 						while (ai > 0) {
-							if((ai & 1) == 1)
+							if ((ai & 1) == 1)
 								colorSelect.Items[selectI + 1] = "✓ " + cc[selectI].Item1;
 							++selectI;
 							ai >>= 1;
@@ -772,7 +777,7 @@ public partial class GeneratorForm : Form {
 				case "res": if (p) resSelect.SelectedIndex = Math.Min(resSelect.Items.Count - 1, n); break;
 				case "paletteSelect": FillPalette(); if (p) paletteSelect.SelectedIndex = Math.Min(paletteSelect.Items.Count - 1, n); break;
 				case "defaultHue": defaultHue.Text = v; break;
-				case "dithering": if(p) ditherBox.Checked = n == 1; break;
+				case "dithering": if (p) ditherBox.Checked = n == 1; break;
 				case "period": periodBox.Text = v; break;
 				case "periodMul": periodMultiplierBox.Text = v; break;
 				case "zoom": if (p) zoomSelect.SelectedIndex = Math.Min(zoomSelect.Items.Count - 1, n); break;
@@ -802,8 +807,10 @@ public partial class GeneratorForm : Form {
 				case "gen": if (p) generationSelect.SelectedIndex = Math.Min(generationSelect.Items.Count - 1, n); break;
 				case "ani": if (p) animated = n <= 0; AnimateButton_Click(null, null); break;
 				case "exp": if (p) exportSelect.SelectedIndex = Math.Min(exportSelect.Items.Count - 1, n); break;
+				case "file": if (p) fileMask = (short)n; break;
 			}
 		}
+		MinimumSelection();
 	}
 	#endregion
 
@@ -1100,11 +1107,16 @@ public partial class GeneratorForm : Form {
 	private static T Clamp<T>(T n, T min, T max) where T : struct, IComparable<T>
 		=> n.CompareTo(min) < 0 ? min : n.CompareTo(max) > 0 ? max : n;
 	private static short ReText(TextBox box, short n) {
-		box.Text = n == 0 ? short.TryParse(box.Text, out _) ? "" : box.Text : n.ToString();
+		//box.Text = n == 0 ? short.TryParse(box.Text, out _) ? (box.Focused ? "" : "0") : box.Text : n.ToString();
+		//box.Text = n == 0 ? short.TryParse(box.Text, out _) ? "" : box.Text : n.ToString();
+		var t = n == 0 ? short.TryParse(box.Text, out _) ? box.Text : (box.Focused ? "" : "0") : n.ToString();
+
+		box.Text = t;
 		return n;
 	}
 	private static int ReText(TextBox box, int n) {
-		box.Text = n == 0 ? int.TryParse(box.Text, out _) ? "" : box.Text : n.ToString();
+		//box.Text = n == 0 ? int.TryParse(box.Text, out _) ? (box.Focused ? "" : "0") : box.Text : n.ToString();
+		box.Text = n == 0 ? int.TryParse(box.Text, out _) ? box.Text : (box.Focused ? "" : "0") : n.ToString();
 		return n;
 	}
 	private static T Mod<T>(T n, T min, T max) where T : struct, IComparable<T> {
@@ -1156,6 +1168,7 @@ public partial class GeneratorForm : Form {
 		// Fractal is different - load it, change the setting and restart generation
 		FillEditor();
 		SetupSelects();
+		MinimumSelection();
 	}
 	private void FractalSelect_TextUpdate(object sender, EventArgs e) {
 		if (fractalSelect.Items.Contains(fractalSelect.Text))
@@ -1164,23 +1177,27 @@ public partial class GeneratorForm : Form {
 			_ = LoadFractal(fractalSelect.Text + ".fractal");
 	}
 	private void AngleSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (MaskApply((short)Math.Max(-1, angleSelect.SelectedIndex-1), ref generator.SelectedChildAngle, ref generator.SelectedChildAngles))
+		if (MaskApply((short)Math.Max(-1, angleSelect.SelectedIndex - 1), ref generator.SelectedChildAngle, ref generator.SelectedChildAngles))
 			return;
 		// put selection back to 0, rename the selected, and change the checkmark:
 		angleSelect.SelectedIndex = 0;
 		var n = generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
 		angleSelect.Items[0] = "Selected: " + n;
-		angleSelect.Items[generator.SelectedChildAngle+1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? "✓ " : "✕ ") + n;
+		angleSelect.Items[generator.SelectedChildAngle + 1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? "✓ " : "✕ ") + n;
+		if (MinimumSelection())
+			return;
 		SwitchChildAngle();
 	}
 	private void ColorSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		if (MaskApply((short)Math.Max(-1, colorSelect.SelectedIndex-1), ref generator.SelectedChildColor, ref generator.SelectedChildColors))
+		if (MaskApply((short)Math.Max(-1, colorSelect.SelectedIndex - 1), ref generator.SelectedChildColor, ref generator.SelectedChildColors))
 			return;
 		// put selection back to 0, rename the selected, and change the checkmark:
 		colorSelect.SelectedIndex = 0;
 		var n = generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
 		colorSelect.Items[0] = "Selected: " + n;
 		colorSelect.Items[generator.SelectedChildColor + 1] = (((generator.SelectedChildColors >> generator.SelectedChildColor) & 1) == 1 ? "✓ " : "✕ ") + n;
+		if (MinimumSelection())
+			return;
 		SwitchChildColor();
 	}
 	private void CutSelect_SelectedIndexChanged(object sender, EventArgs e) {
@@ -1381,6 +1398,18 @@ public partial class GeneratorForm : Form {
 		}
 		generator.SelectedGenerationType = (FractalGenerator.GenerationType)Math.Max(0, generationSelect.SelectedIndex);
 		QueueReset();
+	}
+	private bool MinimumSelection() {
+		bool b = false;
+		if (generator.SelectedChildColors == 0) {
+			colorSelect.SelectedIndex = 1;
+			b = true;
+		}
+		if (generator.SelectedChildAngles == 0) {
+			angleSelect.SelectedIndex = 1;
+			b = true;
+		}
+		return b;
 	}
 	private void LoadBatchButton_Click(object sender, EventArgs e) {
 		// TODO implement/test
@@ -1612,6 +1641,8 @@ public partial class GeneratorForm : Form {
 		}
 	}
 	private void ExportButton_Click(object sender, EventArgs e) {
+		// somehow this being checked was messing with my dialog focus:
+		debugBox.Checked = debugAnimBox.Checked = debugPngBox.Checked = debugGifBox.Checked = false;
 		var b = generator.GetBitmapsFinished();
 		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 
@@ -1631,6 +1662,7 @@ public partial class GeneratorForm : Form {
 				}
 				// Make sure the bitmap is actually loaded
 				UpdateBitmap(generator.GetBitmap(currentBitmapIndex %= b));
+				SetFileName(savePng, "png");
 				_ = savePng.ShowDialog();
 				break;
 			case 1: // Animation PNG
@@ -1639,6 +1671,7 @@ public partial class GeneratorForm : Form {
 						"Please wait");
 					return;
 				}
+				SetFileName(saveMp4, "png");
 				saveMp4.DefaultExt = "png";
 				saveMp4.Filter = "PNG file (*.png)|*.png";
 				_ = saveMp4.ShowDialog();
@@ -1654,6 +1687,7 @@ public partial class GeneratorForm : Form {
 						"Please wait");
 					return;
 				}
+				SetFileName(saveMp4, "mp4");
 				saveMp4.DefaultExt = "mp4";
 				saveMp4.Filter = "MP4 video (*.mp4)|*.mp4";
 				_ = saveMp4.ShowDialog();
@@ -1675,6 +1709,7 @@ public partial class GeneratorForm : Form {
 						"Not available");
 					return;
 				}
+				SetFileName(saveGif, "gif");
 				saveGif.DefaultExt = "gif";
 				saveGif.Filter = "GIF video (*.gif)|*.gif";
 				_ = saveGif.ShowDialog();
@@ -1700,6 +1735,7 @@ public partial class GeneratorForm : Form {
 						"Not available");
 					return;
 				}
+				SetFileName(saveGif, "mp4");
 				saveGif.DefaultExt = "mp4";
 				saveGif.Filter = "MP4 video (*.mp4)|*.mp4";
 				_ = saveGif.ShowDialog();
@@ -1799,9 +1835,11 @@ public partial class GeneratorForm : Form {
 				"Please wait");
 			return;
 		}
+		if (generator.SelectedPngType == FractalGenerator.PngType.No) {
+			encodePngSelect.SelectedIndex = 1;
+		}
 		string ext = saveMp4.FileName[^3..];
 		if (ext == "png") {
-			// TODO save PNGs
 			// save pngs:
 			BackColor = Color.FromArgb(64, 64, 64);
 			mp4Path = ((SaveFileDialog)sender).FileName;
@@ -1893,6 +1931,33 @@ public partial class GeneratorForm : Form {
 			return;
 		}
 		_ = Error(result, "Failed MP4 export");
+	}
+
+	void SetFileName(SaveFileDialog dialog, string extension) {
+		//var prev = dialog.FileName;
+		string f = "";
+		f += generator.GetFractal().Name;
+		if ((fileMask & 1) > 0)
+			f += "_A(" + generator.SelectedChildAngles + ")";
+		if ((fileMask & 2) > 0)
+			f += "_C(" + generator.SelectedChildColors + ")";
+		if ((fileMask & 4) > 0)
+			f += "_F(" + generator.SelectedCut + "_" + generator.SelectedCutSeed + ")";
+		if ((fileMask & 8) > 0)
+			f += "_R(" + generator.SelectedWidth + "x" + generator.SelectedHeight + ")";
+		if ((fileMask & 16) > 0)
+			f += "_H(" + generator.Colors[generator.SelectedPaletteType].Item1 + "_" + generator.SelectedDefaultHue + "_" + generator.SelectedHue + "_" + generator.SelectedExtraHue + ")";
+		if ((fileMask & 32) > 0)
+			f += "_P(" + generator.SelectedPeriod + "_" + generator.SelectedPeriodMultiplier + ")";
+		if ((fileMask & 64) > 0)
+			f += "_Z(" + generator.SelectedZoom + ")";
+		if ((fileMask & 128) > 0)
+			f += "_S(" + generator.SelectedSpin + "_" + generator.SelectedDefaultAngle + "_" + generator.SelectedExtraSpin + ")";
+		if ((fileMask & 256) > 0)
+			f += "_V(" + generator.SelectedAmbient / voidAmbientMul + "_" + (int)(generator.SelectedNoise / voidNoiseMul) + "_" + generator.SelectedVoid + ")";
+		if ((fileMask & 512) > 0)
+			f += "_I(" + generator.SelectedSaturate + "_" + generator.SelectedBrightness + "_" + generator.SelectedBloom + "_" + generator.SelectedBlur + ")";
+		dialog.FileName = f + "." + extension;
 	}
 	#endregion
 
@@ -2516,6 +2581,26 @@ public partial class GeneratorForm : Form {
 
 	private void GeneratorForm_Load(object sender, EventArgs e) {
 
+	}
+
+	private void FileBox_SelectedIndexChanged(object sender, EventArgs e) {
+		if (fileBox.SelectedIndex <= 0)
+			return;
+		fileMask ^= (short)(1 << (fileBox.SelectedIndex - 1));
+		SetFileMask();
+	}
+	private void SetFileMask() {
+		int a = fileMask;
+		int s = 1;
+		string f = "Fractal_";
+		while (a > 0) {
+			if ((a & 1) == 1 && fileBox.Items.Count > s)
+				f += fileBox.Items[s].ToString()[0];
+			++s;
+			a >>= 1;
+		}
+		fileBox.Items[0] = f;
+		fileBox.SelectedIndex = 0;
 	}
 
 

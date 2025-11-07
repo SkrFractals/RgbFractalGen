@@ -61,6 +61,14 @@ internal class FractalGenerator {
 		Local = 1,		// Will encode a GIF during the generation, so you could save it when finished. With a local colormap (one for each frame). Higher color precision. Slow encoding, larger GIF file size. 
 		Global = 2		// Also encodes a GIF. But with a global color map learned from a first frame. Not recommended for changing colors. Much faster encoding, smaller GIF file size
 	}
+	private enum ExportType : byte {
+		None = 0,
+		PngsToMp4 = 1, 
+		GifToMp4 = 2,  
+		Png = 3,
+		Pngs = 4,  
+		Gif = 5,  
+	}
 
 	#endregion
 
@@ -233,6 +241,7 @@ internal class FractalGenerator {
 	//	ofDepthQueue = new(), ofDepth00 = new(), ofDepth01 = new(), ofDepth10 = new(), ofDepth11 = new(); // these were helper buffers for experimental OfDepth implementations that didn't turn out faster than the current one
 
 	internal event Action UpdatePreview;
+	private ExportType exportType = ExportType.None;
 
 	// Export
 	private AnimatedGifEncoder 
@@ -594,7 +603,7 @@ internal class FractalGenerator {
 			]
 			),*/
 
-			new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraY, tetraX,
+			/*new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraY, tetraX,
 			[
 				("BASE",	[symmetric + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi]),
 
@@ -648,7 +657,64 @@ internal class FractalGenerator {
 				//(2, []),	// NoBackDiag
 				(12,[-98303]) // NoChildComplex
 				]
+			),*/
+
+			new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraX, tetraY,
+			[
+				("BASE",    [symmetric + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi]),
+
+				("Div",     [0, 0, pi43, pi23, pi23, 0, pi43, pi43, pi23, 0, 0, pi43, pi23, 0, pi43, pi23]),
+				("In",      [0, 0, pi43, pi23, pi43, pi23, 0, pi23, 0, pi43, 0, pi43, pi23, 0, pi43, pi23]),
+				("Out",     [0, 0, pi43, pi23, 0, pi43, pi23, 0, pi43, pi23, 0, pi43, pi23, 0, pi43, pi23])
+			],
+			[
+				("Center",          [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_Neg",      [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_Half",     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_One",      [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+
+				("Rad",             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2]),
+				("Rad_Neg",         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4]),
+				("Rad_Half",        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3]),
+				("Rad_One",         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]),
+
+				("Vertex",          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0]),
+				("Vertex_Neg",      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0]),
+				("Vertex_Half",     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0]),
+				("Vertex_One",      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0]),
+
+				("Triangle",        [0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Triangle_Neg",    [0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Triangle_Half",   [0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Triangle_One",    [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+
+				("Swirl",           [0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Swirl_Neg",       [0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Swirl_Half",      [0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Swirl_One",       [0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+
+				("Swirl2",          [0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0]),
+				("Swirl2_Neg",      [0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0]),
+				("Swirl2_Half",     [0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0]),
+				("Swirl2_One",      [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+			], [
+				(4, []),// NoChildSymmetric
+				(5, []),// NoChildRad
+				(6, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,128,129,130,
+					131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,
+					156,157,158,159,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,
+					277,278,279,280,281,282,283,284,285,286,287,384,385,386,387,388,389,390,391,392,393,394,395,396,397,
+					398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415]),// NoChildCorner
+				(7, [0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,
+					128,132,136,140,144,148,152,156,160,164,168,172,176,180,184,188,192,196,200,204,208,212,216,220,224,
+					228,232,236,240,244,248,252,256,260,264,268,272,276,280,284,288,292,296,300,304,308,312,316,320,324,
+					328,332,336,340,344,348,352,356,360,364,368,372,376,380,384,388,392,396,400,404,408,412,416,420,424,
+					428,432,436,440,444,448,452,456,460,464,468,472,476,480,484,488,492,496,500,504,508]),// NoChildTriangle
+				//(2, []),	// NoBackDiag
+				(12,[-98303]) // NoChildComplex
+				]
 			),
+
 
 			new("SierpinskiCarpet", 9, 3, 1.0, .25f, .9, carpetX, carpetY,
 			[
@@ -3015,6 +3081,7 @@ internal class FractalGenerator {
 		return pngFailed >= MaxPngFails ? 2 : token.IsCancellationRequested ? 1 : 0; // If the export was cancelled from outside - terminate the ffmpeg process
 	}
 	internal string SavePngs(string pngPath) {
+		exportType = ExportType.Pngs;
 		FinishTasks(true, true, _ => false); // Make sure there are no bitmap generation tasks still running
 		if (SavePngs() == 2) 
 			return Fail("PNG saving failed"); // failed to save
@@ -3132,6 +3199,8 @@ internal class FractalGenerator {
 		return fail;
 	}
 	internal string SavePngsToMp4(string mp4Path) {
+		exportType = ExportType.PngsToMp4;
+		encodedMp4 = 0;
 		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 		if (!File.Exists(ffmpegPath))
 			return Fail("Ffmpeg.exe not found"); // if ffmpeg doesn't exist, return failure immediately
@@ -3141,22 +3210,6 @@ internal class FractalGenerator {
 		} catch (IOException ex) {
 			return Fail("Failed to delete existing file: " + ex.Message); // return failure if deletion fails
 		}
-		/*var (n, nf, d) = GetPngFormat();
-		// write the last image first to ensure the ffmpeg will not stop prematurely
-		int attempt = 0;
-		Stopwatch pngTime = new(); pngTime.Start();
-		while (SavePng(nf - 1, d)) {
-			if (++attempt > 10)
-				return Fail("Failed to write PNG"); // image failed to save after 10 attempts - return failure
-			Thread.Sleep(10 + 10 * attempt * attempt);
-		}
-		while (SavePng(0, d)) {
-			if (++attempt > 10)
-				return Fail("Failed to write PNG"); // image failed to save after 10 attempts - return failure
-			Thread.Sleep(10 + 10 * attempt * attempt);
-		}
-		pngTime.Stop();*/
-		//string args = $"-y -framerate {SelectedFps} -i temp/{filePrefix}image_%0{n}d.png -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v high444 -level 5.2 -preset veryslow -crf 18 -pix_fmt yuv444p \"{mp4Path}\"";
 		// Start FFmpeg in a parallel process to encode the PNG sequence
 		using var ffmpegProcess = new Process {
 			StartInfo = new ProcessStartInfo {
@@ -3165,23 +3218,12 @@ internal class FractalGenerator {
 				Arguments = $"-y -framerate {SelectedFps} -f image2pipe -vcodec png -i pipe:0 -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v high444 -level 5.2 -preset veryslow -crf 18 -pix_fmt yuv444p \"{mp4Path}\"",
 				UseShellExecute = false,
 				RedirectStandardInput = true,
-				//RedirectStandardError = true,
+				RedirectStandardError = true, // will get progress from this
 				//RedirectStandardOutput = true, // not needed so far
 				CreateNoWindow = true
 			}
 		};
 		string fail = ""; // setup error listener
-		/*ffmpegProcess.ErrorDataReceived += (sender, e) => {
-			if (string.IsNullOrEmpty(e.Data))
-				return;
-			// Regex to detect progress output
-			if (Regex.IsMatch(e.Data, @"frame=\s*\d+") || Regex.IsMatch(e.Data, @"time=\d+:\d+:\d+\.\d+")) {
-				// Extract frame count for progress display
-				var match = Regex.Match(e.Data, @"frame=\s*(\d+)");
-				if (match.Success)
-					int.TryParse(match.Groups[1].Value, out encodedMp4);
-			} //else fail += ";" + e.Data;
-		};*/
 		try {
 			// start pipe:
 			//var pipeServer = new NamedPipeServerStream("mypipe", PipeDirection.Out);
@@ -3195,7 +3237,21 @@ internal class FractalGenerator {
 			//ffmpegProcess.BeginOutputReadLine();  // Read standard output asynchronously
 			applyPngType = PngType.Yes; // ensures FinishTasks will want to start threads exporting PNGs
 			pngFailed = 0; // reset failure attempt counter, every png write fail will increment it, and if it reaches 1000 it will cancel the FinishTasks
-			//tryPng = previewFrames; // makes sure that we reexport any missing files, with these settings, the parallel thread elsewhere will export all the pngs as tmp first then rename to png
+						   //tryPng = previewFrames; // makes sure that we reexport any missing files, with these settings, the parallel thread elsewhere will export all the pngs as tmp first then rename to png
+
+			// report completion
+			var frameRegex = new Regex(@"frame=\s*(\d+)", RegexOptions.Compiled);
+			ffmpegProcess.ErrorDataReceived += (s, e) => {
+				if (e.Data == null) return;
+				var match = frameRegex.Match(e.Data);
+				if (match.Success) {
+					encodedMp4 = short.Parse(match.Groups[1].Value);
+				}
+			};
+			ffmpegProcess.BeginErrorReadLine();
+
+
+
 
 			// will check if that other parallel thread elsewhere finished exporting all the pngs into the memory streams, and will dump these streams sequentially into the ffmpeg's input
 			using (var inputStream = ffmpegProcess.StandardInput.BaseStream) {
@@ -3206,17 +3262,6 @@ internal class FractalGenerator {
 						ms.CopyTo(inputStream);  // Write memory stream directly to FFmpeg's input stream
 					}
 			}
-
-			// will check if that other parallel thread elsewhere finished exporting all the pngs into the memory streams, and will dump these streams sequentially into the pipe
-			/*for (int enc = previewFrames; !token.IsCancellationRequested && enc < bitmap.Length; Thread.Sleep(100))
-				while (enc < bitmap.Length && encodedPng[enc] >= 2) {
-					var ms = msPngs[enc++];
-					ms.Position = 0;
-					ms.CopyTo(pipeServer);
-				}
-			pipeServer.Close();  // Close pipe when done
-			*/
-
 			if (pngFailed >= MaxPngFails || token.IsCancellationRequested) { // If the export was cancelled from outside - terminate the ffmpeg process
 				if (ffmpegProcess.StandardInput.BaseStream.CanWrite) {
 					ffmpegProcess.StandardInput.Write("q");  // Send 'q' to FFmpeg to terminate gracefully
@@ -3242,51 +3287,6 @@ internal class FractalGenerator {
 #endif*/
 		return log;
 	}
-	/*internal int SaveMp4Old(string mp4Path) {
-		try {
-			FinishTasks(true, true, _ => false);
-			File.Delete(mp4Path);
-			// If we were not exporting PNGs, then start export them now:
-			applyGenerationType = GenerationType.AnimationRam; 
-			FinishTasks(false, true, (short _) => false);
-			// Just to make sure go trhough it again if anythin's missing, and if I can't save it in 10 more attempts, then return fail
-			var (n, nf, d) = GetPngFormat();
-			for (var i = 0; i < nf; ++i) {
-				var attempt = 0;
-				while (SaveMp4Png(i, d)) {
-					if (++attempt > 10)
-						return 0;
-					Thread.Sleep(100);
-				}
-			}
-			var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
-			if (!File.Exists(ffmpegPath))
-				return 0;
-			var arguments = $"-y -framerate {SelectedFps} -i temp/{filePrefix}image_%0{n}d.png -vf \"scale=iw:ih\" -movflags +faststart -c:v libx264 -profile:v high444 -level 5.2 -preset veryslow -crf 18 -pix_fmt yuv444p \"{mp4Path}\"";
-			using var ffmpegProcess = new Process();
-			ffmpegProcess.StartInfo.FileName = ffmpegPath;
-			ffmpegProcess.StartInfo.Arguments = arguments;
-			ffmpegProcess.StartInfo.UseShellExecute = false;
-			ffmpegProcess.StartInfo.RedirectStandardError = true;
-			ffmpegProcess.StartInfo.RedirectStandardOutput = true;
-			ffmpegProcess.StartInfo.CreateNoWindow = true;
-			ffmpegProcess.Start();
-			// Begin reading error asynchronously
-			ffmpegProcess.BeginErrorReadLine();
-			// Wait for the process to exit
-			ffmpegProcess.WaitForExit();
-		} catch (Exception ex) {
-			var exs = "SaveMp4: Unexpected error: " + ex.Message;
-			Console.WriteLine(exs);
-#if CustomDebug
-			Log(ref logString, exs);
-#endif
-			return 1;
-		}
-		//mp4Success = false;
-		return 0;
-	}*/
-
 
 #if CustomDebug
 	private void Log(ref string log, string line) {
@@ -3408,7 +3408,6 @@ internal class FractalGenerator {
 		SelectedPeriod = debug = 7;
 		SelectedWidth = 8;//1920;
 		SelectedHeight = 8;//1080;
-		//maxDepth = -1;//= 2;
 		SelectedMaxTasks = -1;// 10;
 		SelectedSaturate = 1.0;
 		SelectedDetail = .25f;
@@ -3436,9 +3435,6 @@ internal class FractalGenerator {
 	internal void SetMaxIterations() {
 		selectMaxIterations = (short)(/*2*/ 8 + Math.Ceiling(Math.Log(Math.Max(SelectedWidth, SelectedHeight) * f.MaxSize / SelectedDetail) / logBase));
 	}
-	/*internal void SetupAngle() {
-		childAngle = f.childAngle[selectChildAngle].Item2;
-	}*/
 	internal void SetupCutFunction() 
 		=> selectCutFunction = f.ChildCutFunction == null || f.ChildCutFunction.Count <= 0 ? null : Fractal.CutFunctions[f.ChildCutFunction[SelectedCut].Item1].Item2;
 	internal bool SelectZoomChild(short z) {
@@ -3449,13 +3445,7 @@ internal class FractalGenerator {
 	}
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal void SelectThreadingDepth() {
-		//preIterate = new (double, double, (double, double)[])[Math.Max((short)1,selectMaxTasks)][];
 		SetMaxIterations();
-		/*maxDepth = 0;
-		if (f.ChildCount <= 0)
-			return;
-		for (int n = 1, threadCount = 0; (threadCount += n) < SelectedMaxTasks - 1; n *= f.ChildCount)
-			++maxDepth;*/
 	}
 	#endregion
 
@@ -3497,5 +3487,15 @@ internal class FractalGenerator {
 		=> GetFractal().ChildCutFunction == null? null : Fractal.CutFunctions[GetFractal().ChildCutFunction[SelectedCut].Item1].Item2;
 
 	internal bool IsCancelRequested() => token.IsCancellationRequested;
+
+	internal int GetCompleted() {
+		return exportType switch {
+			ExportType.PngsToMp4 => encodedMp4,
+			ExportType.GifToMp4 => encodedMp4,
+			ExportType.Pngs => GetPngFinished(),
+			ExportType.Gif => 0,
+			_ => 0,
+		};
+	}
 	#endregion
 }
