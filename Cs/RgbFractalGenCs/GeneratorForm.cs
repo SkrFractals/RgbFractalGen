@@ -1215,7 +1215,7 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 
 	}
-	private void PeriodBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(periodBox, ref generator.SelectedPeriod, -1, 1000);
+	private void PeriodBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(periodBox, ref generator.SelectedPeriod, 1, 1000);
 	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e) => ParseClampReTextDiffApply(periodMultiplierBox, ref generator.SelectedPeriodMultiplier, 1, 10);
 	private void PaletteSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		if (DiffApply((short)Math.Max(-1, paletteSelect.SelectedIndex - 1), ref generator.SelectedPaletteType))

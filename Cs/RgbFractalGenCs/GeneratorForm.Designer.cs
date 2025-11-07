@@ -1522,7 +1522,7 @@ namespace RgbFractalGenCs {
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.11.1";
+			Text = "RGB Fractal Zoom Generator C# v1.11.2";
 			FormClosing += GeneratorForm_FormClosing;
 			Load += GeneratorForm_Load;
 			helpPanel.ResumeLayout(false);

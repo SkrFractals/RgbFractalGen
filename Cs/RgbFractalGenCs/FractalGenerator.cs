@@ -2848,7 +2848,7 @@ internal class FractalGenerator {
 				return;
 			var blurPeriod = SelectedPeriod * blur;
 			// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
-			refAngle += refSpin * (applyPeriodAngle * (1 + applyExtraSpin)) / (finalPeriodMultiplier * blurPeriod);
+			refAngle += (Math.Abs(refSpin) > 1 ? 2 * Math.Sign(refSpin) : refSpin) * (applyPeriodAngle * (1 + applyExtraSpin)) / (finalPeriodMultiplier * blurPeriod);
 			refHueAngle += (hueCycleMultiplier + applyPalette2 * SelectedExtraHue) * (float)applyHue / (finalPeriodMultiplier * blurPeriod * 2);
 			IncFrameSize(ref refSize, blurPeriod);
 		}

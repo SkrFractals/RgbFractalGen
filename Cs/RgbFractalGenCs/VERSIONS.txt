@@ -1,3 +1,6 @@
+1.11.2
+-Fixed PeriAntiSpin flipping 180 degrees at the end of the animation for some fractals
+
 1.11.1
 -Fixed a couple bugs
 -Added a FileName builder
