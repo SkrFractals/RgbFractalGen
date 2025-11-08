@@ -13,6 +13,7 @@ using System.Numerics;
 using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Documents;
 using System.Windows.Forms;
 using System.Xml.Linq;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.ScrollBar;
@@ -37,6 +38,16 @@ public partial class GeneratorForm : Form {
 		//RegisterMouseDownRecursive(this); // Detect clicks on all controls
 	}
 	#endregion
+
+	//public const string charOn = "✓ ";
+	//public const string charOff = "✕ ";
+
+	//public const string charOn = "[■]";
+	//public const string charOff = "[□]";
+
+	public const string charOn = "[⬛] ";
+	public const string charOff = "[⬜] ";
+	private string[] filePostfix;
 
 	#region Variables
 	// Threading
@@ -158,6 +169,15 @@ public partial class GeneratorForm : Form {
 			encodeGifSelect.MouseWheel += ComboBox_MouseWheel;
 			generationSelect.MouseWheel += ComboBox_MouseWheel;
 
+
+			filePostfix = new string[fileSelect.Items.Count];
+			for (int i = fileSelect.Items.Count; 0 <= --i; filePostfix[i] = fileSelect.Items[i].ToString()) { }
+
+			colorSelect.DrawItem += BitmaskComboBox_DrawItem;
+			angleSelect.DrawItem += BitmaskComboBox_DrawItem;
+			fileSelect.DrawItem += BitmaskComboBox_DrawItem;
+			colorSelect.DrawMode = angleSelect.DrawMode = fileSelect.DrawMode = DrawMode.OwnerDrawFixed;
+
 			// Init the generator
 			foreach (var i in generator.GetFractals())
 				fractalSelect.Items.AddRange([i.Name]);
@@ -231,7 +251,7 @@ public partial class GeneratorForm : Form {
 			SetupControl(helpButton, "Show README.txt.");
 			SetupControl(exportButton, "");
 			SetupControl(exportSelect, "Select what you want to save with the button on the left.\nHover over that button after the selection to get more info about the selection.");
-			SetupControl(fileBox, "Toggle what selected propeerties should be used for a default export file name.");
+			SetupControl(fileSelect, "Toggle what selected propeerties should be used for a default export file name.");
 			SetupControl(debugBox, "shows a log of task and image states, to see what the generator is doing.");
 
 			// Read the README.txt for the help button
@@ -712,22 +732,6 @@ public partial class GeneratorForm : Form {
 						generator.Colors.Add((pn, c));
 					}
 					break;
-
-
-
-
-
-				/*var n = generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
-				angleSelect.Items[0] = "Selected: " + n;
-				angleSelect.Items[generator.SelectedChildAngle + 1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? "✓ " : "✕ ") + n;
-				SwitchChildAngle();
-				// rename the selected, and change the checkmark:
-				var n = generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
-				colorSelect.Items[0] = "Selected: " + n;
-				colorSelect.Items[generator.SelectedChildColor + 1] = (((generator.SelectedChildColors >> generator.SelectedChildColor) & 1) == 1 ? "✓ " : "✕ ") + n;*/
-
-
-
 				case "path": if (v != "" && File.Exists(v)) _ = LoadFractal(v); break;
 				case "fractal": if (fractalSelect.Items.Contains(v)) fractalSelect.SelectedItem = v; break;
 				case "preview": if (p) previewMode = n > 0; break;
@@ -751,7 +755,7 @@ public partial class GeneratorForm : Form {
 						int selectI = 0;
 						while (ai > 0) {
 							if ((ai & 1) == 1)
-								angleSelect.Items[selectI + 1] = "✓ " + ca[selectI].Item1;
+								angleSelect.Items[selectI + 1] = charOn + ca[selectI].Item1;
 							++selectI;
 							ai >>= 1;
 						}
@@ -764,7 +768,7 @@ public partial class GeneratorForm : Form {
 						int selectI = 0;
 						while (ai > 0) {
 							if ((ai & 1) == 1)
-								colorSelect.Items[selectI + 1] = "✓ " + cc[selectI].Item1;
+								colorSelect.Items[selectI + 1] = charOn + cc[selectI].Item1;
 							++selectI;
 							ai >>= 1;
 						}
@@ -1023,13 +1027,13 @@ public partial class GeneratorForm : Form {
 			angleSelect.Items.Clear();
 			angleSelect.Items.Add("Selected: " + f.ChildAngle[generator.SelectedChildAngle].Item1);
 			foreach (var (name, _) in f.ChildAngle)
-				angleSelect.Items.Add("✕ " + name);
+				angleSelect.Items.Add(charOff + name);
 			angleSelect.SelectedIndex = 0;
 			// Fill color children definitions combobox
 			colorSelect.Items.Clear();
 			colorSelect.Items.Add("Selected: " + f.ChildColor[generator.SelectedChildColor].Item1);
 			foreach (var (name, _) in f.ChildColor)
-				colorSelect.Items.Add("✕ " + name);
+				colorSelect.Items.Add(charOff + name);
 			colorSelect.SelectedIndex = 0;
 			// Fill cutFunction definitions combobox
 			cutSelect.Items.Clear();
@@ -1183,7 +1187,7 @@ public partial class GeneratorForm : Form {
 		angleSelect.SelectedIndex = 0;
 		var n = generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item1;
 		angleSelect.Items[0] = "Selected: " + n;
-		angleSelect.Items[generator.SelectedChildAngle + 1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? "✓ " : "✕ ") + n;
+		angleSelect.Items[generator.SelectedChildAngle + 1] = (((generator.SelectedChildAngles >> generator.SelectedChildAngle) & 1) == 1 ? charOn : charOff) + n;
 		if (MinimumSelection())
 			return;
 		SwitchChildAngle();
@@ -1195,7 +1199,7 @@ public partial class GeneratorForm : Form {
 		colorSelect.SelectedIndex = 0;
 		var n = generator.GetFractal().ChildColor[generator.SelectedChildColor].Item1;
 		colorSelect.Items[0] = "Selected: " + n;
-		colorSelect.Items[generator.SelectedChildColor + 1] = (((generator.SelectedChildColors >> generator.SelectedChildColor) & 1) == 1 ? "✓ " : "✕ ") + n;
+		colorSelect.Items[generator.SelectedChildColor + 1] = (((generator.SelectedChildColors >> generator.SelectedChildColor) & 1) == 1 ? charOn : charOff) + n;
 		if (MinimumSelection())
 			return;
 		SwitchChildColor();
@@ -2489,7 +2493,7 @@ public partial class GeneratorForm : Form {
 			}
 		generator.GetFractal().ChildAngle.Add((angleBox.Text, new double[generator.GetFractal().ChildCount]));
 		//SetupSelects();
-		angleSelect.SelectedIndex = angleSelect.Items.Add("✕ " + angleBox.Text);
+		angleSelect.SelectedIndex = angleSelect.Items.Add(charOff + angleBox.Text);
 		generator.GetFractal().Edit = true;
 		FillEditor();
 	}
@@ -2583,28 +2587,65 @@ public partial class GeneratorForm : Form {
 
 	}
 
-	private void FileBox_SelectedIndexChanged(object sender, EventArgs e) {
-		if (fileBox.SelectedIndex <= 0)
+	private void FileSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		if (fileSelect.SelectedIndex <= 0)
 			return;
-		fileMask ^= (short)(1 << (fileBox.SelectedIndex - 1));
+
+		var m = (short)(1 << (fileSelect.SelectedIndex - 1));
+		fileMask ^= m;
+
+		/*fileSelect.SelectedIndex = 0;
+		
+		string s = fileSelect.Items[fileSelect.SelectedIndex].ToString();
+		fileSelect.Items[fileSelect.SelectedIndex] = (fileMask >> (fileSelect.SelectedIndex - 1) & 1) == 1 ? s.Replace(charOff, charOn) : s.Replace(charOn, charOff);*/
 		SetFileMask();
 	}
 	private void SetFileMask() {
+		fileSelect.SelectedIndex = 0;
 		int a = fileMask;
 		int s = 1;
 		string f = "Fractal_";
-		while (a > 0) {
-			if ((a & 1) == 1 && fileBox.Items.Count > s)
-				f += fileBox.Items[s].ToString()[0];
+		while (s < fileSelect.Items.Count) {
+			if ((a & 1) == 1) {
+				f += filePostfix[s].ToString()[0];
+				fileSelect.Items[s] = charOn + filePostfix[s];
+			} else {
+				fileSelect.Items[s] = charOff + filePostfix[s];
+			}
+
 			++s;
 			a >>= 1;
 		}
-		fileBox.Items[0] = f;
-		fileBox.SelectedIndex = 0;
+		fileSelect.Items[0] = f;
+		fileSelect.SelectedIndex = 0;
+	}
+
+
+
+
+	private void BitmaskComboBox_DrawItem(object sender, DrawItemEventArgs e) {
+		if (e.Index < 0 || sender is not ComboBox combo) 
+			return;
+		e.DrawBackground();
+		string text = combo.Items[e.Index].ToString();
+		var style = text.StartsWith("[⬛]") ? FontStyle.Bold : FontStyle.Regular;
+		using (var font = new Font(combo.Font, style)) {
+			TextRenderer.DrawText(
+				e.Graphics,
+				text,
+				font,
+				e.Bounds,
+				e.Index == 0 ? SystemColors.GrayText : SystemColors.ControlText,
+				TextFormatFlags.Left | TextFormatFlags.VerticalCenter
+			);
+		}
+		e.DrawFocusRectangle();
 	}
 
 
 	#endregion
+
+
 
 	/*#region Notify
 	private void Control_MouseDown(object sender, MouseEventArgs e) {

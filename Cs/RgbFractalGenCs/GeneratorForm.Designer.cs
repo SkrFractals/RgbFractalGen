@@ -89,7 +89,7 @@ namespace RgbFractalGenCs {
 			generatorPanel = new Panel();
 			fileLabel = new Label();
 			exportSelect = new ComboBox();
-			fileBox = new ComboBox();
+			fileSelect = new ComboBox();
 			panel1 = new Panel();
 			ditherBox = new CheckBox();
 			ditherLabel = new Label();
@@ -746,7 +746,7 @@ namespace RgbFractalGenCs {
 			// 
 			generatorPanel.Controls.Add(fileLabel);
 			generatorPanel.Controls.Add(exportSelect);
-			generatorPanel.Controls.Add(fileBox);
+			generatorPanel.Controls.Add(fileSelect);
 			generatorPanel.Controls.Add(panel1);
 			generatorPanel.Controls.Add(exportButton);
 			generatorPanel.Controls.Add(infoLabel);
@@ -783,17 +783,17 @@ namespace RgbFractalGenCs {
 			exportSelect.TabIndex = 61;
 			exportSelect.SelectedIndexChanged += ExportSelect_SelectedIndexChanged;
 			// 
-			// fileBox
+			// fileSelect
 			// 
-			fileBox.DropDownStyle = ComboBoxStyle.DropDownList;
-			fileBox.FormattingEnabled = true;
-			fileBox.Items.AddRange(new object[] { "Fractal", "Angles - A(Bitmask)", "Colors - C(Bitmask)", "Function - F(Type_Seed)", "Resolution - R(WxH)", "Hues - H(Palette_Hue_Shift_Speed)", "Period - P(Frames_Multiplier)", "Zoom - Z(Direction)", "Spin - S(Direction_Default_Speed)", "Void - V(Ambient_Noise_Scale)", "Image - I(Satur_Bright_Bloom_Blur)" });
-			fileBox.Location = new System.Drawing.Point(62, 410);
-			fileBox.Margin = new Padding(4, 3, 4, 3);
-			fileBox.Name = "fileBox";
-			fileBox.Size = new System.Drawing.Size(209, 23);
-			fileBox.TabIndex = 65;
-			fileBox.SelectedIndexChanged += FileBox_SelectedIndexChanged;
+			fileSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+			fileSelect.FormattingEnabled = true;
+			fileSelect.Items.AddRange(new object[] { "Fractal", "Angles - A(Bitmask)", "Colors - C(Bitmask)", "Function - F(Type_Seed)", "Resolution - R(WxH)", "Hues - H(Palette_Hue_Shift_Speed)", "Period - P(Frames_Multiplier)", "Zoom - Z(Direction)", "Spin - S(Direction_Default_Speed)", "Void - V(Ambient_Noise_Scale)", "Image - I(Satur_Bright_Bloom_Blur)" });
+			fileSelect.Location = new System.Drawing.Point(62, 410);
+			fileSelect.Margin = new Padding(4, 3, 4, 3);
+			fileSelect.Name = "fileSelect";
+			fileSelect.Size = new System.Drawing.Size(209, 23);
+			fileSelect.TabIndex = 65;
+			fileSelect.SelectedIndexChanged += FileSelect_SelectedIndexChanged;
 			// 
 			// panel1
 			// 
@@ -1661,7 +1661,7 @@ namespace RgbFractalGenCs {
 		private CheckBox ditherBox;
 		private Label ditherLabel;
 		private Label fileLabel;
-		private ComboBox fileBox;
+		private ComboBox fileSelect;
 	}
 }
 
