@@ -603,7 +603,7 @@ internal class FractalGenerator {
 			]
 			),*/
 
-			new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraY, tetraX,
+			/*new("TetraTriFlakeOld", 16, 4, 1.5, .15f, .8, tetraY, tetraX,
 			[
 				("BASE",	[symmetric + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi]),
 
@@ -657,11 +657,9 @@ internal class FractalGenerator {
 				//(2, []),	// NoBackDiag
 				(12,[-98303]) // NoChildComplex
 				]
-			),
+			),*/
 
-			/* // Vertically symmetric, but for some reason, zoom children don't work here at all...
-			 * 
-			 * new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraX, tetraY,
+			 new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraX, tetraY,
 			[
 				("BASE",    [symmetric + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi]),
 
@@ -715,7 +713,7 @@ internal class FractalGenerator {
 				//(2, []),	// NoBackDiag
 				(12,[-98303]) // NoChildComplex
 				]
-			),*/
+			),
 
 
 			new("SierpinskiCarpet", 9, 3, 1.0, .25f, .9, carpetX, carpetY,
@@ -1991,15 +1989,16 @@ internal class FractalGenerator {
 						zoomAngle += ChildAngle[0];  // Accumulate rotation
 						zoomSize /= f.ChildSize;     // Shrink for next step
 					}
-					// Compute infinite sum for zoomChild
-					var infiniteSum = new Complex(f.ChildX[SelectedZoomChild], f.ChildY[SelectedZoomChild])
-						/ (new Complex(1.0, 0.0) - new Complex(Math.Cos(ChildAngle[SelectedZoomChild]), Math.Sin(ChildAngle[SelectedZoomChild])) / f.ChildSize);
-					// Transform infinite sum into the new coordinate system
-					var cosFinal = Math.Cos(-zoomAngle);
+				// Compute infinite sum for zoomChild
+				var infiniteSum = new Complex(f.ChildX[SelectedZoomChild], -f.ChildY[SelectedZoomChild])
+					/ (new Complex(1.0, 0.0) - new Complex(Math.Cos(ChildAngle[SelectedZoomChild]), Math.Sin(ChildAngle[SelectedZoomChild])) / f.ChildSize);
+				// Transform infinite sum into the new coordinate system
+
+				var cosFinal = Math.Cos(-zoomAngle);
 					var sinFinal = Math.Sin(-zoomAngle);
-					// Calculate the location we are zooming into relative to the center, to shift it to the center
-					sX = zoomSize * (cosFinal * infiniteSum.Real - sinFinal * infiniteSum.Imaginary);
-					sY = zoomSize * (sinFinal * infiniteSum.Real + cosFinal * infiniteSum.Imaginary);
+				// Calculate the location we are zooming into relative to the center, to shift it to the center
+				sX = zoomSize * (cosFinal * infiniteSum.Real - sinFinal * infiniteSum.Imaginary);
+				sY = zoomSize * (sinFinal * infiniteSum.Real + cosFinal * infiniteSum.Imaginary);
 				//}
 
 				// We will use OfDepth, if generating previews, or if we selected so and have enough allowed threads for that
