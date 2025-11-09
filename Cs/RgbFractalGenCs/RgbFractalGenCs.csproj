@@ -349,6 +349,9 @@
     <None Update="Examples\TetraTriFlake_A%283%29_C%2816%29_F%280_0%29_R%28256_256%29_H%28BGR_3_0.7_0%29_P%2890_1_-5%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_5_0%29_D%281_3%29.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Examples\TetraTriFlake_A%283%29_C%28256%29_F%280_10%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_6%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Examples\TetraTriFlake_A%283%29_C%28256%29_F%280_10%29_R%28256_256%29_H%28BGR_3_.6_0%29_P%2890_1_20%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -356,6 +359,18 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Examples\TetraTriFlake_A%283%29_C%28256%29_F%280_14%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_1_20%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%283%29_C%28256%29_F%280_16%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_8%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%283%29_C%28256%29_F%280_21%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_5%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%283%29_C%28256%29_F%280_24%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_6%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%283%29_C%28256%29_F%280_3%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_20%29_Z%283_0_7%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Examples\TetraTriFlake_A%283%29_C%28257%29_F%280_65%29_R%28256_256%29_H%28BGR_3_.7_0%29_P%2890_1_-5%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
@@ -409,10 +424,31 @@
     <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_12%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_1_20%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_12%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_6%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_14%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_4%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_21%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_1_20%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_21%29_R%28256_256%29_H%28BGR_3_.6_0%29_P%2890_1_20%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_22%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_4%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_30%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_2%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_31%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_1%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_4%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_8%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_6%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_6%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Examples\TetraTriFlake_A%285%29_C%28256%29_F%280_65%29_R%28256_256%29_H%28BGR_3_.8_0%29_P%2890_1_20%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
@@ -431,6 +467,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Examples\TetraTriFlake_A%285%29_C%28257%29_F%280_99%29_R%28256_256%29_H%28BGR_3_.8_0%29_P%2890_1_20%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Examples\TetraTriFlake_A%289%29_C%28256%29_F%280_4%29_R%28256_256%29_H%28BGR_3_.5_0%29_P%2890_2_-5%29_Z%283_0_8%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Examples\TriComb_A%281%29_C%281%29_F%280_0%29_R%28256_256%29_H%28BGR_3_0.9_0%29_P%2890_1_-5%29_Z%283_0_0%29_S%281_0_0%29_V%2820_20_2%29_I%28100_150_2_0%29_D%281_3%29.png">
