@@ -9,14 +9,16 @@ using System.Drawing;
 using System.Drawing.Text;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Numerics;
-using System.Reflection.Emit;
+//using System.Reflection.Emit;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Documents;
+//using System.Windows.Documents;
 using System.Windows.Forms;
-using System.Xml.Linq;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ScrollBar;
+//using System.Xml.Linq;
+//using static System.Windows.Forms.VisualStyles.VisualStyleElement.ScrollBar;
+//using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -169,9 +171,11 @@ public partial class GeneratorForm : Form {
 			encodeGifSelect.MouseWheel += ComboBox_MouseWheel;
 			generationSelect.MouseWheel += ComboBox_MouseWheel;
 
-
+			// prepare the file encoder
 			filePostfix = new string[fileSelect.Items.Count];
 			for (int i = fileSelect.Items.Count; 0 <= --i; filePostfix[i] = fileSelect.Items[i].ToString()) { }
+			fileMask = (short)((1 << (filePostfix.Length - 1)) - 1);
+			FillSelectFile();
 
 			colorSelect.DrawItem += BitmaskComboBox_DrawItem;
 			angleSelect.DrawItem += BitmaskComboBox_DrawItem;
@@ -216,11 +220,11 @@ public partial class GeneratorForm : Form {
 			SetupControl(periodBox, "How many frames for the self-similar center child to zoom in to the same size as the parent if you are zooming in.\nOr for the parent to zoom out to the same size as the child if you are zooming out.\nThis will equal the number of generated frames of the animation if the center child is the same color.\nOr it will be a third of the number of generated frames of the animation if the center child is a different color.");
 			SetupControl(periodMultiplierBox, "Multiplies the frame count, slowing down the rotation and hue shifts.");
 			SetupControl(zoomSelect, "Choose in which direction you want the fractal zoom.");
-			SetupControl(defaultZoom, "Type the initial zoom of the first image in number of skipped frames. -1 for random");
+			SetupControl(defaultZoomBox, "Type the initial zoom of the first image in number of skipped frames. -1 for random");
 			SetupControl(hueSelect, "Choose the color scheme of the fractal.\nAlso you can make the color hues slowly cycle as the fractal zoom.");
 			SetupControl(hueSpeedBox, "Type the extra speed on the hue shifting from the values possible for looping.\nOnly possible if you have chosen color cycling on the left.");
 			SetupControl(spinSelect, "Choose in which direction you want the zoom animation to spin, or to not spin.");
-			SetupControl(defaultAngle, "Type the initial angle of the first image (in degrees).");
+			SetupControl(defaultAngleBox, "Type the initial angle of the first image (in degrees).");
 			SetupControl(spinSpeedBox, "Type the extra speed on the spinning from the values possible for looping.");
 			SetupControl(ambBox, "The strength of the ambient grey color in the empty spaces far away between the generated fractal dots.\n-1 for transparent");
 			SetupControl(noiseBox, "The strength of the random noise in the empty spaces far away between the generated fractal dots.");
@@ -551,6 +555,7 @@ public partial class GeneratorForm : Form {
 				2 => "Save MP4",
 				3 => "Save GIF",
 				4 => "Save MP4",
+				5 => "Load File",
 				_ => "Undefined",
 			};
 
@@ -598,9 +603,9 @@ public partial class GeneratorForm : Form {
 			+ "|w|" + resX.Text + "|h|" + resY.Text + "|res|" + resSelect.SelectedIndex
 			+ "|paletteSelect|" + paletteSelect.SelectedIndex + "|dithering|" + (ditherBox.Enabled ? 1 : 0)
 			+ "|period|" + periodBox.Text + "|periodMul|" + periodMultiplierBox.Text
-			+ "|zoom|" + zoomSelect.SelectedIndex + "|defaultZoom|" + defaultZoom.Text
+			+ "|zoom|" + zoomSelect.SelectedIndex + "|defaultZoom|" + defaultZoomBox.Text
 			+ "|hue|" + hueSelect.SelectedIndex + "|defaultHue|" + defaultHue.Text + "|hueMul|" + hueSpeedBox.Text
-			+ "|spin|" + spinSelect.SelectedIndex + "|defaultAngle|" + defaultAngle.Text + "|spinMul|" + spinSpeedBox.Text
+			+ "|spin|" + spinSelect.SelectedIndex + "|defaultAngle|" + defaultAngleBox.Text + "|spinMul|" + spinSpeedBox.Text
 			+ "|amb|" + ambBox.Text + "|noise|" + noiseBox.Text + "|void|" + voidBox.Text
 			+ "|detail|" + detailBox.Text + "|saturate|" + saturateBox.Text + "|brightness|" + brightnessBox.Text
 			+ "|bloom|" + bloomBox.Text + "|blur|" + blurBox.Text
@@ -749,29 +754,15 @@ public partial class GeneratorForm : Form {
 					}
 					break;
 				case "angles":
-					if (p) generator.SelectedChildAngles = (ulong)n; {
-						var ca = generator.GetFractal().ChildAngle;
-						var ai = generator.SelectedChildAngles &= ((ulong)1 << ca.Count) - 1;
-						int selectI = 0;
-						while (ai > 0) {
-							if ((ai & 1) == 1)
-								angleSelect.Items[selectI + 1] = charOn + ca[selectI].Item1;
-							++selectI;
-							ai >>= 1;
-						}
+					if (p) {
+						generator.SelectedChildAngles = (ulong)n;
+						FillSelectAngles();
 					}
 					break;
 				case "colors":
-					if (p) generator.SelectedChildColors = (ulong)n; {
-						var cc = generator.GetFractal().ChildColor;
-						var ai = generator.SelectedChildColors &= ((ulong)1 << cc.Count) - 1;
-						int selectI = 0;
-						while (ai > 0) {
-							if ((ai & 1) == 1)
-								colorSelect.Items[selectI + 1] = charOn + cc[selectI].Item1;
-							++selectI;
-							ai >>= 1;
-						}
+					if (p) {
+						generator.SelectedChildColors = (ulong)n;
+						FillSelectColors();
 					}
 					break;
 				case "cut": if (p) cutSelect.SelectedIndex = Math.Min(cutSelect.Items.Count - 1, n); break;
@@ -785,11 +776,11 @@ public partial class GeneratorForm : Form {
 				case "period": periodBox.Text = v; break;
 				case "periodMul": periodMultiplierBox.Text = v; break;
 				case "zoom": if (p) zoomSelect.SelectedIndex = Math.Min(zoomSelect.Items.Count - 1, n); break;
-				case "defaultZoom": defaultZoom.Text = v; break;
+				case "defaultZoom": defaultZoomBox.Text = v; break;
 				case "hue": if (p) hueSelect.SelectedIndex = Math.Min(hueSelect.Items.Count - 1, n); break;
 				case "hueMul": hueSpeedBox.Text = v; break;
 				case "spin": if (p) spinSelect.SelectedIndex = Math.Min(spinSelect.Items.Count - 1, n); break;
-				case "defaultAngle": defaultAngle.Text = v; break;
+				case "defaultAngle": defaultAngleBox.Text = v; break;
 				case "spinMul": spinSpeedBox.Text = v; break;
 				case "amb": ambBox.Text = v; break;
 				case "noise": noiseBox.Text = v; break;
@@ -811,10 +802,44 @@ public partial class GeneratorForm : Form {
 				case "gen": if (p) generationSelect.SelectedIndex = Math.Min(generationSelect.Items.Count - 1, n); break;
 				case "ani": if (p) animated = n <= 0; AnimateButton_Click(null, null); break;
 				case "exp": if (p) exportSelect.SelectedIndex = Math.Min(exportSelect.Items.Count - 1, n); break;
-				case "file": if (p) fileMask = (short)n; break;
+				case "file": if (p) fileMask = (short)n;
+					if (p) {
+						fileMask = (short)n;
+						FillSelectFile();
+					}
+					break;
 			}
 		}
 		MinimumSelection();
+	}
+	private void FillSelectColors() {
+		var cc = generator.GetFractal().ChildColor;
+		var ai = generator.SelectedChildColors &= ((ulong)1 << cc.Count) - 1;
+		int selectI = 0;
+		while (ai > 0) {
+			colorSelect.Items[selectI + 1] = ((ai & 1) == 1 ? charOn : charOff) + cc[selectI].Item1;
+			++selectI;
+			ai >>= 1;
+		}
+	}
+	private void FillSelectAngles() {
+		var ca = generator.GetFractal().ChildAngle;
+		var ai = generator.SelectedChildAngles &= ((ulong)1 << ca.Count) - 1;
+		int selectI = 0;
+		while (ai > 0) {
+			angleSelect.Items[selectI + 1] = ((ai & 1) == 1 ? charOn : charOff) + ca[selectI].Item1;
+			++selectI;
+			ai >>= 1;
+		}
+	}
+	private void FillSelectFile() {
+		var ai = fileMask;
+		int selectI = 0;
+		while (ai > 0) {
+			++selectI;
+			fileSelect.Items[selectI] = ((ai & 1) == 1 ? charOn : charOff) + filePostfix[selectI];
+			ai >>= 1;
+		}
 	}
 	#endregion
 
@@ -934,9 +959,9 @@ public partial class GeneratorForm : Form {
 		currentBitmapIndex = 0;
 		aTask = null;
 	}
-	private void QueueReset(bool allow = true) {
+	private bool QueueReset(bool allow = true) {
 		if (modifySettings || !allow)
-			return;
+			return false;
 		if (queueReset <= 0) {
 
 
@@ -986,6 +1011,7 @@ public partial class GeneratorForm : Form {
 		ResetRestart();
 		restartButton.Enabled = false;
 		queueReset = abortDelay;
+		return true;
 	}
 	private void ResetRestart() {
 		queueReset = restartTimer = 0;
@@ -1284,13 +1310,13 @@ public partial class GeneratorForm : Form {
 	private void ZoomSelect_SelectedIndexChanged(object sender, EventArgs e)
 		=> DiffApply((short)(zoomSelect.SelectedIndex - 2), ref generator.SelectedZoom);
 	private void DefaultZoom_TextChanged(object sender, EventArgs e)
-		=> ParseDiffApply(defaultZoom, ref generator.SelectedDefaultZoom);
+		=> ParseDiffApply(defaultZoomBox, ref generator.SelectedDefaultZoom);
 	private void SpinSelect_SelectedIndexChanged(object sender, EventArgs e)
 		=> ClampDiffApply((short)(spinSelect.SelectedIndex - 2), ref generator.SelectedSpin, (short)-2, (short)3);
 	private void SpinSpeedBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(spinSpeedBox, ref generator.SelectedExtraSpin, 0, 255);
 	private void DefaultAngle_TextChanged(object sender, EventArgs e)
-		=> ParseModDiffApply(defaultAngle, ref generator.SelectedDefaultAngle, 0, 360);
+		=> ParseModDiffApply(defaultAngleBox, ref generator.SelectedDefaultAngle, 0, 360);
 	private void HueSelect_SelectedIndexChanged(object sender, EventArgs e)
 		=> DiffApply((short)(hueSelect.SelectedIndex == 0 ? -2 : hueSelect.SelectedIndex % 3 - 1), ref generator.SelectedHue);
 	private void HueSpeedBox_TextChanged(object sender, EventArgs e) {
@@ -1348,7 +1374,7 @@ public partial class GeneratorForm : Form {
 		timingBox.Text = (timingSelect.SelectedIndex == 0 ? generator.SelectedDelay : generator.SelectedFps).ToString();
 	}
 	private void TimingBox_TextChanged(object sender, EventArgs e) {
-		// TODO try to remove the GIF restart (was bugger the last time I tried)
+		// TODO try to remove the GIF restart (was bugged the last time I tried)
 		switch (timingSelect.SelectedIndex) {
 			case 0:
 				var newDelay = ParseClampReText(timingBox, (short)1, (short)500);
@@ -1450,9 +1476,9 @@ public partial class GeneratorForm : Form {
 			+ "|angle|" + angleSelect.SelectedIndex + "|color|" + colorSelect.SelectedIndex + "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
 			+ "|paletteSelect|" + paletteSelect.SelectedIndex
 			+ "|period|" + periodBox.Text + "|periodMul|" + periodMultiplierBox.Text
-			+ "|zoom|" + zoomSelect.SelectedIndex + "|defaultZoom|" + defaultZoom.Text
+			+ "|zoom|" + zoomSelect.SelectedIndex + "|defaultZoom|" + defaultZoomBox.Text
 			+ "|hue|" + hueSelect.SelectedIndex + "|defaultHue|" + defaultHue.Text + "|hueMul|" + hueSpeedBox.Text
-			+ "|spin|" + spinSelect.SelectedIndex + "|defaultAngle|" + defaultAngle.Text + "|spinMul|" + spinSpeedBox.Text
+			+ "|spin|" + spinSelect.SelectedIndex + "|defaultAngle|" + defaultAngleBox.Text + "|spinMul|" + spinSpeedBox.Text
 			+ "|amb|" + ambBox.Text + "|noise|" + noiseBox.Text + "|void|" + voidBox.Text
 			+ "|detail|" + detailBox.Text + "|saturate|" + saturateBox.Text + "|brightness|" + brightnessBox.Text
 			+ "|bloom|" + bloomBox.Text + "|blur|" + blurBox.Text
@@ -1744,7 +1770,11 @@ public partial class GeneratorForm : Form {
 				saveGif.Filter = "MP4 video (*.mp4)|*.mp4";
 				_ = saveGif.ShowDialog();
 				break;
-
+			case 5: // IMPORT
+				loadExport.DefaultExt = "";
+				loadExport.Filter = "All files (*.*)|*.*";
+				_ = loadExport.ShowDialog();
+				break;
 		}
 	}
 	private void ExportSelect_SelectedIndexChanged(object sender, EventArgs e) {
@@ -1759,6 +1789,7 @@ public partial class GeneratorForm : Form {
 			2 => "Export the full animation into MP4 video",
 			3 => "Export the full animation into a GIF file.\nMust have GIF encoding enabled.",
 			4 => "Convert a GIF file into Mp4.\nMust have GIF encoding enabled.",
+			5 => "This will import a fractaal instead.\nIf you select any exported fractal it will attempt to load everything it can to replicate it.",
 			_ => ""
 		});
 	}
@@ -1946,21 +1977,23 @@ public partial class GeneratorForm : Form {
 		if ((fileMask & 2) > 0)
 			f += "_C(" + generator.SelectedChildColors + ")";
 		if ((fileMask & 4) > 0)
-			f += "_F(" + generator.SelectedCut + "_" + generator.SelectedCutSeed + ")";
+			f += "_F(" + cutSelect.SelectedIndex + "_" + cutparamBox.Text + ")";
 		if ((fileMask & 8) > 0)
-			f += "_R(" + generator.SelectedWidth + "x" + generator.SelectedHeight + ")";
+			f += "_R(" + generator.SelectedWidth + "_" + generator.SelectedHeight + ")";
 		if ((fileMask & 16) > 0)
-			f += "_H(" + generator.Colors[generator.SelectedPaletteType].Item1 + "_" + generator.SelectedDefaultHue + "_" + generator.SelectedHue + "_" + generator.SelectedExtraHue + ")";
+			f += "_H(" + generator.Colors[generator.SelectedPaletteType].Item1 + "_" + hueSelect.SelectedIndex + "_" + defaultHue.Text + "_" + hueSpeedBox.Text + ")";
 		if ((fileMask & 32) > 0)
-			f += "_P(" + generator.SelectedPeriod + "_" + generator.SelectedPeriodMultiplier + ")";
+			f += "_P(" + periodBox.Text + "_" + periodMultiplierBox.Text + "_" + (timingSelect.SelectedIndex == 0 ? "-" + timingBox.Text : timingBox.Text) + ")";
 		if ((fileMask & 64) > 0)
-			f += "_Z(" + generator.SelectedZoom + ")";
+			f += "_Z(" + zoomSelect.SelectedIndex + "_" + defaultZoomBox.Text + "_" + zoomChildBox.Text + ")";
 		if ((fileMask & 128) > 0)
-			f += "_S(" + generator.SelectedSpin + "_" + generator.SelectedDefaultAngle + "_" + generator.SelectedExtraSpin + ")";
+			f += "_S(" + spinSelect.SelectedIndex + "_" + defaultAngleBox.Text + "_" + spinSpeedBox.Text + ")";
 		if ((fileMask & 256) > 0)
-			f += "_V(" + generator.SelectedAmbient / voidAmbientMul + "_" + (int)(generator.SelectedNoise / voidNoiseMul) + "_" + generator.SelectedVoid + ")";
+			f += "_V(" + ambBox.Text + "_" + noiseBox.Text + "_" + voidBox.Text + ")";
 		if ((fileMask & 512) > 0)
-			f += "_I(" + generator.SelectedSaturate + "_" + generator.SelectedBrightness + "_" + generator.SelectedBloom + "_" + generator.SelectedBlur + ")";
+			f += "_I(" + saturateBox.Text + "_" + brightnessBox.Text + "_" + bloomBox.Text + "_" + blurBox.Text + ")";
+		if ((fileMask & 1024) > 0)
+			f += "_D(" + (ditherBox.Checked ? "1" : "0") + "_" + detailBox.Text + ")";
 		dialog.FileName = f + "." + extension;
 	}
 	#endregion
@@ -2598,6 +2631,7 @@ public partial class GeneratorForm : Form {
 		
 		string s = fileSelect.Items[fileSelect.SelectedIndex].ToString();
 		fileSelect.Items[fileSelect.SelectedIndex] = (fileMask >> (fileSelect.SelectedIndex - 1) & 1) == 1 ? s.Replace(charOff, charOn) : s.Replace(charOn, charOff);*/
+		
 		SetFileMask();
 	}
 	private void SetFileMask() {
@@ -2624,7 +2658,7 @@ public partial class GeneratorForm : Form {
 
 
 	private void BitmaskComboBox_DrawItem(object sender, DrawItemEventArgs e) {
-		if (e.Index < 0 || sender is not ComboBox combo) 
+		if (e.Index < 0 || sender is not ComboBox combo)
 			return;
 		e.DrawBackground();
 		string text = combo.Items[e.Index].ToString();
@@ -2640,6 +2674,196 @@ public partial class GeneratorForm : Form {
 			);
 		}
 		e.DrawFocusRectangle();
+	}
+
+	private void loadExport_FileOk(object sender, CancelEventArgs e) {
+		LoadExportFile();
+	}
+	private bool LoadExportFile() { 
+		var s = Path.GetFileNameWithoutExtension(loadExport.FileName).Split(['_', '(', ')']);
+		var f = generator.GetFractals();
+
+		// load fractal type:
+		short fi = 0;
+		while (fi < f.Count()) {
+			if (f[fi].Name == s[0]) {
+				fractalSelect.SelectedIndex = fi;
+				break;
+			}
+			++fi;
+		}
+		if (fi == f.Count())
+			return false; // not valid file name, nothing can be loaded
+		fi = 1;
+		short _s;
+		while (fi < s.Count()) {
+			if (s[fi].Length < 1)
+				break;
+			switch (s[fi][0]) {
+				case 'A': // Angles
+						  // Child Angles Bitmask
+					if (ulong.TryParse(s[++fi], out generator.SelectedChildAngles)) {
+						FillSelectAngles();
+						++fi;
+					} else return QueueReset();
+					break;
+				case 'C': // Colors
+						  // Child Colors Bitmask:
+					if (ulong.TryParse(s[++fi], out generator.SelectedChildColors)) {
+						FillSelectColors();
+						++fi;
+					} else return QueueReset();
+					break;
+				case 'F': // Cut Function
+						  // Cut Function Select:
+					if (short.TryParse(s[++fi], out _s)) {
+						cutSelect.SelectedIndex = _s;
+					} else break;
+					// Cut Function Seed:
+					if (long.TryParse(s[++fi], out long _l)) {
+						cutparamBox.Text = _l.ToString();
+					} else break;
+					++fi;
+					break;
+				case 'R': // Resolution
+						  // Width:
+					if (short.TryParse(s[++fi], out generator.SelectedWidth)) {
+						resX.Text = generator.SelectedWidth.ToString();
+					} else break;
+					// Height:
+					if (short.TryParse(s[++fi], out generator.SelectedHeight)) {
+						resY.Text = generator.SelectedHeight.ToString();
+					} else break;
+					resSelect.SelectedIndex = 1;
+					++fi;
+					break;
+				case 'H': // Hues
+					short hi = 0;
+					var cc = generator.Colors;
+					++fi;
+					// Palette:
+					while (hi < f.Count()) {
+						if (cc[hi].Item1 == s[fi]) {
+							paletteSelect.SelectedIndex = hi + 1;
+							break;
+						}
+						++hi;
+					}
+					// Select Hue:
+					if (short.TryParse(s[++fi], out _s)) {
+						hueSelect.SelectedIndex = _s;
+					} else break;
+					// Default Hue:
+					if (double.TryParse(s[++fi], out var _d)) {
+						defaultHue.Text = _d.ToString();
+					} else break;
+					// Extra Hue:
+					if (short.TryParse(s[++fi], out _s)) {
+						hueSpeedBox.Text = _s.ToString();
+					} else break;
+					++fi;
+					break;
+				case 'P': // Period Settings
+					// Period:
+					if (short.TryParse(s[++fi], out _s)) {
+						periodBox.Text = _s.ToString();
+					} else break;
+					// Period Multiplier:
+					if (short.TryParse(s[++fi], out _s)) {
+						periodMultiplierBox.Text = _s.ToString();
+					} else break;
+					// Period Multiplier:
+					if (short.TryParse(s[++fi], out _s)) {
+						if (_s < 0) {
+							timingSelect.SelectedIndex = 0;
+							timingBox.Text = (-_s).ToString();
+						} else {
+							timingSelect.SelectedIndex = 1;
+							timingBox.Text = _s.ToString();
+						}
+					} else break;
+					++fi;
+					break;
+				case 'Z': // Zoom Settings
+					// Zoom Direction:
+					if (short.TryParse(s[++fi], out _s)) {
+						zoomSelect.SelectedIndex = _s;
+					} else break;
+					// Zoom Direction:
+					if (short.TryParse(s[++fi], out _s)) {
+						defaultZoomBox.Text = _s.ToString();
+					} else break;
+					// Zoom Child:
+					if (short.TryParse(s[++fi], out _s)) {
+						zoomChildBox.Text = _s.ToString();
+					} else break;
+					++fi;
+					break;
+				case 'S': // Spin Settings
+					// Spin Direction:
+					if (short.TryParse(s[++fi], out _s)) {
+						spinSelect.SelectedIndex = _s;
+					} else break;
+					// Default Angle:
+					if (short.TryParse(s[++fi], out _s)) {
+						defaultAngleBox.Text = _s.ToString();
+					} else break;
+					// Extra Spin:
+					if (short.TryParse(s[++fi], out _s)) {
+						spinSpeedBox.Text = _s.ToString();
+					} else break;
+					++fi;
+					break;
+				case 'V': // Void Settings
+					// Ambient:
+					if (short.TryParse(s[++fi], out _s)) {
+						ambBox.Text = _s.ToString();
+					} else break;
+					// Noise:
+					if (short.TryParse(s[++fi], out _s)) {
+						noiseBox.Text = _s.ToString();
+					} else break;
+					// Scale:
+					if (short.TryParse(s[++fi], out _s)) {
+						voidBox.Text = _s.ToString();
+					} else break;
+					++fi;
+					break;
+				case 'I': // Image Post Processing
+					// Saturation
+					if (short.TryParse(s[++fi], out _s)) {
+						saturateBox.Text = _s.ToString();
+					} else break;
+					// Brightness
+					if (short.TryParse(s[++fi], out _s)) {
+						brightnessBox.Text = _s.ToString();
+					} else break;
+					// Bloom
+					if (short.TryParse(s[++fi], out _s)) {
+						bloomBox.Text = _s.ToString();
+					} else break;
+					// Motion Blur
+					if (short.TryParse(s[++fi], out _s)) {
+						blurBox.Text = _s.ToString();
+					} else break;
+					++fi;
+					break;
+				case 'D': // Details
+					if (short.TryParse(s[++fi], out _s)) {
+						ditherBox.Checked = _s == 1;
+					} else break;
+					// Detail:
+					if (short.TryParse(s[++fi], out _s)) {
+						detailBox.Text = _s.ToString();
+					} else break;
+					++fi;
+					break;
+				default:
+					return QueueReset();
+			}
+			++fi; // skips the empty strings inbetween ")_"
+		}
+		return QueueReset();
 	}
 
 

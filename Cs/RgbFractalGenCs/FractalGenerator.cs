@@ -155,8 +155,7 @@ internal class FractalGenerator {
 	private long startCutSeed;		// What cut seed will the generator start with?
 	public readonly Dictionary<string, int> Hash = [];
 	private readonly Dictionary<long, Vector3[]> colorBlends = [];
-	private short selectZoomChild;  // Which child to zoom into
-
+	
 	// Resolution
 	private short allocatedWidth;	// How much buffer width is currently allocated?
 	private short allocatedHeight;	// How much buffer height is currently allocated?
@@ -274,8 +273,8 @@ internal class FractalGenerator {
 		SelectedChildAngle,				// Child angle definition (0-childAngle.Length)
 		SelectedChildColor;             // Child color definition (0-childColor.Length)
 	internal short SelectedCut;         // Selected CutFunction index (0-cutFunction.Length)
-	internal ulong SelectedChildAngles,   // Child angle definition (0-childAngle.Length)
-		SelectedChildColors;             // Child color definition (0-childColor.Length)
+	internal ulong SelectedChildAngles, // Child angle definition (0-childAngle.Length)
+		SelectedChildColors;            // Child color definition (0-childColor.Length)
 	internal int SelectedCutSeed;		// CutSeed seed (0-maxCutSeed)
 	internal short SelectedWidth,       // Resolution width (1-X)
 		SelectedHeight,                 // Resolution height (1-X)
@@ -300,6 +299,7 @@ internal class FractalGenerator {
 		SelectedBloom;                  // Dot bloom level (pixels)
 	internal short SelectedBlur,        // Dot blur level
 		SelectedBrightness;             // Light normalizer brightness (0-300)
+	internal short SelectedZoomChild;		// Which child to zoom into
 	internal ParallelType 
 		SelectedParallelType;			// 0 = Animation, 1 = Depth, 2 = Recursion
 	internal short SelectedMaxTasks,	// Maximum allowed total tasks
@@ -1018,7 +1018,7 @@ internal class FractalGenerator {
 				("BASE: Classic", [2 * pi / 10, 0, 0, 0, 0, 0]),
 				("BASE: No Rotation", [symmetric + 2 * pi / 5, 0, 0, 0, 0, 0]),
 
-				("Rotated", [0, 0, 2 * pi / 5, 4 * pi / 5, 6 * pi / 5, 8 * pi / 5])
+				("Rotated", [0, 0 * pi / 5, 8 * pi / 5, 6 * pi / 5, 4 * pi / 5, 2 * pi / 5])
 			], [
 				("Center",		[2, 0, 0, 0, 0, 0]),
 				("Center_Neg",	[4, 0, 0, 0, 0, 0]),
@@ -1054,7 +1054,7 @@ internal class FractalGenerator {
 			[
 				("BASE", [symmetric + pi / 3, 0, 0, 0, 0, 0, 0]),
 
-				("Rotated", [0, 0, pi / 3, 2 * pi / 3, pi, 4 * pi / 3, 5 * pi / 3])
+				("Rotated", [0, 0 * pi / 3, 1 * pi / 3, 2 * pi / 3, 3 * pi / 3, 4 * pi / 3, 5 * pi / 3])
 			],
 			[
 				("Center",		[2, 0, 0, 0, 0, 0, 0]),
@@ -1514,12 +1514,12 @@ internal class FractalGenerator {
 		nextBitmap = bitmapsFinished = pngFailed = 0; tryPng = -1;
 
 		// A complex expression to get the multiplier of the basic period required to get to a seamless loop, how many times to zoom to loop back:
-		var m = (short)(applyHue == 0 && ChildColor[selectZoomChild] > 0 && applyZoom != 0 ? SelectedPeriodMultiplier * applyPalette.Length : SelectedPeriodMultiplier);
-		var asymmetric = ChildAngle[selectZoomChild] < 2.0 * Math.PI;
-		var doubled = (Math.Abs(SelectedSpin) > 1 && selectZoomChild == 0 || SelectedSpin == 0 && asymmetric) && applyZoom != 0;
+		var m = (short)(applyHue == 0 && ChildColor[SelectedZoomChild] > 0 && applyZoom != 0 ? SelectedPeriodMultiplier * applyPalette.Length : SelectedPeriodMultiplier);
+		var asymmetric = ChildAngle[SelectedZoomChild] < 2.0 * Math.PI;
+		var doubled = (Math.Abs(SelectedSpin) > 1 && SelectedZoomChild == 0 || SelectedSpin == 0 && asymmetric) && applyZoom != 0;
 		m = (short)(doubled ? 2 * m : m);
 		bool twice =  asymmetric && !doubled;
-		if (selectZoomChild == 0) { // when zooming to the center:
+		if (SelectedZoomChild == 0) { // when zooming to the center:
 			finalPeriodMultiplier = m;
 			// Calculate rotational symmetry (minimum rotation to get back to a seamless loop):
 			applyPeriodAngle = f.ChildCount <= 0 ? 0 : ChildAngle[0] % (2.0 * Math.PI);
@@ -1527,10 +1527,10 @@ internal class FractalGenerator {
 			applyPeriodAngle = SelectedPeriodMultiplier % 2 == 0 && twice ? applyPeriodAngle * 2 : applyPeriodAngle;
 		} else {
 			// Calculate rotational symmetry (minimum rotation to get back to a seamless loop), and recompute the period multiplier:
-			var a = ChildAngle[selectZoomChild] * m % (2 * Math.PI);
+			var a = ChildAngle[SelectedZoomChild] * m % (2 * Math.PI);
 			if (SelectedSpin == 0) {
 				for (finalPeriodMultiplier = 1; a is > 0.1 and < 2 * Math.PI - 0.1; ++finalPeriodMultiplier)
-					a = (a + ChildAngle[selectZoomChild] * m) % (2 * Math.PI);
+					a = (a + ChildAngle[SelectedZoomChild] * m) % (2 * Math.PI);
 				finalPeriodMultiplier *= m;
 			} else {
 				finalPeriodMultiplier = m;
@@ -1541,7 +1541,7 @@ internal class FractalGenerator {
 		applyExtraSpin = twice ? (short)(2 * SelectedExtraSpin) : SelectedExtraSpin;
 
 		// A complex expression to calculate the minimum needed hue shift speed to match the loop: supporting the new custom palettes:
-		var finalHueShift = finalPeriodMultiplier * ChildColor[selectZoomChild] % applyPalette2;
+		var finalHueShift = finalPeriodMultiplier * ChildColor[SelectedZoomChild] % applyPalette2;
 		if (finalHueShift == 0 || applyZoom == 0) {
 			hueCycleMultiplier = (byte)applyPalette2;
 		} else {
@@ -1990,8 +1990,8 @@ internal class FractalGenerator {
 						zoomSize /= f.ChildSize;     // Shrink for next step
 					}
 					// Compute infinite sum for zoomChild
-					var infiniteSum = new Complex(f.ChildX[selectZoomChild], f.ChildY[selectZoomChild])
-						/ (new Complex(1.0, 0.0) - new Complex(Math.Cos(ChildAngle[selectZoomChild]), Math.Sin(ChildAngle[selectZoomChild])) / f.ChildSize);
+					var infiniteSum = new Complex(f.ChildX[SelectedZoomChild], f.ChildY[SelectedZoomChild])
+						/ (new Complex(1.0, 0.0) - new Complex(Math.Cos(ChildAngle[SelectedZoomChild]), Math.Sin(ChildAngle[SelectedZoomChild])) / f.ChildSize);
 					// Transform infinite sum into the new coordinate system
 					var cosFinal = Math.Cos(-zoomAngle);
 					var sinFinal = Math.Sin(-zoomAngle);
@@ -2799,7 +2799,7 @@ internal class FractalGenerator {
 			if (applyPreviewMode)
 				w *= 0.1;
 			// Make sure the fractal is big enough to fill the screen even when I shift it to focus on the zoomChild
-			if (selectZoomChild > 0)
+			if (SelectedZoomChild > 0)
 				w *= fp * fp * fp;// * fp * fp * fp;
 								  // Modulo rotation
 			while (refAngle > Math.PI * 2)
@@ -2818,7 +2818,7 @@ internal class FractalGenerator {
 				refSize /= fp;
 				if (applyPreviewMode)
 					continue;
-				refAngle += selectZoomChild == 0 ? ChildAngle[selectZoomChild] : -ChildAngle[selectZoomChild];
+				refAngle += SelectedZoomChild == 0 ? ChildAngle[SelectedZoomChild] : -ChildAngle[SelectedZoomChild];
 				SwitchParentChild(ref refAngle, ref refSpin, ref refColor, 1);
 			}
 			while (refSize < w) {
@@ -2826,7 +2826,7 @@ internal class FractalGenerator {
 				refSize *= fp;
 				if (applyPreviewMode)
 					continue;
-				refAngle += selectZoomChild == 0 ? -ChildAngle[selectZoomChild] : ChildAngle[selectZoomChild];
+				refAngle += SelectedZoomChild == 0 ? -ChildAngle[SelectedZoomChild] : ChildAngle[SelectedZoomChild];
 				SwitchParentChild(ref refAngle, ref refSpin, ref refColor, -1);
 			}
 
@@ -2835,7 +2835,7 @@ internal class FractalGenerator {
 			void SwitchParentChild(ref double refAngle, ref short refSpin, ref short refColor, short zoomDir) {
 				if (applyPreviewMode)
 					return;
-				refColor = (short)((applyPalette2 + refColor + zoomDir * ChildColor[selectZoomChild]) % applyPalette2);
+				refColor = (short)((applyPalette2 + refColor + zoomDir * ChildColor[SelectedZoomChild]) % applyPalette2);
 				if (Math.Abs(spin) <= 1)
 					return;
 				// reverse angle and spin when antiSpinning, or else the direction would change when parent and child switches
@@ -3438,9 +3438,9 @@ internal class FractalGenerator {
 	internal void SetupCutFunction() 
 		=> selectCutFunction = f.ChildCutFunction == null || f.ChildCutFunction.Count <= 0 ? null : Fractal.CutFunctions[f.ChildCutFunction[SelectedCut].Item1].Item2;
 	internal bool SelectZoomChild(short z) {
-		if (validZoomChildren == null || validZoomChildren.Count < 1 || validZoomChildren[z] == selectZoomChild)
+		if (validZoomChildren == null || validZoomChildren.Count < 1 || validZoomChildren[z] == SelectedZoomChild)
 			return true;
-		selectZoomChild = validZoomChildren[z];
+		SelectedZoomChild = validZoomChildren[z];
 		return false;
 	}
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

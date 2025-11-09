@@ -1,3 +1,6 @@
+1.12.0
+-Added "Load Export" insto Export Selection, which will enable loading a fractal from any exported image of animation exported with 1.12.0 or higher
+
 1.11.2
 -Fixed PeriAntiSpin flipping 180 degrees at the end of the animation for some fractals
 

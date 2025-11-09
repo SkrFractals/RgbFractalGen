@@ -56,8 +56,8 @@ namespace RgbFractalGenCs {
 			statusLabel = new Label();
 			infoLabel = new Label();
 			bloomLabel = new Label();
-			defaultZoom = new TextBox();
-			defaultAngle = new TextBox();
+			defaultZoomBox = new TextBox();
+			defaultAngleBox = new TextBox();
 			defaultHue = new TextBox();
 			periodMultiplierBox = new TextBox();
 			periodLabel = new Label();
@@ -151,6 +151,7 @@ namespace RgbFractalGenCs {
 			debugAnimBox = new CheckBox();
 			debugPngBox = new CheckBox();
 			debugGifBox = new CheckBox();
+			loadExport = new OpenFileDialog();
 			helpPanel.SuspendLayout();
 			generatorPanel.SuspendLayout();
 			panel1.SuspendLayout();
@@ -446,23 +447,23 @@ namespace RgbFractalGenCs {
 			bloomLabel.TabIndex = 0;
 			bloomLabel.Text = "Bloom (0-40):";
 			// 
-			// defaultZoom
+			// defaultZoomBox
 			// 
-			defaultZoom.Location = new System.Drawing.Point(164, 67);
-			defaultZoom.Name = "defaultZoom";
-			defaultZoom.Size = new System.Drawing.Size(59, 23);
-			defaultZoom.TabIndex = 13;
-			defaultZoom.Text = "0";
-			defaultZoom.TextChanged += DefaultZoom_TextChanged;
+			defaultZoomBox.Location = new System.Drawing.Point(164, 67);
+			defaultZoomBox.Name = "defaultZoomBox";
+			defaultZoomBox.Size = new System.Drawing.Size(59, 23);
+			defaultZoomBox.TabIndex = 13;
+			defaultZoomBox.Text = "0";
+			defaultZoomBox.TextChanged += DefaultZoom_TextChanged;
 			// 
-			// defaultAngle
+			// defaultAngleBox
 			// 
-			defaultAngle.Location = new System.Drawing.Point(98, 146);
-			defaultAngle.Name = "defaultAngle";
-			defaultAngle.Size = new System.Drawing.Size(60, 23);
-			defaultAngle.TabIndex = 16;
-			defaultAngle.Text = "0";
-			defaultAngle.TextChanged += DefaultAngle_TextChanged;
+			defaultAngleBox.Location = new System.Drawing.Point(98, 146);
+			defaultAngleBox.Name = "defaultAngleBox";
+			defaultAngleBox.Size = new System.Drawing.Size(60, 23);
+			defaultAngleBox.TabIndex = 16;
+			defaultAngleBox.Text = "0";
+			defaultAngleBox.TextChanged += DefaultAngle_TextChanged;
 			// 
 			// defaultHue
 			// 
@@ -776,7 +777,7 @@ namespace RgbFractalGenCs {
 			// 
 			exportSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			exportSelect.FormattingEnabled = true;
-			exportSelect.Items.AddRange(new object[] { "Current PNG", "PNGs", "MP4", "Selected GIF", "GIF->MP4" });
+			exportSelect.Items.AddRange(new object[] { "Current PNG", "PNGs", "MP4", "Selected GIF", "GIF->MP4", "Load Export" });
 			exportSelect.Location = new System.Drawing.Point(162, 381);
 			exportSelect.Name = "exportSelect";
 			exportSelect.Size = new System.Drawing.Size(108, 23);
@@ -787,7 +788,7 @@ namespace RgbFractalGenCs {
 			// 
 			fileSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			fileSelect.FormattingEnabled = true;
-			fileSelect.Items.AddRange(new object[] { "Fractal", "Angles - A(Bitmask)", "Colors - C(Bitmask)", "Function - F(Type_Seed)", "Resolution - R(WxH)", "Hues - H(Palette_Hue_Shift_Speed)", "Period - P(Frames_Multiplier)", "Zoom - Z(Direction)", "Spin - S(Direction_Default_Speed)", "Void - V(Ambient_Noise_Scale)", "Image - I(Satur_Bright_Bloom_Blur)" });
+			fileSelect.Items.AddRange(new object[] { "Fractal", "Angles - (Bitmask)", "Colors - (Bitmask)", "Function - (Type_Seed)", "Resolution - (W_H)", "Hues - (Palette_Hue_Shift_Speed)", "Period - (Frames_Multiplier)", "Zoom - (Direction_Child)", "Spin - (Direction_Default_Speed)", "Void - (Ambient_Noise_Scale)", "Image - (Satur_Bright_Bloom_Blur)", "Detail - (Dithering_Detail)" });
 			fileSelect.Location = new System.Drawing.Point(62, 410);
 			fileSelect.Margin = new Padding(4, 3, 4, 3);
 			fileSelect.Name = "fileSelect";
@@ -841,7 +842,7 @@ namespace RgbFractalGenCs {
 			panel1.Controls.Add(spinSelect);
 			panel1.Controls.Add(blurBox);
 			panel1.Controls.Add(spinSpeedBox);
-			panel1.Controls.Add(defaultAngle);
+			panel1.Controls.Add(defaultAngleBox);
 			panel1.Controls.Add(parallelTypeSelect);
 			panel1.Controls.Add(bloomBox);
 			panel1.Controls.Add(hueSpeedBox);
@@ -849,7 +850,7 @@ namespace RgbFractalGenCs {
 			panel1.Controls.Add(ambBox);
 			panel1.Controls.Add(saturateBox);
 			panel1.Controls.Add(voidAmbientLabel);
-			panel1.Controls.Add(defaultZoom);
+			panel1.Controls.Add(defaultZoomBox);
 			panel1.Controls.Add(bloomLabel);
 			panel1.Controls.Add(noiseBox);
 			panel1.Controls.Add(detailBox);
@@ -1486,6 +1487,12 @@ namespace RgbFractalGenCs {
 			debugGifBox.UseVisualStyleBackColor = true;
 			debugGifBox.CheckedChanged += debugGifBox_CheckedChanged;
 			// 
+			// loadExport
+			// 
+			loadExport.Filter = "All files (*.*)|*.*";
+			loadExport.RestoreDirectory = true;
+			loadExport.FileOk += loadExport_FileOk;
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -1522,7 +1529,7 @@ namespace RgbFractalGenCs {
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.11.2";
+			Text = "RGB Fractal Zoom Generator C# v1.12.0";
 			FormClosing += GeneratorForm_FormClosing;
 			Load += GeneratorForm_Load;
 			helpPanel.ResumeLayout(false);
@@ -1567,8 +1574,8 @@ namespace RgbFractalGenCs {
 		private System.Windows.Forms.Label saturateLabel;
 		private System.Windows.Forms.Label voidAmbientLabel;
 		private System.Windows.Forms.Label bloomLabel;
-		private System.Windows.Forms.TextBox defaultZoom;
-		private System.Windows.Forms.TextBox defaultAngle;
+		private System.Windows.Forms.TextBox defaultZoomBox;
+		private System.Windows.Forms.TextBox defaultAngleBox;
 		private System.Windows.Forms.TextBox defaultHue;
 		private System.Windows.Forms.TextBox periodMultiplierBox;
 		private System.Windows.Forms.Label periodLabel;
@@ -1662,6 +1669,7 @@ namespace RgbFractalGenCs {
 		private Label ditherLabel;
 		private Label fileLabel;
 		private ComboBox fileSelect;
+		private OpenFileDialog loadExport;
 	}
 }
 
