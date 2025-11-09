@@ -603,7 +603,7 @@ internal class FractalGenerator {
 			]
 			),*/
 
-			/*new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraY, tetraX,
+			new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraY, tetraX,
 			[
 				("BASE",	[symmetric + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi]),
 
@@ -657,9 +657,11 @@ internal class FractalGenerator {
 				//(2, []),	// NoBackDiag
 				(12,[-98303]) // NoChildComplex
 				]
-			),*/
+			),
 
-			new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraX, tetraY,
+			/* // Vertically symmetric, but for some reason, zoom children don't work here at all...
+			 * 
+			 * new("TetraTriFlake", 16, 4, 1.5, .15f, .8, tetraX, tetraY,
 			[
 				("BASE",    [symmetric + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi]),
 
@@ -713,7 +715,7 @@ internal class FractalGenerator {
 				//(2, []),	// NoBackDiag
 				(12,[-98303]) // NoChildComplex
 				]
-			),
+			),*/
 
 
 			new("SierpinskiCarpet", 9, 3, 1.0, .25f, .9, carpetX, carpetY,
