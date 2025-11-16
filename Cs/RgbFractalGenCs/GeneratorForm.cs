@@ -89,6 +89,7 @@ public partial class GeneratorForm : Form {
 	private int controlTabIndex;    // Iterator for tabIndexes - to make sure all the controls tab in the correct order even as I add new ones in the middle
 	private int pointTabIndex;      // Iterator for tabIndexes for dynamically generated controls in editor
 	private bool notify = true, notifyExp;
+	private bool cacheLabelUpdate = false;
 
 	// Editor
 	private readonly List<(TextBox, TextBox, TextBox, TextBox, Button)>
@@ -108,7 +109,7 @@ public partial class GeneratorForm : Form {
 	private bool previewMode = true;
 
 	// Config
-	private ushort fileMask = 0, voidAmbientMax = 30, voidAmbientMul = 4, voidNoiseMax = 30, voidScaleMax = 300, detailMax = 10, saturateMax = 100, brightnessMax = 300, bloomMax = 40, blurMax = 40;
+	private ushort fileMask = 0, voidAmbientMax = 30, voidAmbientMul = 4, voidNoiseMax = 30, voidScaleMax = 300, detailMax = 10, saturateMax = 100, brightnessMax = 300, bloomMax = 40, blurMax = 40, l2Max = 4096, stripeMax = 0, binMax = 4096;
 	private float bloomMul = .25f;
 	private double detailMul = .1, threadsMul = 1.0, voidNoiseMul = .1;
 	private string loadedBatch;
@@ -139,6 +140,9 @@ public partial class GeneratorForm : Form {
 			);
 		} finally { Monitor.Exit(this); }
 	}
+	private void UpdateCache() {
+		cacheLabelUpdate = true;
+	}
 	private void SetupEditControl(Control control, string tip) {
 		// Add tooltip and set the next tabIndex
 		toolTips.SetToolTip(control, tip);
@@ -154,6 +158,9 @@ public partial class GeneratorForm : Form {
 	private void Timer_Tick(object sender, EventArgs e) {
 		#region Init
 		void Init() {
+
+			FractalGenerator.WarmUpShaders();
+
 			bInit = false;
 
 			fractalSelect.MouseWheel += ComboBox_MouseWheel;
@@ -170,6 +177,8 @@ public partial class GeneratorForm : Form {
 			generationSelect.MouseWheel += ComboBox_MouseWheel;
 			timingSelect.MouseWheel += ComboBox_MouseWheel;
 			fileSelect.MouseWheel += ComboBox_MouseWheel;
+			voidSelect.MouseWheel += ComboBox_MouseWheel;
+			drawSelect.MouseWheel += ComboBox_MouseWheel;
 
 			// prepare the file encoder
 			filePostfix = new string[fileSelect.Items.Count];
@@ -188,6 +197,7 @@ public partial class GeneratorForm : Form {
 			generator.SelectedFractal = -1;
 			//generator.RestartGif = false;
 			generator.UpdatePreview += UpdatePreview;
+			generator.UpdateCache += UpdateCache;
 
 			// Setup interactable controls (tooltips + tabIndex)
 			SetupControl(sizeBox, "Scale Of children inside (how much to scale the image when switching parent<->child)");
@@ -235,19 +245,23 @@ public partial class GeneratorForm : Form {
 			SetupControl(bloomBox, "Bloom: 0 will be maximally crisp, but possibly dark with think fractals. Higher values wil blur/bloom out the fractal dots.");
 			SetupControl(blurBox, "Motion blur: Lowest no blur and fast generation, highest 10 smeared frames 10 times slower generation.");
 			SetupControl(zoomChildBox, "Which child to focus and zoom into? 0 is center.");
-			SetupControl(parallelTypeSelect, "Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommended for fast single images, 1 in a million pixels might be slightly wrong");
-			SetupControl(threadsBox, "The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
+			SetupControl(abortBox, "How many millisecond of pause after the last settings change until the generator restarts?");
 			SetupControl(timingSelect, "Choose if you want to set a delay or framerate. Delay will be precisely used for GIF export, and framerate from MP4 export.");
 			SetupControl(timingBox, ""); // This one is updated dynamically based on the timingSelect selection
-			SetupControl(abortBox, "How many millisecond of pause after the last settings change until the generator restarts?");
+			SetupControl(parallelTypeSelect, "Select which parallelism to be used if the left checkBox is enabled.\nOf Animation = Batching animation frames, recommended for Animations with perfect pixels.\nOf Depth/Of Recursion = parallel single image generation, recommended for fast single images, 1 in a million pixels might be slightly wrong");
+			SetupControl(threadsBox, "The maximum allowed number of parallel CPU threads for either generation or drawing.\nAt least one of the parallel check boxes below must be checked for this to apply.\nTurn it down from the maximum if your system is already busy elsewhere, or if you want some spare CPU threads for other stuff.\nThe generation should run the fastest if you tune this to the exact number of free available CPU threads.\nThe maximum on this slider is the number of all CPU threads, but not only the free ones.");
+			SetupControl(cacheBox, "Should the fractal be generated with special new algorithm that aim to be friendly with cache optimization?");
+			SetupControl(stripeBox, "Cache optimization parameter: Into how large horizontal stripes wouldthe image be subdivided and the rendering sorted?\n There should fit at least twice as many striped into image's height. And it should be small enough to fit into cache.\nIf either Bin or Stripe are left at zero, the app wil ltry to guess some good estimation of both.");
+			SetupControl(binBox, "Cache optimization parameter: How many hundreds of dots will fit into one bin on each stripe, before a next bin is initialized?(1 dotis about 18 bytes)\nIf either Bin or Stripe are left at zero, the app will try to guess some good estimation of both.");
+			SetupControl(l2Box, "Cache optimization parameter: How large is the L2 cache of one thread of your CPU? (in kilobytes)\nThis is hard tfor the app to know. If left zero, it will only do an educated guess.");
+			SetupControl(voidSelect, "What and how will render the depth of void? Just original CPU, or some of the GPU variants? \n BFS should have identical quality to CPU, Fast Flood should be the fastest. Jump Flood in-between.");
+			SetupControl(drawSelect, "What and how will draw the finished image? Just original CPU, or some of the GPU variants? Functions recommended for performance.");
 			SetupControl(encodePngSelect, "Yes: Will export animation as PNG series, that will enable you to export the PNGS or MP4 quicker after it's finished, but not really quicker overall.");
 			SetupControl(encodeGifSelect, "No: Will not encode a gif, you will not be able to export a gif afterwards, but you can switch to a Local/Global later and it will not fully reset the generator, just catches up with missing frames.\nLocal: Will encode a GIF during the generation, so you could save it when finished. With a local colormap (one for each frame). Higher color precision. Slow encoding, larger GIF file size.\nGlobal: Also encodes a GIF. But with a global color map learned from a first frame. Not recommended for changing colors. Much faster encoding, smaller GIF file size.");
 			SetupControl(generationSelect, "Only Image: Will only render one still image. Cannot exprt PNG animation, or GIF animation, only a single image, the first one from a zoom animation.\nAnimation: Will render the animation as sett up by your settings.\nAll Seeds: Will not zoom/spin/shift at all, but instead cycle through all the available CutFunction seeds.");
-
 			SetupControl(loadBatchButton, "");
 			SetupControl(addBatchButton, "");
 			SetupControl(saveBatchButton, "");
-
 			SetupControl(prevButton, "Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 			SetupControl(animateButton, "Toggle preview animation.\nWill seamlessly loop when the fractal is finished generating.\nClicking on the image does the same thing.");
 			SetupControl(nextButton, "Stop the animation and move to the next frame.\nUseful for selecting the exact frame you want to export to PNG file.");
@@ -266,9 +280,15 @@ public partial class GeneratorForm : Form {
 			generator.SelectedFps = 60;
 			generator.SelectedDelay = 100 / 60;
 			FillPalette();
+			voidSelect.SelectedIndex = 3;
+			drawSelect.SelectedIndex = 1;
 			fractalSelect.SelectedIndex = 0;
 			resSelect.SelectedIndex = 0;
 			zoomSelect.SelectedIndex = 3;
+			CacheBox_CheckedChanged(null, null);
+			StripeBox_TextChanged(null, null);
+			BinBox_TextChanged(null, null);
+			L2Box_TextChanged(null, null);
 			AbortBox_TextChanged(null, null);
 			DitherBox_CheckedChanged(null, null);
 			PeriodBox_TextChanged(null, null);
@@ -288,7 +308,6 @@ public partial class GeneratorForm : Form {
 			BrightnessBox_TextChanged(null, null);
 			VoidBox_TextChanged(null, null);
 			ZoomChildBox_TextChanged(null, null);
-			DitherBox_CheckedChanged(null, null);
 			SetAnimate();
 			encodePngSelect.SelectedIndex = encodeGifSelect.SelectedIndex = parallelTypeSelect.SelectedIndex = 0;
 			generationSelect.SelectedIndex = timingSelect.SelectedIndex = spinSelect.SelectedIndex = hueSelect.SelectedIndex = paletteSelect.SelectedIndex = 1;
@@ -318,8 +337,8 @@ public partial class GeneratorForm : Form {
 
 
 			// TODO remove debug
-			maxTasks = 1;
-			threadsBox.Text = maxTasks.ToString();
+			//maxTasks = 1;
+			//threadsBox.Text = maxTasks.ToString();
 
 
 			// Start the generator
@@ -569,6 +588,11 @@ public partial class GeneratorForm : Form {
 		}*/
 		// Fetch a bitmap to display
 		UpdatePreview();
+		if (cacheLabelUpdate) {
+			stripeLabel.Text = "Stripe Height: " + generator.GetStripeHeight();
+			binLabel.Text = "Bin Size: " + generator.GetBinSize();
+			cacheLabelUpdate = false;
+		}
 		// Info text refresh
 		var infoText = " / " + bitmapsTotal;
 		if (bitmapsFinished < bitmapsTotal) {
@@ -587,37 +611,7 @@ public partial class GeneratorForm : Form {
 		infoLabel.Text = infoText;
 		//gifButton.Text = gTask == null ? "Save GIF" : "Saving";
 	}
-	private void SaveSettings() {
-		var f = generator.GetFractal();
-		var file = "";
-		foreach (var c in generator.Colors) {
-			var p = "palette|" + c.Item1 + ";";
-			foreach (var i in c.Item2)
-				p += i.X + ":" + i.Y + ":" + i.Z + ";";
-			file += p[..^1] + "|";
-		}
-		file += "fractal|" + fractalSelect.Text + "|path|" + f.Path
-			+ "|preview|" + (previewMode ? 1 : 0) + "|edit|" + (editorPanel.Visible ? 1 : 0)
-			+ "|angle|" + generator.SelectedChildAngle + "|color|" + generator.SelectedChildColor
-			+ "|angles|" + generator.SelectedChildAngles + "|colors|" + generator.SelectedChildColors
-			+ "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
-			+ "|w|" + resX.Text + "|h|" + resY.Text + "|res|" + resSelect.SelectedIndex
-			+ "|paletteSelect|" + paletteSelect.SelectedIndex + "|dithering|" + (ditherBox.Enabled ? 1 : 0)
-			+ "|period|" + periodBox.Text + "|periodMul|" + periodMultiplierBox.Text
-			+ "|zoom|" + zoomSelect.SelectedIndex + "|defaultZoom|" + defaultZoomBox.Text
-			+ "|hue|" + hueSelect.SelectedIndex + "|defaultHue|" + defaultHue.Text + "|hueMul|" + hueSpeedBox.Text
-			+ "|spin|" + spinSelect.SelectedIndex + "|defaultAngle|" + defaultAngleBox.Text + "|spinMul|" + spinSpeedBox.Text
-			+ "|amb|" + ambBox.Text + "|noise|" + noiseBox.Text + "|void|" + voidBox.Text
-			+ "|detail|" + detailBox.Text + "|saturate|" + saturateBox.Text + "|brightness|" + brightnessBox.Text
-			+ "|bloom|" + bloomBox.Text + "|blur|" + blurBox.Text
-			+ "|child|" + zoomChildBox.Text
-			+ "|parallel|" + parallelTypeSelect.SelectedIndex + "|threads|" + threadsBox.Text
-			+ "|delay|" + generator.SelectedDelay + "|fps|" + generator.SelectedFps + "|timing|" + timingSelect.SelectedIndex + "|abort|" + abortBox.Text
-			+ "|png|" + encodePngSelect.SelectedIndex + "|gif|" + encodeGifSelect.SelectedIndex + "|gen|" + generationSelect.SelectedIndex
-			+ "|ani|" + (animated ? 1 : 0) + "|exp|" + exportSelect.SelectedIndex + "|file|" + fileMask;
 
-		File.WriteAllText("settings.txt", file);
-	}
 	private void LoadConfig() {
 		if (!File.Exists("config.txt"))
 			return;
@@ -648,7 +642,8 @@ public partial class GeneratorForm : Form {
 					case "detailMax": detailMax = n; break;
 					case "saturateMax": saturateMax = n; break;
 					case "brightnessMax": brightnessMax = n; break;
-					case "bloomMax": bloomMax = n; break;
+					case "binMax": binMax = n; break;
+					case "L2Max": l2Max = n; break;
 					case "blurMax": blurMax = n; break;
 				}
 			}
@@ -662,6 +657,39 @@ public partial class GeneratorForm : Form {
 				}
 			}
 		}
+	}
+	private void SaveSettings() {
+		var f = generator.GetFractal();
+		var file = "";
+		foreach (var c in generator.Colors) {
+			var p = "palette|" + c.Item1 + ";";
+			foreach (var i in c.Item2)
+				p += i.X + ":" + i.Y + ":" + i.Z + ";";
+			file += p[..^1] + "|";
+		}
+		file += "fractal|" + fractalSelect.Text + "|path|" + f.Path
+			+ "|preview|" + (previewMode ? 1 : 0) + "|edit|" + (editorPanel.Visible ? 1 : 0)
+			+ "|angle|" + generator.SelectedChildAngle + "|color|" + generator.SelectedChildColor
+			+ "|angles|" + generator.SelectedChildAngles + "|colors|" + generator.SelectedChildColors
+			+ "|cut|" + cutSelect.SelectedIndex + "|seed|" + cutparamBox.Text
+			+ "|w|" + resX.Text + "|h|" + resY.Text + "|res|" + resSelect.SelectedIndex
+			+ "|paletteSelect|" + paletteSelect.SelectedIndex + "|dithering|" + (ditherBox.Enabled ? 1 : 0)
+			+ "|period|" + periodBox.Text + "|periodMul|" + periodMultiplierBox.Text
+			+ "|zoom|" + zoomSelect.SelectedIndex + "|defaultZoom|" + defaultZoomBox.Text
+			+ "|hue|" + hueSelect.SelectedIndex + "|defaultHue|" + defaultHue.Text + "|hueMul|" + hueSpeedBox.Text
+			+ "|spin|" + spinSelect.SelectedIndex + "|defaultAngle|" + defaultAngleBox.Text + "|spinMul|" + spinSpeedBox.Text
+			+ "|amb|" + ambBox.Text + "|noise|" + noiseBox.Text + "|void|" + voidBox.Text
+			+ "|detail|" + detailBox.Text + "|saturate|" + saturateBox.Text + "|brightness|" + brightnessBox.Text
+			+ "|bloom|" + bloomBox.Text + "|blur|" + blurBox.Text
+			+ "|child|" + zoomChildBox.Text + "|abort|" + abortBox.Text
+			+ "|delay|" + generator.SelectedDelay + "|fps|" + generator.SelectedFps + "|timing|" + timingSelect.SelectedIndex
+			+ "|parallel|" + parallelTypeSelect.SelectedIndex + "|threads|" + threadsBox.Text
+			+ "|cache|" + (cacheBox.Checked ? 1 : 0) + "|cachestripe|" + stripeBox.Text + "|cachebin|" + binBox.Text + "|cachesize|" + l2Box.Text
+			+ "|gpuvoid|" + voidSelect.SelectedIndex + "|gpudraw|" + drawSelect.SelectedIndex
+			+ "|png|" + encodePngSelect.SelectedIndex + "|gif|" + encodeGifSelect.SelectedIndex + "|gen|" + generationSelect.SelectedIndex
+			+ "|ani|" + (animated ? 1 : 0) + "|exp|" + exportSelect.SelectedIndex + "|file|" + fileMask;
+
+		File.WriteAllText("settings.txt", file);
 	}
 	private void LoadSettings() {
 		isGifReady = 0;
@@ -792,18 +820,25 @@ public partial class GeneratorForm : Form {
 				case "bloom": bloomBox.Text = v; break;
 				case "blur": blurBox.Text = v; break;
 				case "child": zoomChildBox.Text = v; break;
-				case "parallel": parallelTypeSelect.SelectedIndex = Math.Min(parallelTypeSelect.Items.Count - 1, n); break;
-				case "threads": threadsBox.Text = v; break;
+				case "abort": abortBox.Text = v; break;
 				case "delay": generator.SelectedDelay = (ushort)n; break;
 				case "fps": generator.SelectedFps = (ushort)n; break;
 				case "timing": timingSelect.SelectedIndex = Math.Min(parallelTypeSelect.Items.Count - 1, n); TimingSelect_SelectedIndexChanged(null, null); break;
-				case "abort": abortBox.Text = v; break;
+				case "parallel": parallelTypeSelect.SelectedIndex = Math.Min(parallelTypeSelect.Items.Count - 1, n); break;
+				case "threads": threadsBox.Text = v; break;
+				case "cache": if (p) cacheBox.Checked = n == 1; break;
+				case "cachestripe": if (p) stripeBox.Text = v; break;
+				case "cachebin": if (p) binBox.Text = v; break;
+				case "cachesize": if (p) l2Box.Text = v; break;
+				case "guivoid": if (p) voidSelect.SelectedIndex = Math.Min(voidSelect.Items.Count - 1, n); break;
+				case "guidraw": if (p) drawSelect.SelectedIndex = Math.Min(drawSelect.Items.Count - 1, n); break;
 				case "png": if (p) encodePngSelect.SelectedIndex = Math.Min(encodePngSelect.Items.Count - 1, n); break;
 				case "gif": if (p) encodeGifSelect.SelectedIndex = Math.Min(encodeGifSelect.Items.Count - 1, n); break;
 				case "gen": if (p) generationSelect.SelectedIndex = Math.Min(generationSelect.Items.Count - 1, n); break;
 				case "ani": if (p) animated = n <= 0; AnimateButton_Click(null, null); break;
 				case "exp": if (p) exportSelect.SelectedIndex = Math.Min(exportSelect.Items.Count - 1, n); break;
-				case "file": if (p) fileMask = (ushort)n;
+				case "file":
+					if (p) fileMask = (ushort)n;
 					if (p) {
 						fileMask = (ushort)n;
 						FillSelectFile();
@@ -869,7 +904,13 @@ public partial class GeneratorForm : Form {
 			width = 80;
 		if (!short.TryParse(rxy[1], out height))
 			height = 80;
-		return generator.SelectedWidth != width || generator.SelectedHeight != height;
+		if (generator.SelectedWidth != width || generator.SelectedHeight != height) {
+			// Number of threads can change the maximum of these:
+			BloomBox_TextChanged(null, null);
+			StripeBox_TextChanged(null, null);
+			return true;
+		}
+		return false;
 	}
 	private void GeneratorForm_FormClosing(object sender, FormClosingEventArgs e) {
 		Close(e);
@@ -1335,9 +1376,9 @@ public partial class GeneratorForm : Form {
 		generator.SelectDithering(ditherBox.Checked);
 		QueueReset();
 	}
-	private void PeriodBox_TextChanged(object sender, EventArgs e) 
+	private void PeriodBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(periodBox, ref generator.SelectedPeriod, (ushort)1, (ushort)1000);
-	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e) 
+	private void PeriodMultiplierBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(periodMultiplierBox, ref generator.SelectedPeriodMultiplier, (ushort)1, (ushort)10);
 	private void ZoomSelect_SelectedIndexChanged(object sender, EventArgs e)
 		=> DiffApply((short)(zoomSelect.SelectedIndex - 2), ref generator.SelectedZoom);
@@ -1374,8 +1415,27 @@ public partial class GeneratorForm : Form {
 		=> ParseClampReTextMulDiffApply(saturateBox, ref generator.SelectedSaturate, 0, saturateMax, 1.0f / saturateMax);
 	private void BrightnessBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(brightnessBox, ref generator.SelectedBrightness, (ushort)0, brightnessMax);
-	private void BloomBox_TextChanged(object sender, EventArgs e)
-		=> ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, bloomMax, bloomMul);
+	private void BloomBox_TextChanged(object sender, EventArgs e) {
+		AdjustBloomMax();
+		if (ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, bloomMax, bloomMul))
+			return;
+		// Number of threads can change the maximum of these:
+		StripeBox_TextChanged(null, null);
+	}
+	private void AdjustBloomMax() {
+		if (generator.SelectedWidth + generator.SelectedHeight <= 0)
+			return;
+		byte OnePixelBytes = 12;
+		var maxCache = ((.85f * (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes)) / (OnePixelBytes * generator.SelectedWidth) + 1 - generator.SelectedStripeHeight) / 2;
+		if (maxTasks <= 0) {
+			bloomMax = (ushort)maxCache;
+			return;
+		}
+		bloomMax = (ushort)(bloomMul * Math.Min(
+			generator.SelectedHeight / (6 * maxTasks) - 1, // Should be enough run all the threads of each in parallel
+			maxCache // the cache size should fit a strip wide as Width, and Tall as BloomDiameter+StripHeight
+		));
+	}
 	private void BlurBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(blurBox, ref generator.SelectedBlur, (ushort)0, blurMax);
 	private void ZoomChildBox_TextChanged(object sender, EventArgs e) {
@@ -1384,18 +1444,10 @@ public partial class GeneratorForm : Form {
 			return;
 		QueueReset();
 	}
-	private void ParallelTypeSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		/*if ((FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex == FractalGenerator.ParallelType.OfDepth) {
-			_ = MessageBox.Show(
-				"Warning: this parallelism mode might be fast at rendering a single image, but it messes up few pixels.\nSo if you want highest quality the OfAnimation is recommended.",
-				"Warning",
-				MessageBoxButtons.OK,
-				MessageBoxIcon.Warning);
-		}*/
-		generator.SelectedParallelType = (FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex;
-	}
-	private void Parallel_Changed(object sender, EventArgs e) {
-		SetupParallel(ParseClampReText(threadsBox, (short)FractalGenerator.MinTasks, (short)Math.Max(1, threadsMul * maxTasks)));
+	private void AbortBox_TextChanged(object sender, EventArgs e)
+	=> abortDelay = ParseClampReText(abortBox, (ushort)0, (ushort)10000);
+	private void EncodePngSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		generator.SelectedPngType = (FractalGenerator.PngType)Math.Max(0, encodePngSelect.SelectedIndex);
 	}
 	private void TimingSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		toolTips.SetToolTip(timingBox, timingSelect.SelectedIndex switch {
@@ -1434,10 +1486,66 @@ public partial class GeneratorForm : Form {
 				break;
 		}
 	}
-	private void AbortBox_TextChanged(object sender, EventArgs e)
-		=> abortDelay = ParseClampReText(abortBox, (ushort)0, (ushort)10000);
-	private void EncodePngSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		generator.SelectedPngType = (FractalGenerator.PngType)Math.Max(0, encodePngSelect.SelectedIndex);
+	private void ParallelTypeSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		/*if ((FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex == FractalGenerator.ParallelType.OfDepth) {
+			_ = MessageBox.Show(
+				"Warning: this parallelism mode might be fast at rendering a single image, but it messes up few pixels.\nSo if you want highest quality the OfAnimation is recommended.",
+				"Warning",
+				MessageBoxButtons.OK,
+				MessageBoxIcon.Warning);
+		}*/
+		generator.SelectedParallelType = (FractalGenerator.ParallelType)parallelTypeSelect.SelectedIndex;
+	}
+	private void Parallel_Changed(object sender, EventArgs e) {
+		SetupParallel(ParseClampReText(threadsBox, (short)FractalGenerator.MinTasks, (short)Math.Max(1, threadsMul * maxTasks)));
+		// Number of threads can change the maximum of these:
+		BloomBox_TextChanged(null, null);
+		StripeBox_TextChanged(null, null);
+	}
+	private void CacheBox_CheckedChanged(object sender, EventArgs e) {
+		cacheBox.Text = cacheBox.Checked ? "Enabled" : "Disabled";
+		generator.SelectedCacheOpt = cacheBox.Checked;
+		QueueReset();
+	}
+	private void StripeBox_TextChanged(object sender, EventArgs e) {
+		AdjustStripeMax();
+		ParseClampReTextDiffApply(stripeBox, ref generator.SelectedStripeHeight, (ushort)0, stripeMax);
+		BloomBox_TextChanged(null, null);
+	}
+	private void AdjustStripeMax() {
+		byte OnePixelBytes = 12;
+
+		var cache = (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes) * .85f / (OnePixelBytes * generator.SelectedWidth) - 2 * generator.SelectedBloom + 1;
+		if (maxTasks <= 0) {
+			stripeMax = (ushort)Math.Ceiling(cache);
+			return;
+		}
+		stripeMax = (ushort)Math.Min(
+			generator.SelectedHeight / maxTasks * 5, // Should be enough run all the threads of each in parallel
+			cache // the cache size should fit a strip wide as Width, and Tall as BloomDiameter+StripHeight
+		);
+	}
+	private void BinBox_TextChanged(object sender, EventArgs e) {
+		ParseClampReTextDiffApply(binBox, ref generator.SelectedBinSize, (ushort)0, binMax);
+	}
+	private void L2Box_TextChanged(object sender, EventArgs e) {
+		ParseClampReTextDiffApply(l2Box, ref generator.SelectedL2Kilobytes, (ushort)0, l2Max);
+	}
+	private void VoidSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		var prev = generator.SelectedGpuVoidType;
+		var now = (FractalGenerator.GpuVoidType)Math.Max(0, voidSelect.SelectedIndex);
+		if (generator.SelectedGpuVoidType == now)
+			return;
+		generator.SelectedGpuVoidType = now;
+		QueueReset();
+	}
+	private void DrawSelect_SelectedIndexChanged(object sender, EventArgs e) {
+		var prev = generator.SelectedGpuDrawType;
+		var now = (FractalGenerator.GpuDrawType)Math.Max(0, drawSelect.SelectedIndex);
+		if (generator.SelectedGpuDrawType == now)
+			return;
+		generator.SelectedGpuDrawType = now;
+		QueueReset();
 	}
 	private void EncodeGifSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		var prev = generator.SelectedGifType;
@@ -2849,4 +2957,5 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 	}
 	#endregion
+
 }

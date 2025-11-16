@@ -21,14 +21,8 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ComputeSharp;
 using System.Runtime.InteropServices;
-using System.Windows.Media.Media3D;
 
 namespace RgbFractalGenCs;
-
-[StructLayout(LayoutKind.Sequential)]
-public struct I {
-	public int V;
-}
 
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal partial class FractalGenerator {
@@ -98,8 +92,8 @@ internal partial class FractalGenerator {
 		internal TaskState State;       // States of Animation Tasks
 		internal Vector3[] Buffer;    // Buffer for points to print into bmp
 		internal float[] Kernel;
-		internal I[] VoidDepth;       // Depths of Void
-		internal I[] VoidDepthN;       // Depths of Void
+		internal int[] VoidDepth;       // Depths of Void
+		internal int[] VoidDepthN;       // Depths of Void
 		internal Vector3[] VoidNoise; // Randomized noise samples for the void noise
 		internal Float3[] VoidNoiseF; // Randomized noise samples for the void nois
 		internal int[]
@@ -123,7 +117,8 @@ internal partial class FractalGenerator {
 			PreIterate;                 // (childSize, childDetail, childSpread, (childX,childY)[])
 
 
-		internal ushort StripeHeight, StripeCount, PredictedBinsPerStripe;
+		internal ushort StripeHeight, StripeCount;
+		internal uint PredictedBinsPerStripe;
 		private (long, float, float, byte)[][][] bin;
 		private ushort[] filledBins; // Which bidId is being filled in this stripeId?
 		private uint[] filledStripes; // How many dots are in the latest bin of this stripeId?
@@ -460,9 +455,10 @@ internal partial class FractalGenerator {
 		SelectedAmbient,                // Void ambient strength (-1 - MaxAmbient)
 		SelectedMaxTasks;               // Maximum allowed total tasks
 	internal ushort
-		SelectedBinKilobytes = 0,		// Override automatic BinSize (0 = automatic)
+		SelectedL2Kilobytes = 0,		// Override L2 cache size (0 = automatic guess)
+		SelectedBinSize = 0,		// Override automatic BinSize (0 = automatic)
 		SelectedStripeHeight = 0,		// Override automatic StripeHeight (0 = automatic) 
-		SelectedMaxPreviewFrames = 0,	// How many preview frames are allowed? (0 to disable preview)
+		SelectedMaxPreviewFrames = 16,	// How many preview frames are allowed? (0 to disable preview)
 		SelectedLessPreviewFrames = 0,	// How many highest resolution preview frames get skipped?
 		SelectedWidth,                  // Resolution width (1-X)
 		SelectedHeight,                 // Resolution height (1-X)
@@ -639,6 +635,8 @@ internal partial class FractalGenerator {
 
 	internal event Action
 		UpdatePreview;
+	internal event Action
+		UpdateCache;
 
 	private readonly object
 		taskLock = new();			// Monitor lock
@@ -661,7 +659,7 @@ internal partial class FractalGenerator {
 	#region Delegates
 	// Row:
 	unsafe private static void Noise(FractalTask drawTask, int y, ref byte* ptr, FractalGenerator self) {
-		fixed (I* voidY = &drawTask.VoidDepth[y]) {
+		fixed (int* voidY = &drawTask.VoidDepth[y]) {
 			fixed (Vector3* buffY = &drawTask.Buffer[y]) {
 				//var buffY = drawTask.Buffer[y];
 				var fy = (float)y / (self.allocVoid * drawTask.ApplyWidth);
@@ -672,7 +670,7 @@ internal partial class FractalGenerator {
 				for (var x = 0; x < drawTask.ApplyWidth; ++x) {
 					var fx = (float)x / self.allocVoid;
 					var startX = (int)Math.Floor(fx);
-					float voidAmb = voidY[x].V / drawTask.VoidDepthMax,
+					float voidAmb = voidY[x] / drawTask.VoidDepthMax,
 						ax = fx - startX, ox = 1f - ax, b0 = ox * oy, b1 = ax * oy, b2 = ox * ay, b3 = ax * ay;
 					self.ditherFunc(ApplyAmbientNoise(
 						self.saturateFunc(Normalize(buffY[x], drawTask.LightNormalizer), self.SelectedSaturate),
@@ -685,7 +683,7 @@ internal partial class FractalGenerator {
 		}
 	}
 	unsafe private static void NoNoise(FractalTask drawTask, int y, ref byte* ptr, FractalGenerator self) {
-		fixed (int* voidY = &drawTask.VoidDepth[y].V) {
+		fixed (int* voidY = &drawTask.VoidDepth[y]) {
 			fixed (Vector3* buffY = &drawTask.Buffer[y]) {
 				//var buffY = drawTask.Buffer[y];
 				for (var x = 0; x < drawTask.ApplyWidth; ++x)
@@ -762,6 +760,43 @@ internal partial class FractalGenerator {
 	#endregion
 
 	#region Init
+	internal static void WarmUpShaders() {
+		var d = GraphicsDevice.GetDefault();
+		// Minimal buffers just to trigger pipeline creation
+		var wi = d.AllocateReadWriteBuffer<int>(9);
+		var wf = d.AllocateReadWriteBuffer<Float3>(1);
+		var rf = d.AllocateReadOnlyBuffer<Float3>(1);
+		Int2 i2 = new(1, 1);
+		d.For(1, 1, new VoidBfs(wi, wi, wi, 1));
+		d.For(1, 1, new JumpFlood(wi, wi, 1, 1, 1));
+		d.For(1, 1, new JumpFloodBoundlessOptimized(wi, wi, 1, 1));
+		d.For(1, 1, new PipeAmbient(wf, 1, wi, 1, 1));
+
+		d.For(1, 1, new PipeBytes(wf, wi, 1));
+		d.For(1, 1, new PipeBytesDither(wf, wi, 1));
+		d.For(1, 1, new PipeNoise(wf, 1, wi, 1, 1, rf, i2));
+		d.For(1, 1, new PipeNormalize(wf, rf, 1, 1f));
+		d.For(1, 1, new PipeNormalizeSaturate(wf, rf, 1, 1f, 1f));
+
+		d.For(1, 1, new DrawAmbient(wi, rf, 1, 1f, wi, 1, 1f));
+		d.For(1, 1, new DrawAmbientDither(wi, rf, 1, 1f, wi, 1, 1f));
+		d.For(1, 1, new DrawAmbientSaturate(wi, rf, 1, 1f, wi, 1, 1f, 1f));
+		d.For(1, 1, new DrawAmbientSaturateDither(wi, rf, 1, 1f, wi, 1, 1f, 1f));
+
+		d.For(1, 1, new Draw(wi, rf, 1, 1f));
+		d.For(1, 1, new DrawDither(wi, rf, 1, 1f));
+		d.For(1, 1, new DrawSaturate(wi, rf, 1, 1f, 1f));
+		d.For(1, 1, new DrawSaturateDither(wi, rf, 1, 1f, 1f));
+
+		d.For(1, 1, new DrawNoise(wi, rf, 1, 1f, wi, 1, 1f, rf, i2));
+		d.For(1, 1, new DrawNoiseDither(wi, rf, 1, 1f, wi, 1, 1f, rf, i2));
+		d.For(1, 1, new DrawNoiseSaturate(wi, rf, 1, 1f, wi, 1, 1f, rf, i2, 1f));
+		d.For(1, 1, new DrawNoiseSaturateDither(wi, rf, 1, 1f, wi, 1, 1f, rf, i2, 1f));
+
+		wi.Dispose();
+		wf.Dispose();
+		rf.Dispose();
+	}
 	internal FractalGenerator() {
 		filePrefix = "guid" + Guid.NewGuid().ToString("N");
 		SelectedParallelType = ParallelType.OfAnimation;
@@ -1778,25 +1813,7 @@ internal partial class FractalGenerator {
 	}
 	#endregion
 
-	static readonly object ShaderInitLock = new();
 	private void GenerateAnimation() {
-
-		static void WarmUpShaders() {
-			lock (ShaderInitLock) {
-				var d = GraphicsDevice.GetDefault();
-				// Minimal buffers just to trigger pipeline creation
-				var tmpIn = d.AllocateReadWriteBuffer<I>(1);
-				var tmpOut = d.AllocateReadWriteBuffer<I>(1);
-				var tmpMax = d.AllocateReadWriteBuffer<I>(1);
-				var warmup = new VoidBfs(tmpIn, tmpOut, tmpMax, 1);
-				d.For(1, 1, warmup);
-				tmpIn.Dispose();
-				tmpOut.Dispose();
-				tmpMax.Dispose();
-				//GraphicsDevice.GetDefault().WarmUpShader<RgbFractalShaders.VoidBfs>();
-			}
-		}
-		WarmUpShaders();
 
 		#region GeneralAnimation_Implementation
 #if CustomDebug
@@ -1806,8 +1823,7 @@ internal partial class FractalGenerator {
 		startTime = new();
 		startTime.Start();
 #endif
-		// Are we using the new cache/GPU optimizations?
-		allocCacheOpt = SelectedCacheOpt;
+		// Are we using the new GPU optimizations?
 		allocGpuVoidType = SelectedGpuVoidType;
 		allocGpuDrawType = SelectedGpuDrawType;
 
@@ -1945,16 +1961,6 @@ internal partial class FractalGenerator {
 			for (var i = frames; 0 <= --i; lockedBmp[i] = false) {
 			}
 		}
-		// Precalculate the caching:
-		if (allocCacheOpt) {
-			var previewTask = tasks[0];
-			previewTask.BitmapIndex = previewFrames;
-			PreviewResolution(previewTask);
-			CalculateCache(previewTask);
-			allocBinSize = previewTask.BinSize;
-			allocStripeHeight = previewTask.StripeHeight;
-			allocStripeCount = previewTask.StripeCount;
-		}
 
 		// Setup reset BitmapStates
 		for (var b = frames; b >= 0; bitmapState[b--] = BitmapState.Queued) { }
@@ -1993,6 +1999,23 @@ internal partial class FractalGenerator {
 #endif
 		// Generate the images
 		while (!token.IsCancellationRequested) {
+			void NewCache() {
+				// Precalculate the caching:
+				if (allocCacheOpt = SelectedCacheOpt) {
+					var previewTask = tasks[0];
+					previewTask.BitmapIndex = previewFrames;
+					PreviewResolution(previewTask);
+					CalculateCache(previewTask);
+					allocBinSize = previewTask.BinSize;
+					allocStripeHeight = previewTask.StripeHeight;
+					allocStripeCount = previewTask.StripeCount;
+				} else {
+					allocBinSize = 0;
+					allocStripeHeight = 0;
+					allocStripeCount = 0;
+				}
+				UpdateCache?.Invoke();
+			}
 			// if we need to start/restart gif encoder:
 			if (SelectedGifType != allocGifType || SelectedDelay != allocDelay) {
 				// TODO this doesn't work right, the TryWrite keeps crashing that frameIndex was supplied twice or something
@@ -2024,7 +2047,9 @@ internal partial class FractalGenerator {
 					NewBuffer(task);
 				}
 				SetMaxIterations();
+				NewCache();
 			}
+
 			/*if (SelectedWidth != allocWidth) {
 				for (short t = 0; t < allocMaxTasks; tasks[t++].Kernel = new float[SelectedWidth]) { }
 			}*/
@@ -2035,6 +2060,7 @@ internal partial class FractalGenerator {
 				noiseHeight = (ushort)(SelectedHeight / allocVoid + 2);
 				for (short t = 0; t < allocMaxTasks; NewBuffer(tasks[t++])) { }
 				rect = new(0, 0, allocWidth = (short)SelectedWidth, allocHeight = (short)SelectedHeight);
+				NewCache();
 			}
 			// reallocate noise buffer if the noise resolution has changed (but YX did not, so keep tose buffers)
 			if (allocVoid != SelectedVoid + 1) {
@@ -2051,6 +2077,13 @@ internal partial class FractalGenerator {
 						tasks[t].VoidNoise = null;
 					}
 			}
+			// If only Cache settings changed, then also update them
+			if (SelectedBinSize * 100 != allocBinSize || SelectedStripeHeight != allocStripeHeight
+				|| SelectedCacheOpt != allocCacheOpt || SelectedBinSize * SelectedStripeHeight == 0) // switched on/off or automatic
+			//if ((SelectedBinSize * 100 != allocBinSize || SelectedStripeHeight != allocStripeHeight) && SelectedBinSize + SelectedStripeHeight > 0 // Changed overrride settings
+			//	|| SelectedCacheOpt != allocCacheOpt || SelectedBinSize * SelectedStripeHeight == 0) // switched on/off or automatic
+			NewCache();
+			
 			// remember how many iterations deep are we going to go.
 			allocMaxIterations = maxIterations;
 			// Let this master thread sleep fo a tiny bit if nothing needs to be done (no more frames to generate or encode)
@@ -2088,8 +2121,8 @@ internal partial class FractalGenerator {
 			// Initialized new buffer data (new task or height changed)
 			var area = SelectedWidth * SelectedHeight;
 			task.VoidQueue = new int[area];
-			task.VoidDepth = new I[area];
-			task.VoidDepthN = new I[area];
+			task.VoidDepth = new int[area];
+			task.VoidDepthN = new int[area];
 			task.Buffer = new Vector3[area];
 			if (SelectedGpuDrawType == GpuDrawType.CPU) {
 				task.VoidNoise = new Vector3[noiseWidth * noiseHeight];
@@ -2118,18 +2151,13 @@ internal partial class FractalGenerator {
 				}
 			return 0;
 			}*/
-			int GetEstimatedL2CachePerCore() {
-				int cores = Environment.ProcessorCount;
-				if (cores <= 4) return 256 * 1024;
-				if (cores <= 8) return 512 * 1024;
-				return 1024 * 1024; // 1 MB per core for modern CPUs
-			}
-			if (SelectedBinKilobytes > 0 && SelectedStripeHeight > 0) {
-				task.BinSize = (uint)(SelectedBinKilobytes * 1024);
+
+			if (SelectedBinSize > 0 && SelectedStripeHeight > 0) {
+				task.BinSize = (uint)(SelectedBinSize * 100); // 
 				task.StripeHeight = (ushort)Math.Ceiling((float)SelectedStripeHeight * task.ApplyHeight / SelectedHeight);
 				task.StripeCount = (ushort)Math.Ceiling((float)task.ApplyHeight / task.StripeHeight);
 			} else {
-				task.ChooseStripeAndBin(allocMaxTasks, GetEstimatedL2CachePerCore(), out task.StripeCount, out task.BinSize);
+				task.ChooseStripeAndBin(allocMaxTasks, (long)(SelectedL2Kilobytes == 0 ? GetEstimatedL2CachePerCore() : 1024 * SelectedL2Kilobytes), out task.StripeCount, out task.BinSize);
 				task.StripeHeight = (ushort)Math.Ceiling((float)task.ApplyHeight / task.StripeCount);
 			}
 		}
@@ -2440,12 +2468,15 @@ internal partial class FractalGenerator {
 						}
 						return sum / 2;
 					}
-					float FractalArea = Math.Max(GetConvexHull(), task.ApplyWidth * task.ApplyHeight);
-
-					float DotDensityPerPixel = (float)Math.Pow(_AverageChildCount, PreSimulatedDepth) * (task.ApplyWidth * task.ApplyHeight / FractalArea);
-					task.PredictedBinsPerStripe = (ushort)(1.5 * DotDensityPerPixel * task.StripeHeight * task.ApplyWidth / (task.BinSize * (sizeof(float) * 2 + sizeof(long) + sizeof(byte))));
+					
+					// Total number of dots divided by fractal convex hull area (or bitmap size if the area is smaller, but it shouldn't)
+					float DotDensityPerPixel = (float)Math.Pow(_AverageChildCount, PreSimulatedDepth) / Math.Max(GetConvexHull(), task.ApplyWidth * task.ApplyHeight);
+					// BinBytes = BinSize * (sizeof(float) * 2 + sizeof(long) + sizeof(byte)))
+					// How many dots to be expected per stripe * 2 / bin capacity  // 2 to account for irregular distribution
+					task.PredictedBinsPerStripe = (ushort)Math.Ceiling(2 * DotDensityPerPixel * task.StripeHeight * task.ApplyWidth / task.BinSize);
 					// We will use OfDepth, if generating previews, or if we selected so and have enough allowed threads for that
 					if (ofDepth) {
+						// Of depth may split areas of bitmap to threads, so each thread will only acccess about a square root of thread count (at least)
 						task.PredictedBinsPerStripe = (ushort)Math.Ceiling(task.PredictedBinsPerStripe / Math.Sqrt(allocMaxTasks));
 						task.NewBin(task);
 						tuples[0] = (dotsTaskIndex, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startSeed, 0);
@@ -3201,11 +3232,10 @@ internal partial class FractalGenerator {
 			#endregion
 		}
 		void GenerateImage(FractalTask task) {
-			ReadWriteBuffer<I> v = null;
+			ReadWriteBuffer<int> v = null;
 			void DisposeDraw() {
 				// if we get cancelled we should dispose this buffer if we are still keeping it for GpuDraw
-				if (allocGpuDrawType > GpuDrawType.CPU)
-					v.Dispose();
+				v?.Dispose();
 				task.State = TaskState.Done;
 			}
 #if CustomDebug
@@ -3223,6 +3253,7 @@ internal partial class FractalGenerator {
 			int i = 0;
 			Vector3 buffI;
 			float max;
+			bool IsAmbient = false;
 			// find the highest seed value
 			float GetMax(int i) {
 				buffI = buffT[i];
@@ -3230,7 +3261,6 @@ internal partial class FractalGenerator {
 				task.LightNormalizer = Math.Max(task.LightNormalizer, max);
 				return max;
 			}
-			
 			// Void Depth:
 			if (allocGpuVoidType > GpuVoidType.CPU) {
 				var voidTN = task.VoidDepthN;
@@ -3238,38 +3268,39 @@ internal partial class FractalGenerator {
 				int maxSize = Math.Max(task.ApplyWidth, task.ApplyHeight) + 1;
 				// prefill the buffer and also figure out if it's voidless
 				seeds += task.ApplyWidth * 2 + task.ApplyHeight * 2 - 4; // add all edges
-				for (int x = i + task.ApplyWidth; i < x; voidTN[i].V = voidT[i++].V = 0)
+				for (int x = i + task.ApplyWidth; i < x; voidTN[i] = voidT[i++] = 0)
 					GetMax(i); // top edge
-				for (int y = i + task.ApplyWidth * (task.ApplyHeight - 2); i < y; voidTN[i].V = voidT[i++].V = 0) {
+				for (int y = i + task.ApplyWidth * (task.ApplyHeight - 2); i < y; voidTN[i] = voidT[i++] = 0) {
 					// if (token.IsCancellationRequested) { task.State = TaskState.Done; return; }
-					GetMax(i); voidTN[i].V = voidT[i++].V = 0; // left edge
+					GetMax(i); voidTN[i] = voidT[i++] = 0; // left edge
 					int x = i + task.ApplyWidth - 2; // insides
 					while (i < x)
 						if (GetMax(i) > 0) {
-							voidTN[i].V = voidT[i++].V = 0; ++seeds;
-						} else voidTN[i].V = voidT[i++].V = maxSize;
+							voidTN[i] = voidT[i++] = 0; ++seeds;
+						} else voidTN[i] = voidT[i++] = maxSize;
 					GetMax(i); // right edge
 				}
-				for (int x = i + task.ApplyWidth; i < x; voidTN[i].V = voidT[i++].V = 0)
+				for (int x = i + task.ApplyWidth; i < x; voidTN[i] = voidT[i++] = 0)
 					GetMax(i); // bottom edge
 				if (seeds < task.ApplyWidth * task.ApplyHeight) {
+					IsAmbient = true;
 					// if there was at least 1 pixel of void, do the BFS:
 					task.VoidDepthMax = maxSize;
 					int innerWidth = task.ApplyWidth - 2;
 					int innerHeight = task.ApplyHeight - 2;
-					var outB = new I[1] { new() { V = 1 } };
+					var outB = new int[1] { 1 };
 					// Wrap into GPU buffers
 					v = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(voidT);
 					var bufferVoidN = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(voidTN);
 					var outMaxBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(outB);
 					static void Swap<T>(ref T a, ref T b) => (b, a) = (a, b);
 					void BFS() {
-						outB[0].V = 1;
+						outB[0] = 1;
 						outMaxBuffer.CopyFrom(outB);
 						GraphicsDevice.GetDefault().For(innerWidth, innerHeight, new VoidBfs(v, bufferVoidN, outMaxBuffer, task.ApplyWidth));
 						Swap(ref v, ref bufferVoidN);
 						outMaxBuffer.CopyTo(outB);
-						task.VoidDepthMax = outB[0].V;
+						task.VoidDepthMax = outB[0];
 					}
 					void DisposeBuffers() {
 						bufferVoidN.Dispose();
@@ -3325,38 +3356,39 @@ internal partial class FractalGenerator {
 				if (SelectedAmbient > 0) {
 					// Void Depth Seed points (no points, no borders), let the void depth generator know where to start incrementing the depth
 					short voidMax = 0;
-					for (int x = i + task.ApplyWidth; i < x; voidT[i++].V = 0) {
+					for (int x = i + task.ApplyWidth; i < x; voidT[i++] = 0) {
 						GetMax(i); queueT[queueE++] = i; // top edge
 					}
-					for (int y = i + task.ApplyWidth * (task.ApplyHeight - 2); i < y; voidT[i++].V = 0) {
+					for (int y = i + task.ApplyWidth * (task.ApplyHeight - 2); i < y; voidT[i++] = 0) {
 						// if (token.IsCancellationRequested) { task.State = TaskState.Done; return; }
-						GetMax(i); queueT[queueE++] = i; voidT[i++].V = 0; // left edge
+						GetMax(i); queueT[queueE++] = i; voidT[i++] = 0; // left edge
 						int x = i + task.ApplyWidth - 2; // insides
 						while (i < x) {
 							if (GetMax(i) > 0) {
 								queueT[queueE++] = i;
-								voidT[i++].V = 0;
-							} else voidT[i++].V = -1;
+								voidT[i++] = 0;
+							} else voidT[i++] = -1;
 						}
 						GetMax(i);  // right edge
 						queueT[queueE++] = i;
 					}
-					for (int x = i + task.ApplyWidth; i < x; voidT[i++].V = 0) {
+					for (int x = i + task.ApplyWidth; i < x; voidT[i++] = 0) {
 						GetMax(i); // bottom edge
 						queueT[queueE++] = i;
 					}
 					// Depth of Void (fill the void with incrementally larger values of depth, that will generate the grey areas)
 					if (queueE < task.ApplyWidth * task.ApplyHeight) {
+						IsAmbient = true;
 						// if fully filled then there are no voids at all, and we don't even need to dequeue anything
 						while (queueS < queueE) {
 							i = queueT[queueS++];
 							//short ym = (short)(y - 1), yp = (short)(y + 1), xm = (short)(x - 1), xp = (short)(x + 1);
-							int ip, voidYx = voidT[i].V + 1;
+							int ip, voidYx = voidT[i] + 1;
 							voidMax = Math.Max(voidMax, (short)voidYx);
-							if ((ip = i + 1) % task.ApplyWidth > 0 && voidT[ip].V == -1) { voidT[ip].V = voidYx; queueT[queueE++] = ip; }
-							if (i % task.ApplyWidth > 0 && voidT[ip = i - 1].V == -1) { voidT[ip].V = voidYx; queueT[queueE++] = ip; }
-							if ((ip = i + task.ApplyWidth) < voidT.Length && voidT[ip].V == -1) { voidT[ip].V = voidYx; queueT[queueE++] = ip; }
-							if ((ip = i - task.ApplyWidth) >= 0 && voidT[ip].V == -1) { voidT[ip].V = voidYx; queueT[queueE++] = ip; }
+							if ((ip = i + 1) % task.ApplyWidth > 0 && voidT[ip] == -1) { voidT[ip] = voidYx; queueT[queueE++] = ip; }
+							if (i % task.ApplyWidth > 0 && voidT[ip = i - 1] == -1) { voidT[ip] = voidYx; queueT[queueE++] = ip; }
+							if ((ip = i + task.ApplyWidth) < voidT.Length && voidT[ip] == -1) { voidT[ip] = voidYx; queueT[queueE++] = ip; }
+							if ((ip = i - task.ApplyWidth) >= 0 && voidT[ip] == -1) { voidT[ip] = voidYx; queueT[queueE++] = ip; }
 						}
 					}
 					task.VoidDepthMax = voidMax;
@@ -3390,12 +3422,12 @@ internal partial class FractalGenerator {
 				? new Rectangle(0, 0, task.ApplyWidth, task.ApplyHeight) : rect
 			,allocGpuDrawType == GpuDrawType.CPU ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb).Scan0;
 			//var vw = task.ApplyHeight / allocVoid + 2;
-			int DrawType = allocNoise > 0 && allocGenerationType != GenerationType.HashSeeds ? 0 : (SelectedAmbient == 0 ? 8 : 4);
+			int DrawType = allocNoise > 0 && allocGenerationType != GenerationType.HashSeeds && IsAmbient ? 0 : (IsAmbient ? 4 : 8);
 			if (allocGpuDrawType == GpuDrawType.CPU) {
 				// Draw the generated pixel to bitmap data with CPU
 				unsafe {
 					var p = (byte*)(void*)bytes;
-					if (DrawType >= 8) {
+					if (DrawType < 4) {
 						// We are using Noise, so prepare the grid values for it:
 						for (var n = 0; n < noiseWidth * noiseHeight; ++n)
 							task.VoidNoise[n] = new Vector3(random.Next(allocNoise), random.Next(allocNoise), random.Next(allocNoise));
@@ -3416,55 +3448,93 @@ internal partial class FractalGenerator {
 				}
 			} else {
 				// Draw the generated pixels to bitmap data with GPU
-				unsafe {
-					for (var a = 0; a < noiseWidth * noiseHeight; ++a)
-						task.VoidNoiseF[a] = new Float3(random.Next(allocNoise), random.Next(allocNoise), random.Next(allocNoise));
+				ReadOnlyBuffer<Float3> n = null;
+				if (DrawType < 4) {
+					unsafe {
+						for (var a = 0; a < noiseWidth * noiseHeight; ++a)
+							task.VoidNoiseF[a] = new Float3(random.Next(allocNoise), random.Next(allocNoise), random.Next(allocNoise));
+					}
+					n = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(task.VoidNoiseF);
 				}
 				// Output texture (same size as your bitmap)
-				using var o = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<int>(bmp.Width * bmp.Height);
+				var o = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<int>(bmp.Width * bmp.Height);
 				// Reinterpret task.Buffer as Float3[]
-				using var b = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(MemoryMarshal.Cast<Vector3, Float3>(task.Buffer.AsSpan()));
-				using var n = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(task.VoidNoiseF);
-				if (allocGpuVoidType == GpuVoidType.CPU)
+				var b = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(MemoryMarshal.Cast<Vector3, Float3>(task.Buffer.AsSpan()));
+				
+				if (allocGpuVoidType == GpuVoidType.CPU && IsAmbient)
 					v = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(task.VoidDepth);
-				if (SelectedSaturate <= 0.0f)
-					DrawType += 2;
-				if (!allocDithering)
-					++DrawType;
 				Int2 np = new Int2(noiseWidth, allocVoid);
-				switch (DrawType) {
-					case 0: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawNoiseSaturateDither(o, b,
-						task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, n, np, SelectedSaturate)); break;
-					case 1: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawNoiseSaturate(o, b,
-						task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, n, np, SelectedSaturate)); break;
-					case 2: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawNoiseDither(o, b,
-						task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, n, np)); break;
-					case 3: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawNoise(o, b,
-						task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, n, np)); break;
+				if (allocGpuDrawType == GpuDrawType.Functions) {
+					// GPU Type: Switch functions
+					if (SelectedSaturate <= 0.0f)
+						DrawType += 2;
+					if (!allocDithering)
+						++DrawType;
+					switch (DrawType) {
+						case 0:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawNoiseSaturateDither(o, b,
+							task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, n, np, SelectedSaturate)); break;
+						case 1:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawNoiseSaturate(o, b,
+							task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, n, np, SelectedSaturate)); break;
+						case 2:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawNoiseDither(o, b,
+							task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, n, np)); break;
+						case 3:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawNoise(o, b,
+							task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, n, np)); break;
 
-					case 4: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawAmbientSaturateDither(o, b,
-						task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, SelectedSaturate)); break;
-					case 5: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawAmbientSaturate(o, b,
-						task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, SelectedSaturate)); break;
-					case 6: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawAmbientDither(o, b,
-						task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax)); break;
-					case 7: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawAmbient(o, b,
-						task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax)); break;
+						case 4:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawAmbientSaturateDither(o, b,
+							task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, SelectedSaturate)); break;
+						case 5:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawAmbientSaturate(o, b,
+							task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax, SelectedSaturate)); break;
+						case 6:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawAmbientDither(o, b,
+							task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax)); break;
+						case 7:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawAmbient(o, b,
+							task.ApplyWidth, task.LightNormalizer, v, SelectedAmbient, task.VoidDepthMax)); break;
 
-					case 8: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawSaturateDither(o, b,
-						task.ApplyWidth, task.LightNormalizer, SelectedSaturate)); break;
-					case 9: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawSaturate(o, b,
-						task.ApplyWidth, task.LightNormalizer, SelectedSaturate)); break;
-					case 10: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawDither(o, b,
-						task.ApplyWidth, task.LightNormalizer)); break;
-					case 11: GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new Draw(o, b,
-						task.ApplyWidth, task.LightNormalizer)); break;
+						case 8:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawSaturateDither(o, b,
+							task.ApplyWidth, task.LightNormalizer, SelectedSaturate)); break;
+						case 9:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawSaturate(o, b,
+							task.ApplyWidth, task.LightNormalizer, SelectedSaturate)); break;
+						case 10:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new DrawDither(o, b,
+							task.ApplyWidth, task.LightNormalizer)); break;
+						case 11:
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new Draw(o, b,
+							task.ApplyWidth, task.LightNormalizer)); break;
+					}
+				} else {
+					// GPU Type: Multi-pass pipeline
+					var ping = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<Float3>(task.VoidNoiseF);
+					if(SelectedSaturate <= 0.0f)
+						GraphicsDevice.GetDefault().For(bmp.Width * bmp.Height, new PipeNormalize(ping, b, task.ApplyWidth, task.LightNormalizer));
+					else GraphicsDevice.GetDefault().For(bmp.Width * bmp.Height, new PipeNormalizeSaturate(ping, b, task.ApplyWidth, task.LightNormalizer, SelectedSaturate));
+					if (v != null) {
+						if (DrawType < 4)
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeNoise(ping, task.ApplyWidth, v, SelectedAmbient, task.VoidDepthMax, n, np));
+						else
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeAmbient(ping, task.ApplyWidth, v, SelectedAmbient, task.VoidDepthMax));
+					}
+					if(allocDithering)
+						GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeBytesDither(ping, o, task.ApplyWidth));
+					else GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeBytes(ping, o, task.ApplyWidth));
+					ping.Dispose();
 				}
 				// Marshal the data into bitmap
 				var ints = MemoryMarshal.Cast<int, byte>(o.ToArray().AsSpan());
 				Marshal.Copy(ints.ToArray(), 0, bytes, ints.Length);
 				// finally dispose the buffer to not leak memory
-				v.Dispose();
+				v?.Dispose();
+				n?.Dispose();
+				b?.Dispose();
+				o?.Dispose();
 			}
 			
 			if (token.IsCancellationRequested) {
@@ -4155,6 +4225,12 @@ internal partial class FractalGenerator {
 	#endregion
 
 	#region Interface_Getters
+	internal static long GetEstimatedL2CachePerCore() {
+		int cores = Environment.ProcessorCount;
+		if (cores <= 4) return 256 * 1024;
+		if (cores <= 8) return 512 * 1024;
+		return 1024 * 1024; // 1 MB per core for modern CPUs
+	}
 	internal int GetMaxCutSeed()
 	{
 		if (SelectedCut < 0 || GetFractal().ChildCutFunction == null)
@@ -4190,7 +4266,6 @@ internal partial class FractalGenerator {
 	//GetTempGif();
 	internal Fractal.CutFunction GetCutFunction() 
 		=> GetFractal().ChildCutFunction == null? null : Fractal.CutFunctions[GetFractal().ChildCutFunction[SelectedCut].Item1].Item2;
-
 	internal bool IsCancelRequested() => token.IsCancellationRequested;
 
 	internal int GetCompleted() {
@@ -4202,5 +4277,30 @@ internal partial class FractalGenerator {
 			_ => 0,
 		};
 	}
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal string GetBinSize() {
+		uint b = allocBinSize, d = (b % 100) * 10;
+		b /= 100;
+		string p = "";
+		if (b >= 1000) {
+			d = b % 1000;
+			b /= 1000;
+			p = "K";
+		}
+		if(b >= 1000) {
+			d = b % 1000;
+			b /= 1000;
+			p = "M";
+		}
+		if (b >= 1000) {
+			d = b % 1000;
+			b /= 1000;
+			p = "B";
+		}
+		return p + b + "." + d.ToString("D4");
+	}
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal string GetStripeHeight() => allocStripeHeight.ToString();
+	
 	#endregion
 }

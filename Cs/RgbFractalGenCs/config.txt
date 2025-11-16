@@ -32,11 +32,13 @@ detailMul=0.1
 saturateMax=100
 //100 is 100%, more will overexpose, but will not overflow the colors
 brightnessMax=500
-//maximum size of bloom
-bloomMax=40
 //one step of bloom
 bloomMul=0.25
+//maximum allowed L2 Cache Size, in case you are in the future and 4096 is not enough anymore.
+L2Max=40
+//maximum allowed bin size in hundreds if 1000 is not enough anymore. (100 * 100 = 10K dots ~ 180kB of L2 Cache)
+binMax=100
 //maximum motion blur
-blurMax=40
+blurMax=4096
 // warning: setting this higher than 1 will likely not make it faster
 threadsMul=1.0

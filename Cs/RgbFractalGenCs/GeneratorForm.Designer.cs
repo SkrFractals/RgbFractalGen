@@ -91,6 +91,16 @@ namespace RgbFractalGenCs {
 			exportSelect = new ComboBox();
 			fileSelect = new ComboBox();
 			panel1 = new Panel();
+			gpuDLabel = new Label();
+			gpuVLabel = new Label();
+			stripeLabel = new Label();
+			binLabel = new Label();
+			cacheLabel = new Label();
+			cacheBox = new CheckBox();
+			stripeBox = new TextBox();
+			binBox = new TextBox();
+			voidSelect = new ComboBox();
+			drawSelect = new ComboBox();
 			ditherBox = new CheckBox();
 			ditherLabel = new Label();
 			updateBatchButton = new Button();
@@ -152,6 +162,8 @@ namespace RgbFractalGenCs {
 			debugPngBox = new CheckBox();
 			debugGifBox = new CheckBox();
 			loadExport = new OpenFileDialog();
+			l2Box = new TextBox();
+			l2Label = new Label();
 			helpPanel.SuspendLayout();
 			generatorPanel.SuspendLayout();
 			panel1.SuspendLayout();
@@ -600,7 +612,7 @@ namespace RgbFractalGenCs {
 			parallelTypeSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			parallelTypeSelect.FormattingEnabled = true;
 			parallelTypeSelect.Items.AddRange(new object[] { "Of Animation", "Of Depth" });
-			parallelTypeSelect.Location = new System.Drawing.Point(59, 436);
+			parallelTypeSelect.Location = new System.Drawing.Point(59, 494);
 			parallelTypeSelect.Name = "parallelTypeSelect";
 			parallelTypeSelect.Size = new System.Drawing.Size(99, 23);
 			parallelTypeSelect.TabIndex = 27;
@@ -662,7 +674,7 @@ namespace RgbFractalGenCs {
 			// 
 			// threadsBox
 			// 
-			threadsBox.Location = new System.Drawing.Point(164, 436);
+			threadsBox.Location = new System.Drawing.Point(164, 494);
 			threadsBox.Name = "threadsBox";
 			threadsBox.Size = new System.Drawing.Size(59, 23);
 			threadsBox.TabIndex = 28;
@@ -671,7 +683,7 @@ namespace RgbFractalGenCs {
 			// 
 			// abortBox
 			// 
-			abortBox.Location = new System.Drawing.Point(164, 494);
+			abortBox.Location = new System.Drawing.Point(164, 436);
 			abortBox.Margin = new Padding(4, 3, 4, 3);
 			abortBox.Name = "abortBox";
 			abortBox.Size = new System.Drawing.Size(59, 23);
@@ -715,7 +727,7 @@ namespace RgbFractalGenCs {
 			generationSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			generationSelect.FormattingEnabled = true;
 			generationSelect.Items.AddRange(new object[] { "Only Image", "Animation", "All Seeds" });
-			generationSelect.Location = new System.Drawing.Point(115, 581);
+			generationSelect.Location = new System.Drawing.Point(115, 750);
 			generationSelect.Name = "generationSelect";
 			generationSelect.Size = new System.Drawing.Size(108, 23);
 			generationSelect.TabIndex = 51;
@@ -800,6 +812,18 @@ namespace RgbFractalGenCs {
 			// 
 			panel1.AutoScroll = true;
 			panel1.BackColor = System.Drawing.Color.Black;
+			panel1.Controls.Add(l2Label);
+			panel1.Controls.Add(l2Box);
+			panel1.Controls.Add(gpuDLabel);
+			panel1.Controls.Add(gpuVLabel);
+			panel1.Controls.Add(stripeLabel);
+			panel1.Controls.Add(binLabel);
+			panel1.Controls.Add(cacheLabel);
+			panel1.Controls.Add(cacheBox);
+			panel1.Controls.Add(stripeBox);
+			panel1.Controls.Add(binBox);
+			panel1.Controls.Add(voidSelect);
+			panel1.Controls.Add(drawSelect);
 			panel1.Controls.Add(ditherBox);
 			panel1.Controls.Add(ditherLabel);
 			panel1.Controls.Add(updateBatchButton);
@@ -859,6 +883,120 @@ namespace RgbFractalGenCs {
 			panel1.Size = new System.Drawing.Size(256, 300);
 			panel1.TabIndex = 60;
 			// 
+			// gpuDLabel
+			// 
+			gpuDLabel.AutoSize = true;
+			gpuDLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			gpuDLabel.ForeColor = System.Drawing.Color.White;
+			gpuDLabel.Location = new System.Drawing.Point(4, 666);
+			gpuDLabel.Margin = new Padding(4, 0, 4, 0);
+			gpuDLabel.Name = "gpuDLabel";
+			gpuDLabel.Size = new System.Drawing.Size(63, 15);
+			gpuDLabel.TabIndex = 94;
+			gpuDLabel.Text = "GPU Draw:";
+			// 
+			// gpuVLabel
+			// 
+			gpuVLabel.AutoSize = true;
+			gpuVLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			gpuVLabel.ForeColor = System.Drawing.Color.White;
+			gpuVLabel.Location = new System.Drawing.Point(4, 637);
+			gpuVLabel.Margin = new Padding(4, 0, 4, 0);
+			gpuVLabel.Name = "gpuVLabel";
+			gpuVLabel.Size = new System.Drawing.Size(59, 15);
+			gpuVLabel.TabIndex = 93;
+			gpuVLabel.Text = "GPU Void:";
+			// 
+			// stripeLabel
+			// 
+			stripeLabel.AutoSize = true;
+			stripeLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			stripeLabel.ForeColor = System.Drawing.Color.White;
+			stripeLabel.Location = new System.Drawing.Point(4, 550);
+			stripeLabel.Margin = new Padding(4, 0, 4, 0);
+			stripeLabel.Name = "stripeLabel";
+			stripeLabel.Size = new System.Drawing.Size(112, 15);
+			stripeLabel.TabIndex = 92;
+			stripeLabel.Text = "Stripe Height";
+			// 
+			// binLabel
+			// 
+			binLabel.AutoSize = true;
+			binLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			binLabel.ForeColor = System.Drawing.Color.White;
+			binLabel.Location = new System.Drawing.Point(4, 579);
+			binLabel.Margin = new Padding(4, 0, 4, 0);
+			binLabel.Name = "binLabel";
+			binLabel.Size = new System.Drawing.Size(108, 15);
+			binLabel.TabIndex = 91;
+			binLabel.Text = "Bin Size:";
+			// 
+			// cacheLabel
+			// 
+			cacheLabel.AutoSize = true;
+			cacheLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+			cacheLabel.ForeColor = System.Drawing.Color.White;
+			cacheLabel.Location = new System.Drawing.Point(4, 523);
+			cacheLabel.Margin = new Padding(4, 0, 4, 0);
+			cacheLabel.Name = "cacheLabel";
+			cacheLabel.Size = new System.Drawing.Size(115, 15);
+			cacheLabel.TabIndex = 90;
+			cacheLabel.Text = "Cache Optimization:";
+			// 
+			// cacheBox
+			// 
+			cacheBox.AutoSize = true;
+			cacheBox.Checked = true;
+			cacheBox.CheckState = CheckState.Checked;
+			cacheBox.ForeColor = System.Drawing.SystemColors.Control;
+			cacheBox.Location = new System.Drawing.Point(155, 523);
+			cacheBox.Name = "cacheBox";
+			cacheBox.Size = new System.Drawing.Size(68, 19);
+			cacheBox.TabIndex = 89;
+			cacheBox.Text = "Enabled";
+			cacheBox.UseVisualStyleBackColor = true;
+			cacheBox.CheckedChanged += CacheBox_CheckedChanged;
+			// 
+			// stripeBox
+			// 
+			stripeBox.Location = new System.Drawing.Point(164, 547);
+			stripeBox.Name = "stripeBox";
+			stripeBox.Size = new System.Drawing.Size(59, 23);
+			stripeBox.TabIndex = 88;
+			stripeBox.Text = "0";
+			stripeBox.TextChanged += StripeBox_TextChanged;
+			// 
+			// binBox
+			// 
+			binBox.Location = new System.Drawing.Point(164, 576);
+			binBox.Name = "binBox";
+			binBox.Size = new System.Drawing.Size(59, 23);
+			binBox.TabIndex = 87;
+			binBox.Text = "0";
+			binBox.TextChanged += BinBox_TextChanged;
+			// 
+			// voidSelect
+			// 
+			voidSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+			voidSelect.FormattingEnabled = true;
+			voidSelect.Items.AddRange(new object[] { "CPU", "GPU BFS", "GPU JumpFlood", "GPU FastFlood" });
+			voidSelect.Location = new System.Drawing.Point(115, 634);
+			voidSelect.Name = "voidSelect";
+			voidSelect.Size = new System.Drawing.Size(108, 23);
+			voidSelect.TabIndex = 86;
+			voidSelect.SelectedIndexChanged += VoidSelect_SelectedIndexChanged;
+			// 
+			// drawSelect
+			// 
+			drawSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+			drawSelect.FormattingEnabled = true;
+			drawSelect.Items.AddRange(new object[] { "CPU", "GPU Functions", "GPU Pipeline" });
+			drawSelect.Location = new System.Drawing.Point(115, 663);
+			drawSelect.Name = "drawSelect";
+			drawSelect.Size = new System.Drawing.Size(108, 23);
+			drawSelect.TabIndex = 85;
+			drawSelect.SelectedIndexChanged += DrawSelect_SelectedIndexChanged;
+			// 
 			// ditherBox
 			// 
 			ditherBox.AutoSize = true;
@@ -885,7 +1023,7 @@ namespace RgbFractalGenCs {
 			// 
 			// updateBatchButton
 			// 
-			updateBatchButton.Location = new System.Drawing.Point(151, 638);
+			updateBatchButton.Location = new System.Drawing.Point(151, 807);
 			updateBatchButton.Name = "updateBatchButton";
 			updateBatchButton.Size = new System.Drawing.Size(72, 23);
 			updateBatchButton.TabIndex = 82;
@@ -898,7 +1036,7 @@ namespace RgbFractalGenCs {
 			encodePngLabel.AutoSize = true;
 			encodePngLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
 			encodePngLabel.ForeColor = System.Drawing.Color.White;
-			encodePngLabel.Location = new System.Drawing.Point(4, 526);
+			encodePngLabel.Location = new System.Drawing.Point(4, 695);
 			encodePngLabel.Margin = new Padding(4, 0, 4, 0);
 			encodePngLabel.Name = "encodePngLabel";
 			encodePngLabel.Size = new System.Drawing.Size(87, 15);
@@ -910,7 +1048,7 @@ namespace RgbFractalGenCs {
 			encodePngSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			encodePngSelect.FormattingEnabled = true;
 			encodePngSelect.Items.AddRange(new object[] { "No", "Yes" });
-			encodePngSelect.Location = new System.Drawing.Point(115, 523);
+			encodePngSelect.Location = new System.Drawing.Point(115, 692);
 			encodePngSelect.Name = "encodePngSelect";
 			encodePngSelect.Size = new System.Drawing.Size(108, 23);
 			encodePngSelect.TabIndex = 80;
@@ -921,7 +1059,7 @@ namespace RgbFractalGenCs {
 			encodeGifLabel.AutoSize = true;
 			encodeGifLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
 			encodeGifLabel.ForeColor = System.Drawing.Color.White;
-			encodeGifLabel.Location = new System.Drawing.Point(4, 555);
+			encodeGifLabel.Location = new System.Drawing.Point(4, 724);
 			encodeGifLabel.Margin = new Padding(4, 0, 4, 0);
 			encodeGifLabel.Name = "encodeGifLabel";
 			encodeGifLabel.Size = new System.Drawing.Size(80, 15);
@@ -933,7 +1071,7 @@ namespace RgbFractalGenCs {
 			encodeGifSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			encodeGifSelect.FormattingEnabled = true;
 			encodeGifSelect.Items.AddRange(new object[] { "No", "Local", "Global" });
-			encodeGifSelect.Location = new System.Drawing.Point(115, 552);
+			encodeGifSelect.Location = new System.Drawing.Point(115, 721);
 			encodeGifSelect.Name = "encodeGifSelect";
 			encodeGifSelect.Size = new System.Drawing.Size(108, 23);
 			encodeGifSelect.TabIndex = 77;
@@ -944,7 +1082,7 @@ namespace RgbFractalGenCs {
 			generationModeLabel.AutoSize = true;
 			generationModeLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
 			generationModeLabel.ForeColor = System.Drawing.Color.White;
-			generationModeLabel.Location = new System.Drawing.Point(4, 584);
+			generationModeLabel.Location = new System.Drawing.Point(4, 753);
 			generationModeLabel.Margin = new Padding(4, 0, 4, 0);
 			generationModeLabel.Name = "generationModeLabel";
 			generationModeLabel.Size = new System.Drawing.Size(102, 15);
@@ -953,7 +1091,7 @@ namespace RgbFractalGenCs {
 			// 
 			// batchBox
 			// 
-			batchBox.Location = new System.Drawing.Point(86, 639);
+			batchBox.Location = new System.Drawing.Point(86, 808);
 			batchBox.Margin = new Padding(4, 3, 4, 3);
 			batchBox.Name = "batchBox";
 			batchBox.Size = new System.Drawing.Size(59, 23);
@@ -966,7 +1104,7 @@ namespace RgbFractalGenCs {
 			batchLabel.AutoSize = true;
 			batchLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
 			batchLabel.ForeColor = System.Drawing.Color.White;
-			batchLabel.Location = new System.Drawing.Point(4, 643);
+			batchLabel.Location = new System.Drawing.Point(4, 812);
 			batchLabel.Margin = new Padding(4, 0, 4, 0);
 			batchLabel.Name = "batchLabel";
 			batchLabel.Size = new System.Drawing.Size(74, 15);
@@ -975,7 +1113,7 @@ namespace RgbFractalGenCs {
 			// 
 			// saveBatchButton
 			// 
-			saveBatchButton.Location = new System.Drawing.Point(151, 610);
+			saveBatchButton.Location = new System.Drawing.Point(151, 779);
 			saveBatchButton.Name = "saveBatchButton";
 			saveBatchButton.Size = new System.Drawing.Size(72, 23);
 			saveBatchButton.TabIndex = 73;
@@ -985,7 +1123,7 @@ namespace RgbFractalGenCs {
 			// 
 			// loadBatchButton
 			// 
-			loadBatchButton.Location = new System.Drawing.Point(4, 610);
+			loadBatchButton.Location = new System.Drawing.Point(4, 779);
 			loadBatchButton.Name = "loadBatchButton";
 			loadBatchButton.Size = new System.Drawing.Size(75, 23);
 			loadBatchButton.TabIndex = 72;
@@ -995,7 +1133,7 @@ namespace RgbFractalGenCs {
 			// 
 			// addBatchButton
 			// 
-			addBatchButton.Location = new System.Drawing.Point(85, 610);
+			addBatchButton.Location = new System.Drawing.Point(85, 779);
 			addBatchButton.Name = "addBatchButton";
 			addBatchButton.Size = new System.Drawing.Size(60, 23);
 			addBatchButton.TabIndex = 71;
@@ -1005,7 +1143,7 @@ namespace RgbFractalGenCs {
 			// 
 			// runBatchButton
 			// 
-			runBatchButton.Location = new System.Drawing.Point(6, 668);
+			runBatchButton.Location = new System.Drawing.Point(6, 837);
 			runBatchButton.Name = "runBatchButton";
 			runBatchButton.Size = new System.Drawing.Size(217, 23);
 			runBatchButton.TabIndex = 62;
@@ -1029,7 +1167,7 @@ namespace RgbFractalGenCs {
 			label2.AutoSize = true;
 			label2.Font = new System.Drawing.Font("Segoe UI", 9F);
 			label2.ForeColor = System.Drawing.Color.White;
-			label2.Location = new System.Drawing.Point(4, 497);
+			label2.Location = new System.Drawing.Point(4, 439);
 			label2.Margin = new Padding(4, 0, 4, 0);
 			label2.Name = "label2";
 			label2.Size = new System.Drawing.Size(72, 15);
@@ -1053,7 +1191,7 @@ namespace RgbFractalGenCs {
 			parallelLabel.AutoSize = true;
 			parallelLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
 			parallelLabel.ForeColor = System.Drawing.Color.White;
-			parallelLabel.Location = new System.Drawing.Point(4, 439);
+			parallelLabel.Location = new System.Drawing.Point(4, 497);
 			parallelLabel.Margin = new Padding(4, 0, 4, 0);
 			parallelLabel.Name = "parallelLabel";
 			parallelLabel.Size = new System.Drawing.Size(48, 15);
@@ -1493,6 +1631,27 @@ namespace RgbFractalGenCs {
 			loadExport.RestoreDirectory = true;
 			loadExport.FileOk += LoadExport_FileOk;
 			// 
+			// l2Box
+			// 
+			l2Box.Location = new System.Drawing.Point(164, 605);
+			l2Box.Name = "l2Box";
+			l2Box.Size = new System.Drawing.Size(59, 23);
+			l2Box.TabIndex = 95;
+			l2Box.Text = "0";
+			l2Box.TextChanged += L2Box_TextChanged;
+			// 
+			// l2Label
+			// 
+			l2Label.AutoSize = true;
+			l2Label.Font = new System.Drawing.Font("Segoe UI", 9F);
+			l2Label.ForeColor = System.Drawing.Color.White;
+			l2Label.Location = new System.Drawing.Point(4, 608);
+			l2Label.Margin = new Padding(4, 0, 4, 0);
+			l2Label.Name = "l2Label";
+			l2Label.Size = new System.Drawing.Size(81, 15);
+			l2Label.TabIndex = 96;
+			l2Label.Text = "L2 Cache Size:";
+			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -1529,7 +1688,7 @@ namespace RgbFractalGenCs {
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.12.0";
+			Text = "RGB Fractal Zoom Generator C# v1.13.0";
 			FormClosing += GeneratorForm_FormClosing;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();
@@ -1669,6 +1828,18 @@ namespace RgbFractalGenCs {
 		private Label fileLabel;
 		private ComboBox fileSelect;
 		private OpenFileDialog loadExport;
+		private TextBox stripeBox;
+		private TextBox binBox;
+		private ComboBox voidSelect;
+		private ComboBox drawSelect;
+		private CheckBox cacheBox;
+		private Label gpuDLabel;
+		private Label gpuVLabel;
+		private Label stripeLabel;
+		private Label binLabel;
+		private Label cacheLabel;
+		private Label l2Label;
+		private TextBox l2Box;
 	}
 }
 

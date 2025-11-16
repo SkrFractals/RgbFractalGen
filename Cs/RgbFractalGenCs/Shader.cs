@@ -19,7 +19,7 @@ public static class ShaderMath {
 		return new Float3(voidAmbS, voidAmbS, voidAmbS)
 			+ Hlsl.Mul((1.0f - voidAmb) * voidAmb, Hlsl.Mul(b.X, n0) + Hlsl.Mul(b.Y, n1) + Hlsl.Mul(b.Z, n2) + Hlsl.Mul(b.W, n3));
 	}
-	public static NoiseCoordData NoiseCoords(Int2 xy, int width, Int2 noiseP) {
+	public static NoiseCoordData NoiseCoords(Int2 xy, Int2 noiseP) {
 		var fy = (float)xy.Y / (noiseP.Y);
 		var startY = (int)fy;
 		var ay = fy - startY;
@@ -30,8 +30,8 @@ public static class ShaderMath {
 		float ax = fx - startX, ox = 1f - ax, b0 = ox * oy, b1 = ax * oy, b2 = ox * ay, b3 = ax * ay;
 		return new NoiseCoordData(new Int4(noiseI,noiseI + 1, noiseI + noiseP.X, noiseI + noiseP.X + 1), new Float4(b0, b1, b2, b3));
 	}
-	public static Float3 Ambient(I voidA, float voidDepthMax, int selectedAmbient) {
-		float voidAmb = selectedAmbient * voidA.V / voidDepthMax;
+	public static Float3 Ambient(int voidA, float voidDepthMax, int selectedAmbient) {
+		float voidAmb = selectedAmbient * voidA/ voidDepthMax;
 		return new Float3(voidAmb, voidAmb, voidAmb);
 	}
 	// Saturation
@@ -65,62 +65,83 @@ public static class ShaderMath {
 #endregion
 
 #region Draw_Pipeline
-/*[System.Runtime.Versioning.SupportedOSPlatform("windows")]
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
-public readonly partial struct PipeNoise : IComputeShader {
-	// 1. Buffers grouped together and by type
-	public readonly ReadWriteBuffer<Float3> output;
-	public readonly ReadWriteBuffer<Float3> noise;
-	public readonly ReadWriteBuffer<I> voidT;
-
-	// 2. Uniforms grouped last
-	public readonly int width;
-	public readonly int selectedAmbient;
-	public readonly int voidDepthMax;
-	public readonly int noiseWidth;
-	public readonly int allocVoid;
-
-	public PipeNoise(
-		ReadWriteBuffer<Float3> output,
-		ReadWriteBuffer<Float3> noise,
-		ReadWriteBuffer<I> voidT,
-		int width,
-		int selectedAmbient,
-		int voidDepthMax,
-		int noiseWidth,
-		int allocVoid) {
-		this.output = output;
-		this.noise = noise;
-		this.voidT = voidT;
-
-		this.width = width;
-		this.selectedAmbient = selectedAmbient;
-		this.voidDepthMax = voidDepthMax;
-		this.noiseWidth = noiseWidth;
-		this.allocVoid = allocVoid;
-	}
-	public void Execute() {
-	}
-}*/
-
-/*[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct PipeNoise(
-	ReadWriteBuffer<Float3> output,
-	ReadWriteBuffer<int> voidT, 
-	ReadWriteBuffer<Float3> noise,
-	int width, int selectedAmbient, int voidDepthMax, int noiseWidth, int allocVoid
+public readonly partial struct PipeNormalizeSaturate(
+	ReadWriteBuffer<Float3> ping, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	float saturateAmount
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
-		output[xy.Y * width + xy.X] = new Float3(0, 0, 0);
-		output[xy.Y * width + xy.X] = ShaderMath.Noise(voidT, noise, xy, width, selectedAmbient, voidDepthMax, noiseWidth, allocVoid);
+		var i = xy.Y * width + xy.X;
+		ping[i] = ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount);
 	}
-}*/
-
-
+}
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
+[ThreadGroupSize(16, 16, 1)]
+[GeneratedComputeShaderDescriptor]
+public readonly partial struct PipeNormalize(
+	ReadWriteBuffer<Float3> ping, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer
+) : IComputeShader {
+	public void Execute() {
+		var xy = ThreadIds.XY;
+		var i = xy.Y * width + xy.X;
+		ping[i] = ShaderMath.Normalize(buffer[i], lightNormalizer);
+	}
+}
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
+[ThreadGroupSize(16, 16, 1)]
+[GeneratedComputeShaderDescriptor]
+public readonly partial struct PipeNoise(
+	ReadWriteBuffer<Float3> ping, int width,
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
+	ReadOnlyBuffer<Float3> noise, Int2 noiseP
+) : IComputeShader {
+	public void Execute() {
+		var xy = ThreadIds.XY;
+		var i = xy.Y * width + xy.X;
+		var nc = ShaderMath.NoiseCoords(xy, noiseP);
+		ping[i] = ping[i] + ShaderMath.Noise(voidT[i] / voidDepthMax, selectedAmbient, nc.b, noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W]);
+	}
+}
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
+[ThreadGroupSize(16, 16, 1)]
+[GeneratedComputeShaderDescriptor]
+public readonly partial struct PipeAmbient(
+	ReadWriteBuffer<Float3> ping, int width,
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax
+) : IComputeShader {
+	public void Execute() {
+		var xy = ThreadIds.XY;
+		var i = xy.Y * width + xy.X;
+		ping[i] = ping[i] + ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient);
+	}
+}
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
+[ThreadGroupSize(16, 16, 1)]
+[GeneratedComputeShaderDescriptor]
+public readonly partial struct PipeBytesDither(
+	ReadWriteBuffer<Float3> ping, ReadWriteBuffer<int> output, int width
+) : IComputeShader {
+	public void Execute() {
+		var xy = ThreadIds.XY;
+		var i = xy.Y * width + xy.X;
+		output[i] = ShaderMath.ToBytes(ShaderMath.Dithering(ping[i], xy));
+	}
+}
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
+[ThreadGroupSize(16, 16, 1)]
+[GeneratedComputeShaderDescriptor]
+public readonly partial struct PipeBytes(
+	ReadWriteBuffer<Float3> ping, ReadWriteBuffer<int> output, int width
+) : IComputeShader {
+	public void Execute() {
+		var xy = ThreadIds.XY;
+		var i = xy.Y * width + xy.X;
+		output[i] = ShaderMath.ToBytes(ping[i]);
+	}
+}
 #endregion
 
 #region Noise
@@ -129,40 +150,18 @@ public readonly partial struct PipeNoise(
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawNoiseSaturateDither(
 	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
-	ReadWriteBuffer<I> voidT, int selectedAmbient, float voidDepthMax,
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	ReadOnlyBuffer<Float3> noise, Int2 noiseP,
 	float saturateAmount
 ) : IComputeShader {
 	public void Execute() {
-
-		/*var xy = ThreadIds.XY;
-		var i = xy.Y * width + xy.X;
-
-		var fy = (float)xy.Y / (noiseP.Y * width);
-		var startY = (int)fy;
-		var ay = fy - startY;
-		var oy = 1f - ay;
-		var fx = (float)xy.X / noiseP.Y;
-		var startX = (int)fx;
-		int noiseI = startY * noiseP.X + startX;
-		float ax = fx - startX, ox = 1f - ax, b0 = ox * oy, b1 = ax * oy, b2 = ox * ay, b3 = ax * ay;
-		var nc = new NoiseCoordData(new Int4(noiseI, noiseI + 1, noiseI + noiseP.X, noiseI + noiseP.X + 1), new Float4(b0, b1, b2, b3));
-
-		var voidAmb = voidT[i].V / voidDepthMax;
-		var voidAmbS = selectedAmbient * voidAmb;
-		output[i] = ShaderMath.ToBytes(ShaderMath.Dithering(
-			ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount)
-			+ new Float3(voidAmbS, voidAmbS, voidAmbS)
-			+ Hlsl.Mul((1.0f - voidAmb) * voidAmb, Hlsl.Mul(nc.b.X, noise[nc.i.X]) + Hlsl.Mul(nc.b.Y, noise[nc.i.Y]) + Hlsl.Mul(nc.b.Z, noise[nc.i.Z]) + Hlsl.Mul(nc.b.W, noise[nc.i.W]))
-			, xy));*/
-
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
-		var nc = ShaderMath.NoiseCoords(xy, width, noiseP);
+		var nc = ShaderMath.NoiseCoords(xy, noiseP);
 		output[i] = ShaderMath.ToBytes(ShaderMath.Dithering(
-			ShaderMath.Noise(voidT[i].V / voidDepthMax, selectedAmbient, nc.b, 
-				noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W])
-			+ ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount), xy));
+			ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount)
+			+ ShaderMath.Noise(voidT[i] / voidDepthMax, selectedAmbient, nc.b,
+				noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W]), xy));
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -170,18 +169,18 @@ public readonly partial struct DrawNoiseSaturateDither(
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawNoiseSaturate(
 	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
-	ReadWriteBuffer<I> voidT, int selectedAmbient, float voidDepthMax,
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	ReadOnlyBuffer<Float3> noise, Int2 noiseP,
 	float saturateAmount
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
-		var nc = ShaderMath.NoiseCoords(xy, width, noiseP);
+		var nc = ShaderMath.NoiseCoords(xy, noiseP);
 		output[i] = ShaderMath.ToBytes(
-			ShaderMath.Noise(voidT[i].V / voidDepthMax, selectedAmbient, nc.b, 
-				noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W])
-			+ ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount));
+			ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount)
+			+ ShaderMath.Noise(voidT[i] / voidDepthMax, selectedAmbient, nc.b,
+				noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W]));
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -189,17 +188,17 @@ public readonly partial struct DrawNoiseSaturate(
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawNoiseDither(
 	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
-	ReadWriteBuffer<I> voidT, int selectedAmbient, float voidDepthMax,
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	ReadOnlyBuffer<Float3> noise, Int2 noiseP
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
-		var nc = ShaderMath.NoiseCoords(xy, width, noiseP);
+		var nc = ShaderMath.NoiseCoords(xy, noiseP);
 		output[i] = ShaderMath.ToBytes(ShaderMath.Dithering(
-			ShaderMath.Noise(voidT[i].V / voidDepthMax, selectedAmbient, nc.b, 
-				noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W])
-			+ ShaderMath.Normalize(buffer[i], lightNormalizer), xy));
+			ShaderMath.Normalize(buffer[i], lightNormalizer)
+			+ ShaderMath.Noise(voidT[i] / voidDepthMax, selectedAmbient, nc.b,
+				noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W]), xy));
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -207,17 +206,17 @@ public readonly partial struct DrawNoiseDither(
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawNoise(
 	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
-	ReadWriteBuffer<I> voidT, int selectedAmbient, float voidDepthMax,
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	ReadOnlyBuffer<Float3> noise, Int2 noiseP
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
-		var nc = ShaderMath.NoiseCoords(xy, width, noiseP);
+		var nc = ShaderMath.NoiseCoords(xy, noiseP);
 		output[i] = ShaderMath.ToBytes(
-			ShaderMath.Noise(voidT[i].V / voidDepthMax, selectedAmbient, nc.b, 
-				noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W])
-			+ ShaderMath.Normalize(buffer[i], lightNormalizer));
+			ShaderMath.Normalize(buffer[i], lightNormalizer)
+			+ ShaderMath.Noise(voidT[i] / voidDepthMax, selectedAmbient, nc.b,
+				noise[nc.i.X], noise[nc.i.Y], noise[nc.i.Z], noise[nc.i.W]));
 	}
 }
 #endregion
@@ -228,15 +227,15 @@ public readonly partial struct DrawNoise(
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawAmbientSaturateDither(
 	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
-	ReadWriteBuffer<I> voidT, int selectedAmbient, float voidDepthMax,
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	float saturateAmount
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
 		output[i] = ShaderMath.ToBytes(ShaderMath.Dithering(
-			ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient)
-			+ ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount), xy));
+			ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount)
+			+ ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient), xy));
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -244,15 +243,15 @@ public readonly partial struct DrawAmbientSaturateDither(
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawAmbientSaturate(
 	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
-	ReadWriteBuffer<I> voidT, int selectedAmbient, float voidDepthMax,
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	float saturateAmount
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
 		output[i] = ShaderMath.ToBytes(
-			ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient)
-			+ ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount));
+			ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount)
+			+ ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient));
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -260,14 +259,14 @@ public readonly partial struct DrawAmbientSaturate(
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawAmbientDither(
 	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
-	ReadWriteBuffer<I> voidT, int selectedAmbient, float voidDepthMax
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
 		output[i] = ShaderMath.ToBytes(ShaderMath.Dithering(
-			ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient)
-			+ ShaderMath.Normalize(buffer[i], lightNormalizer), xy));
+			ShaderMath.Normalize(buffer[i], lightNormalizer)
+			+ ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient), xy));
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -275,14 +274,14 @@ public readonly partial struct DrawAmbientDither(
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawAmbient(
 	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
-	ReadWriteBuffer<I> voidT, int selectedAmbient, float voidDepthMax
+	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
 		output[i] = ShaderMath.ToBytes(
-			ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient)
-			+ ShaderMath.Normalize(buffer[i], lightNormalizer));
+			ShaderMath.Normalize(buffer[i], lightNormalizer)
+			+ ShaderMath.Ambient(voidT[i], voidDepthMax, selectedAmbient));
 	}
 }
 #endregion
@@ -325,7 +324,8 @@ public readonly partial struct DrawDither(
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
-		output[i] = ShaderMath.ToBytes(ShaderMath.Dithering(ShaderMath.Normalize(buffer[i], lightNormalizer), xy));
+		output[i] = ShaderMath.ToBytes(
+			ShaderMath.Dithering(ShaderMath.Normalize(buffer[i], lightNormalizer), xy));
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -337,168 +337,43 @@ public readonly partial struct Draw(
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
-		output[i] = ShaderMath.ToBytes(ShaderMath.Normalize(buffer[i], lightNormalizer));
+		output[i] = ShaderMath.ToBytes(
+			ShaderMath.Normalize(buffer[i], lightNormalizer));
 	}
 }
 #endregion
-
-/*
-#region Noise_Old
-
-
-
-
-#endregion
-
-#region Ambient
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct DrawAmbientSaturateDither(
-	ReadOnlyBuffer<Float3> buffer, int width, ReadWriteTexture2D<Float4> output, Float3 lightNormalizer,
-	ReadOnlyBuffer<I> voidT, int selectedAmbient, int voidDepthMax,
-	Float3 saturateAmount
-) : IComputeShader {
-	public void Execute() {
-		var xy = ThreadIds.XY;
-		var rgb = buffer[xy.Y * width + xy.X];
-		output[xy] = new Float4(ShaderMath.Dithering(
-			ShaderMath.Ambient(voidT, xy, width, selectedAmbient, voidDepthMax)
-			+ ShaderMath.ApplySaturate(ShaderMath.Normalize(rgb, lightNormalizer), saturateAmount), xy).XYZ, 1f);
-	}
-}
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct DrawAmbientSaturate(
-	ReadOnlyBuffer<Float3> buffer, int width, ReadWriteTexture2D<Float4> output, Float3 lightNormalizer,
-	ReadOnlyBuffer<I> voidT, int selectedAmbient, int voidDepthMax,
-	Float3 saturateAmount
-) : IComputeShader {
-	public void Execute() {
-		var xy = ThreadIds.XY;
-		var rgb = buffer[xy.Y * width + xy.X];
-		output[xy] = new Float4(
-			(ShaderMath.Ambient(voidT, xy, width, selectedAmbient, voidDepthMax)
-			+ ShaderMath.ApplySaturate(ShaderMath.Normalize(rgb, lightNormalizer), saturateAmount)).XYZ, 1f);
-	}
-}
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct DrawAmbientDithering(
-	ReadOnlyBuffer<Float3> buffer, int width, ReadWriteTexture2D<Float4> output, Float3 lightNormalizer,
-	ReadOnlyBuffer<I> voidT, int selectedAmbient, int voidDepthMax
-) : IComputeShader {
-	public void Execute() {
-		var xy = ThreadIds.XY;
-		var rgb = buffer[xy.Y * width + xy.X];
-		output[xy] = new Float4(ShaderMath.Dithering(
-			ShaderMath.Ambient(voidT, xy, width, selectedAmbient, voidDepthMax)
-			+ ShaderMath.Normalize(rgb, lightNormalizer), xy).XYZ, 1f);
-	}
-}
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct DrawAmbient(
-	ReadOnlyBuffer<Float3> buffer, int width, ReadWriteTexture2D<Float4> output, Float3 lightNormalizer,
-	ReadOnlyBuffer<I> voidT, int selectedAmbient, int voidDepthMax
-) : IComputeShader {
-	public void Execute() {
-		var xy = ThreadIds.XY;
-		var rgb = buffer[xy.Y * width + xy.X];
-		output[xy] = new Float4(
-			(ShaderMath.Ambient(voidT, xy, width, selectedAmbient, voidDepthMax)
-			+ ShaderMath.Normalize(rgb, lightNormalizer)).XYZ, 1f);
-	}
-}
-#endregion
-
-#region NoAmbient
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct DrawSaturateDither(
-	ReadOnlyBuffer<Float3> buffer, int width, ReadWriteTexture2D<Float4> output, Float3 lightNormalizer,
-	Float3 saturateAmount
-) : IComputeShader {
-	public void Execute() {
-		var xy = ThreadIds.XY;
-		var rgb = buffer[xy.Y * width + xy.X];
-		output[xy] = new Float4(ShaderMath.Dithering(
-			ShaderMath.ApplySaturate(ShaderMath.Normalize(rgb, lightNormalizer), saturateAmount), xy).XYZ, 1f);
-	}
-}
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct DrawSaturate(
-	ReadOnlyBuffer<Float3> buffer, int width, ReadWriteTexture2D<Float4> output, Float3 lightNormalizer,
-	Float3 saturateAmount
-) : IComputeShader {
-	public void Execute() {
-		var xy = ThreadIds.XY; var rgb = buffer[xy.Y * width + xy.X];
-		output[xy] = new Float4(
-			ShaderMath.ApplySaturate(ShaderMath.Normalize(rgb, lightNormalizer), saturateAmount).XYZ, 1f);
-	}
-}
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct DrawDithering(
-	ReadOnlyBuffer<Float3> buffer, int width, ReadWriteTexture2D<Float4> output, Float3 lightNormalizer
-) : IComputeShader {
-	public void Execute() {
-		var xy = ThreadIds.XY; var rgb = buffer[xy.Y * width + xy.X];
-		output[xy] = new Float4(ShaderMath.Dithering(ShaderMath.Normalize(rgb, lightNormalizer), xy).XYZ, 1f);
-	}
-}
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
-[ThreadGroupSize(16, 16, 1)]
-[GeneratedComputeShaderDescriptor]
-public readonly partial struct Draw(
-	ReadOnlyBuffer<Float3> buffer, int width, ReadWriteTexture2D<Float4> output, Float3 lightNormalizer
-) : IComputeShader {
-	public void Execute() {
-		var xy = ThreadIds.XY; var rgb = buffer[xy.Y * width + xy.X];
-		output[xy] = new Float4(ShaderMath.Normalize(rgb, lightNormalizer).XYZ, 1f);
-	}
-}
-#endregion
-*/
 
 #region Void
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct VoidBfs(
-	ReadWriteBuffer<I> input, 
-	ReadWriteBuffer<I> output,
-	ReadWriteBuffer<I> outMax, 
+	ReadWriteBuffer<int> input,
+	ReadWriteBuffer<int> output,
+	ReadWriteBuffer<int> outMax,
 	int width
 ) : IComputeShader {
 	public void Execute() {
 		int x = ThreadIds.X + 1;
 		int y = ThreadIds.Y + 1;
 		int idx = y * width + x;
-		int d = input[idx].V;
-		if (d == 0) { output[idx].V = 0; return; }
+		int d = input[idx];
+		if (d == 0) { output[idx] = 0; return; }
 		int best = d;
-		best = Hlsl.Min(best, input[idx - 1].V + 1);
-		best = Hlsl.Min(best, input[idx + 1].V + 1);
-		best = Hlsl.Min(best, input[idx - width].V + 1);
-		best = Hlsl.Min(best, input[idx + width].V + 1);
-		output[idx].V = best;
-		Hlsl.InterlockedMax(ref outMax[0].V, best);
+		best = Hlsl.Min(best, input[idx - 1] + 1);
+		best = Hlsl.Min(best, input[idx + 1] + 1);
+		best = Hlsl.Min(best, input[idx - width] + 1);
+		best = Hlsl.Min(best, input[idx + width] + 1);
+		output[idx] = best;
+		Hlsl.InterlockedMax(ref outMax[0], best);
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct JumpFloodBoundlessOptimized(
-	ReadWriteBuffer<I> input,
-	ReadWriteBuffer<I> output,
+	ReadWriteBuffer<int> input,
+	ReadWriteBuffer<int> output,
 	int width,
 	int step
 ) : IComputeShader {
@@ -512,7 +387,7 @@ public readonly partial struct JumpFloodBoundlessOptimized(
 		int py = y + step;
 		int yw = y * width;
 		int idx = yw + x;
-		output[idx].V = Hlsl.Min(input[idx].V, Hlsl.Min(Hlsl.Min(input[yw + mx].V, input[yw + px].V), Hlsl.Min(input[my * width + x].V, input[py * width + x].V)) + step);
+		output[idx] = Hlsl.Min(input[idx], Hlsl.Min(Hlsl.Min(input[yw + mx], input[yw + px]), Hlsl.Min(input[my * width + x], input[py * width + x])) + step);
 	}
 }
 /*[System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -542,8 +417,8 @@ public readonly partial struct JumpFloodBoundlessReadable(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct JumpFlood(
-	ReadWriteBuffer<I> input,
-	ReadWriteBuffer<I> output,
+	ReadWriteBuffer<int> input,
+	ReadWriteBuffer<int> output,
 	int width,
 	int height,
 	int step
@@ -552,20 +427,20 @@ public readonly partial struct JumpFlood(
 		int x = ThreadIds.X + 1;
 		int y = ThreadIds.Y + 1;
 		int idx = y * width + x;
-		int best = input[idx].V;
+		int best = input[idx];
 		int nx = x - step;
 		if (nx >= 0)
-			best = Hlsl.Min(best, input[y * width + nx].V + step);
+			best = Hlsl.Min(best, input[y * width + nx] + step);
 		nx = x + step;
-		if (nx < width) 
-			best = Hlsl.Min(best, input[y * width + nx].V + step);
+		if (nx < width)
+			best = Hlsl.Min(best, input[y * width + nx] + step);
 		int ny = y - step;
 		if (ny >= 0)
-			best = Hlsl.Min(best, input[ny * width + x].V + step);
+			best = Hlsl.Min(best, input[ny * width + x] + step);
 		ny = y + step;
 		if (ny < height)
-			best = Hlsl.Min(best, input[ny * width + x].V + step);
-		output[idx].V = best;
+			best = Hlsl.Min(best, input[ny * width + x] + step);
+		output[idx] = best;
 	}
 }
 #endregion
