@@ -276,9 +276,11 @@ internal partial class FractalGenerator {
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal static void DrawStripeOfDepth(FractalTask[] tasks, FractalTask dotsTask, ushort stripeId) {
 			foreach (var task in tasks) { // draw each thread's same stripe bins sequentially
-				var bins = task.bin[stripeId];
-				if (bins == null)
+				if (task.bin == null)
 					continue;
+				var bins = task.bin[stripeId];
+				//if (bins == null)
+				//	continue;
 				int b = 0; // binId from 0, do it as while instead of for, so that we can keep the ending binId to draw the last unfilled bin
 				while (b < task.filledBins[stripeId]) { // for each stripe, draw each bin sequentially
 					var binsb = bins[b];
@@ -297,11 +299,12 @@ internal partial class FractalGenerator {
 			StripeHeight = task.StripeHeight;
 			bin = new (long, float, float, byte)[StripeCount = task.StripeCount][][]; // allocate stripes of bins
 			for (int i = 0; i < task.StripeCount; ++i)
-				(bin[i] = new (long, float, float, byte)[PredictedBinsPerStripe][])[0] = new (long, float, float, byte)[BinSize = task.BinSize];
+				(bin[i] = new (long, float, float, byte)[task.PredictedBinsPerStripe][])[0] = new (long, float, float, byte)[BinSize = task.BinSize];
 			//foreach (ref var dbin in bin) // make a fresh list with a fresh bin for each stripe
 			//	(dbin = new (long, float, float, byte)[PredictedBinsPerStripe][])[0] = new (long, float, float, byte)[task.BinSize];
 			filledBins = new ushort[task.StripeCount];
 			filledStripes = new uint[task.StripeCount];
+			UseBuffer = task.Buffer;
 		}
 		internal void ClearBin() {
 			bin = null;
@@ -376,7 +379,7 @@ internal partial class FractalGenerator {
 			return found == true ? "" : "not found anything";
 		}
 		internal interface IDotApplier {
-			void Apply(FractalTask task, (long dotsKey, float dotsX, float dotsY, byte dotsColor) dot);
+			public void Apply(FractalTask task, (long dotsKey, float dotsX, float dotsY, byte dotsColor) dot);
 		}
 		internal struct ApplyDotImpl : IDotApplier {
 			public void Apply(FractalTask task, (long dotsKey, float dotsX, float dotsY, byte dotsColor) dot) => task.ApplyDot(dot);
@@ -2480,6 +2483,7 @@ internal partial class FractalGenerator {
 						task.PredictedBinsPerStripe = (ushort)Math.Ceiling(task.PredictedBinsPerStripe / Math.Sqrt(allocMaxTasks));
 						task.NewBin(task);
 						tuples[0] = (dotsTaskIndex, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startSeed, 0);
+						
 						GenerateBufferOfDepth(bitmapIndex);
 						foreach (var t in tasks)
 							t.ClearBin();
@@ -2704,12 +2708,12 @@ internal partial class FractalGenerator {
 				GenerateDotsSingleTask(dotsTask, dotsTask, dotsXy, dotsAngle,dotsColor,dotsFlags,dotsDepth, addDot);
 				dotsTask.DrawStripesOfAnimation();
 			}
-			void GenerateDotsSingleTask<TApplier>(FractalTask dotsTask, FractalTask dotTask,
+			void GenerateDotsSingleTask<TApplier>(FractalTask mainTask, FractalTask binTask,
 			(double, double) dotsXy, (double, double) dotsAngle, byte dotsColor, long dotsFlags, byte dotsDepth, TApplier applier
 			) where TApplier : struct, FractalTask.IDotApplier {
-				var preIterated = dotsTask.PreIterate[dotsDepth]; // PreIterate = (dotsSize, dotsDetail, f.ChildX[i] * dotsSize, f.ChildY[i] * dotsSize)
-				var newPreIterated = dotsTask.PreIterate[++dotsDepth]; // the same thing, but one depth level deeper (newDotsSize, newDotsDetail, f.ChildX[i] * newDotsSize, f.ChildY[i] * newDotsSize)
-				if (newPreIterated.Item1 < dotsTask.ApplyDetail) {
+				var preIterated = mainTask.PreIterate[dotsDepth]; // PreIterate = (dotsSize, dotsDetail, f.ChildX[i] * dotsSize, f.ChildY[i] * dotsSize)
+				var newPreIterated = mainTask.PreIterate[++dotsDepth]; // the same thing, but one depth level deeper (newDotsSize, newDotsDetail, f.ChildX[i] * newDotsSize, f.ChildY[i] * newDotsSize)
+				if (newPreIterated.Item1 < mainTask.ApplyDetail) {
 					// we are deep enough that the parent is within a pixel, so just split it one last time and draw its children as dots
 					for (var i = 0; i < f.ChildCount; ++i) {
 						if (token.IsCancellationRequested)
@@ -2722,8 +2726,8 @@ internal partial class FractalGenerator {
 						var xy = preIterated.Item3[i];
 						var newXy = NewXY(dotsXy, xy, dotsAngle.Item1);
 						// Outside View check, if inside view, it will continue iterating this child
-						if (TestSize(dotsTask, newXy.Item1, newXy.Item2, preIterated.Item1))
-							applier.Apply(dotTask, (i + f.ChildCount * (newFlags & (((long)1 << f.ChildCount) - 1)), (float)newXy.Item1, (float)newXy.Item2,
+						if (TestSize(mainTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+							applier.Apply(binTask, (i + f.ChildCount * (newFlags & (((long)1 << f.ChildCount) - 1)), (float)newXy.Item1, (float)newXy.Item2,
 								allocPreviewMode && dotsDepth > 1 ? dotsColor : (byte)((dotsColor + ChildColor[i]) % allocPalette2)));
 					}
 					return;
@@ -2740,8 +2744,8 @@ internal partial class FractalGenerator {
 					var xy = preIterated.Item3[i];
 					var newXy = NewXY(dotsXy, xy, dotsAngle.Item1);
 					// Outside View check, if inside view, it will continue iterating this child
-					if (TestSize(dotsTask, newXy.Item1, newXy.Item2, preIterated.Item1))
-						GenerateDotsSingleTask(dotsTask, dotsTask, newXy,
+					if (TestSize(mainTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+						GenerateDotsSingleTask(mainTask, binTask, newXy,
 							i == 0
 							? (dotsAngle.Item1 + ChildAngle[i] - dotsAngle.Item2, -dotsAngle.Item2)
 							: (dotsAngle.Item1 + ChildAngle[i], SelectedSpin == 3 ? -dotsAngle.Item2 : dotsAngle.Item2),
@@ -2767,7 +2771,7 @@ internal partial class FractalGenerator {
 						tasks[taskIndex].State = TaskState.Done;
 					});
 					stripeId += passMod;
-					if (stripeId > task.StripeCount)
+					if (stripeId >= task.StripeCount)
 						stripeId = ++pass;
 					return true;
 				});
