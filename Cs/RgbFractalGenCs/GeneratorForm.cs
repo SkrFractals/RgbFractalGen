@@ -329,7 +329,6 @@ public partial class GeneratorForm : Form {
 			detailLabel.Text = "Detail (0-" + detailMax + "):";
 			saturateLabel.Text = "Saturate (0-" + saturateMax + "):";
 			brightnessLabel.Text = "Brightness (0-" + brightnessMax + "):";
-			bloomLabel.Text = "Bloom (0-" + bloomMax + "):";
 			blurLabel.Text = "Motion Blur (0-" + blurMax + "):";
 
 			LoadSettings();
@@ -346,6 +345,7 @@ public partial class GeneratorForm : Form {
 			modifySettings = helpPanel.Visible = false;
 			TryResize();
 			ResizeAll();
+
 			aTask = xTask = null;
 			generator.StartGenerate();
 
@@ -1423,18 +1423,22 @@ public partial class GeneratorForm : Form {
 		StripeBox_TextChanged(null, null);
 	}
 	private void AdjustBloomMax() {
-		if (generator.SelectedWidth + generator.SelectedHeight <= 0)
+		if (width + height <= 0)
 			return;
 		byte OnePixelBytes = 12;
-		var maxCache = ((.85f * (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes)) / (OnePixelBytes * generator.SelectedWidth) + 1 - generator.SelectedStripeHeight) / 2;
+		var L2_eff = .85f * (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes);
+		var maxCache = (L2_eff / (OnePixelBytes * width) - 2) / 2;
+
 		if (maxTasks <= 0) {
 			bloomMax = (ushort)maxCache;
+			bloomLabel.Text = "Bloom (0-" + bloomMax + "):";
 			return;
 		}
-		bloomMax = (ushort)(bloomMul * Math.Min(
-			generator.SelectedHeight / (6 * maxTasks) - 1, // Should be enough run all the threads of each in parallel
+		bloomMax = (ushort)(Math.Min(
+			Math.Max(1,height / (2 * maxTasks) - 1), // Should be enough run all the threads of each in parallel
 			maxCache // the cache size should fit a strip wide as Width, and Tall as BloomDiameter+StripHeight
-		));
+		) / bloomMul);
+		bloomLabel.Text = "Bloom (0-" + bloomMax + "):";
 	}
 	private void BlurBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(blurBox, ref generator.SelectedBlur, (ushort)0, blurMax);
@@ -1514,15 +1518,16 @@ public partial class GeneratorForm : Form {
 	}
 	private void AdjustStripeMax() {
 		byte OnePixelBytes = 12;
+		var L2_eff = (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes) *.85f;
+		var minCachableStripe = (ushort)Math.Max(1, L2_eff / (OnePixelBytes * width) - 2 * generator.SelectedBloom - 2);
 
-		var cache = (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes) * .85f / (OnePixelBytes * generator.SelectedWidth) - 2 * generator.SelectedBloom + 1;
 		if (maxTasks <= 0) {
-			stripeMax = (ushort)Math.Ceiling(cache);
+			stripeMax = minCachableStripe;
 			return;
 		}
-		stripeMax = (ushort)Math.Min(
-			generator.SelectedHeight / maxTasks * 5, // Should be enough run all the threads of each in parallel
-			cache // the cache size should fit a strip wide as Width, and Tall as BloomDiameter+StripHeight
+		stripeMax = Math.Min(
+			(ushort)(0.75f * height / maxTasks), // Should be enough run all the threads of each in parallel
+			minCachableStripe // the cache size should fit a strip wide as Width, and Tall as BloomDiameter+StripHeight
 		);
 	}
 	private void BinBox_TextChanged(object sender, EventArgs e) {
@@ -1532,7 +1537,6 @@ public partial class GeneratorForm : Form {
 		ParseClampReTextDiffApply(l2Box, ref generator.SelectedL2Kilobytes, (ushort)0, l2Max);
 	}
 	private void VoidSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		var prev = generator.SelectedGpuVoidType;
 		var now = (FractalGenerator.GpuVoidType)Math.Max(0, voidSelect.SelectedIndex);
 		if (generator.SelectedGpuVoidType == now)
 			return;
@@ -1540,7 +1544,6 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 	}
 	private void DrawSelect_SelectedIndexChanged(object sender, EventArgs e) {
-		var prev = generator.SelectedGpuDrawType;
 		var now = (FractalGenerator.GpuDrawType)Math.Max(0, drawSelect.SelectedIndex);
 		if (generator.SelectedGpuDrawType == now)
 			return;
