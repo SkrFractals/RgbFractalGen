@@ -311,10 +311,10 @@ Export Select:
 - GIF: Saves the finished animation to a GIF (local or global based on your GIF encoding selection). Technically the gif gets saved as a gifX.tmp file, and then only renamed and moved when you "Save" it.
 - GIF->MP4: Convert the temporary or exported GIF into an MP4. You need to have GIF encoding selected for this to be available. You can use it before of after saving the GIF.
 - MP4: Will Export the animation as PNG series and covert those into high quality MP4. Unintuitively, it's a bit faster overall with PNG encoding turned OFF.
-
+- Load Export: This will instead let you open any exported file, and try to read all of it's properties, as long as they are encoded in the file name descibed below:
 
 File:
-- This will let you choose the dault filename that will be offered to you when you export. (you can always rename to whatever you want though)
+- This will let you choose the default filename that will be offered to you when you export. (you can always rename to whatever you want though)
 - It is a togglable bitmas like the angles and colors, that means' you can enable a combination of each options
 - Each enabled options will add _X(Y_Y_Y...) tothe file name
 - X being the first letter of the option, and Ys are all the parameters related to it:
@@ -324,23 +324,24 @@ File:
 - A(BITMASK) - which childAngles are toggled on
 - C(BITMASK) - which child Color are toggled on
 - F(Type_Seed) - Type is which CutFunction INDEX is selected, Seed is the seed number that's next to it
-- R(WxH) - What resolution was this rendered to
+- R(W_H) - What resolution was this rendered to
 - H(Palette_Hue_Shift_Speed)
 -- Palette is the INDEX of the selected palette (BGR,RGB, etc)
 -- Hue is the defaulty Hue (to the right of the palette choice)
 -- Shift is the direction of the hue shifting (0 is static, 1 is ->, -1 is <-), It's the first selection in "Hue Shift" line.
 -- Speed is the speed multiplier of the hue shifting, the second selection in "Hue Shift" line.
 - P(Frames_Multiplier) - he two entries in the "Period" line.
-- Z(Direction_Child) - the zoom direction, the first selector ins the Zoom line, child is the Zoom Child number
+- Z(Direction_Default_Child) - the zoom direction, default zoom, and the first selector ins the Zoom line, child is the Zoom Child number
 - S(Direction_Default_Speed)
 -- Direction - which way is it spinning - 0 is Static, 1 is Clockwise, 2 is AntiSpin, 3 is periAntiSpin, -1 is counterClockwise
 -- Default - deafult angle at the first frame
 -- Speed - how many extra rotations are added per period
-- V(Ambinet_Noise_Scale)
+- V(Ambient_Noise_Scale)
 -- Ambinet is the overall brightness of the void, 0 will make it pitch black
 -- Noise is the intensity of the noise, 0 will make it not noisy, and just a gradient, ambinet also scales this
 -- Scale is the scale of the noise, 1 will be noise at high resolution and kills YouTube compressins, more will make the noise scaled up
-- I(Satur_Brihgt_Bloom_Blur) - the 4 same named lines at the bottom of the paramenters
+- I(Satur_Bright_Bloom_Blur) - the 4 same named lines at the bottom of the paramenters
+- D(Detail_Dither) - the Detail line, and the dithering check box
 
 Debug Log:
 - Will show a state list of CPU threads and images.

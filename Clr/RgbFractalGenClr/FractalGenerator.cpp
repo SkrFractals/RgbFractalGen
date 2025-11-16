@@ -4,6 +4,8 @@
 #include <omp.h>
 #include "GifEncoder.h"
 
+#pragma region Defines
+
 // CLR VS CPP:
 #ifdef CLR
 #define PACK(X,Y) pack(X, Y)
@@ -18,10 +20,14 @@
 #define FLOOR Math::Floor
 #define CEIL Math::Ceiling
 #define TOSTRING(X) X
+#define IFJOINABLE auto% t = parallelTasks[task.TaskIndex]; if(t != nullptr){ t->Wait(); t = nullptr; }
+#define STARTTASK(INDEX,BMP) Start(INDEX, BMP); parallelTasks[INDEX] = Task::Factory->StartNew
+#define STARTLOCK Monitor::Enter(taskLock); try {
+#define ENDLOCK } finally { Monitor::Exit(taskLock); }
 #else
 #define PACK(X,Y) { X, Y }
 #define CANCEL cancelRequested
-#define GETTUPLEPACK const std::pair<float, float>& inXY = std::get<1>(params); const std::pair<float, float>& AA = std::get<2>(params);
+#define GETTUPLEPACK const std::pair<double, double>& inXY = std::get<1>(params); const std::pair<double, double>& AA = std::get<2>(params);
 #define GIFCANCEL false, &gifCancelRequested
 #define EXCEPTION Exception
 #define ABS std::abs
@@ -31,29 +37,33 @@
 #define FLOOR std::floor
 #define CEIL std::ceil
 #define TOSTRING(X) std::to_string(X)
+#define IFJOINABLE if(task.task.joinable()){ task.task.join(); }
+#define STARTTASK(INDEX,BMP) Start(INDEX, BMP).task = std::thread
+#define STARTLOCK taskLock.lock();
+$define ENDLOCK taskLock.unlock();
 #endif
 
 // UNIVERSAL:
 #define M_PI 3.14159265358979323846
-//#define Y(V) = Vector<float>(gcnew array<float>(3){ V[2], V[0], V[1] })
-//#define Z(V) = Vector<float>(gcnew array<float>(3){ V[1], V[2], V[0] })
-#define FA(N) std::vector<std::string, float*>>(N)
-#define F(N) new float[N]
+//#define Y(V) = Vector<double>(gcnew array<double>(3){ V[2], V[0], V[1] })
+//#define Z(V) = Vector<double>(gcnew array<double>(3){ V[1], V[2], V[0] })
+#define DA(N) std::vector<std::string, double*>>(N)
+#define D(N) new double[N]
 #define BA(N) std::vector<std::pair<std::string, uint8_t*>>(N)
 #define B(N) new uint8_t[N]
 #define CA(N) std::vector<std::pair<int32_t, std::vector<int32_t>><(N)
-#define FE { "", new float[0] { } }
+#define FE { "", new double[0] { } }
 #define BE { "", new uint8_t[0] { } }
 #define CE { -1 , empty }
 #define CHILDPARAMS PACK(task.applyWidth * .5f, task.applyHeight * .5f), PACK(angle, ABS(spin) > 1 ? 2 * angle : 0), color, startParam, 0
 #define STARTITERATION GETPREITERATE UNPACKXY UNPACKAA IFDOT
-#define UNPACKXY float inX, inY; unpack(inXY, inX, inY);
-#define UNPACKAA float inAngle, inAntiAngle; unpack(AA, inAngle, inAntiAngle);
+#define UNPACKXY double inX, inY; unpack(inXY, inX, inY);
+#define UNPACKAA double inAngle, inAntiAngle; unpack(AA, inAngle, inAntiAngle);
 #define FORCHILD for (int i = 0; i < f->childCount; ++i)
 #define IFDOT if (std::get<0>(newPreIterated) < applyDetail)
 #define GETPREITERATE const auto& preIterated = task.preIterate[inDepth]; const auto& newPreIterated = task.preIterate[++inDepth];
 #define GETXY const auto& XY = std::get<2>(preIterated)[i];
-#define NEWXY const float newX = inX + XY.first * cs - XY.second * sn, newY = inY - XY.second * cs - XY.first * sn;
+#define NEWXY const double newX = inX + XY.first * cs - XY.second * sn, newY = inY - XY.second * cs - XY.first * sn;
 #define NEWCOLOR applyPreviewMode && inDepth > 1 ? inColor : (uint8_t)((inColor + childColor[i]) % 3)
 #define SINCOS const auto cs = cos(inAngle), sn = sin(inAngle);
 #define CALCFLAGS if (CANCEL) return; const auto newFlags = CalculateFlags(i, inFlags); if (newFlags < 0) continue;
@@ -64,134 +74,325 @@
 #define FINISHTASKS(M) bool tasksRemaining = true; uint8_t i = 3; uint16_t taskIndex = 0; while(FinishTasks(M, i, tasksRemaining, taskIndex))
 #define CANCELDOTS { if (stateIndex >= 0) tasks[stateIndex].state = TaskState::Done; return; }
 
-namespace RgbFractalGenClr {
+#pragma endregion
+
+namespace RgbFractalGenCpp {
 
 #ifdef CLR
 	using namespace System::IO;
-#ifdef CUSTOMDEBUG
+	#if defined(CUSTOMDEBUG) || defined(PARALLELDEBUG)
 	using namespace System::Diagnostics;
+	#endif
 #endif
-#ifdef PARALLELDEBUG
-	using namespace System::Diagnostics;
-#endif
-#endif
+
+#pragma region FractalTask
+	bool FractalGenerator::IsTaskStillRunning(FractalTask& task) {
+		return task.State == TaskState::Done ? Join(task) : task.State != TaskState::Free;
+	}
+	inline bool FractalGenerator::Join(FractalTask& task) {
+		if (task.taskStarted) {
+			IFJOINABLE else {
+				//#ifdef PARALLELDEBUG
+				//				Debug::WriteLine("ERROR not joinable " + task.index);
+				//#endif
+			}
+		} else {
+			//#ifdef PARALLELDEBUG
+			//			Debug::WriteLine("ERROR join: task not running " + task.index);
+			//#endif
+		}
+		task.State = TaskState::Free;
+		return task.taskStarted = false;
+	}
+	inline FractalTask& FractalGenerator::Start(const uint16_t taskIndex, int16_t bitmap) {
+		auto& task = tasks[taskIndex];
+		if (task.taskStarted) {
+			//#ifdef PARALLELDEBUG
+			//			Debug::WriteLine("ERROR start: task already running " + task.index);
+			//#endif
+			IFJOINABLE else {
+				//#ifdef PARALLELDEBUG
+				//				Debug::WriteLine("ERROR not joinable " + task.index);
+				//#endif
+			}
+		} else {
+			//#ifdef PARALLELDEBUG
+			//			Debug::WriteLine("start" + task.index);
+			//#endif
+		}
+		task.taskStarted = true;
+		task.BitmapIndex = bitmap;
+		task.State = TaskState::Running;
+		return task;
+	}
+#pragma endregion
+
+#pragma region Delegates
+	// Row:
+	VOIDTYPE FractalGenerator::Noise(const FractalTask& drawTask, const uint16_t y, uint8_t*& p) {
+		const auto& voidY = drawTask.VoidDepth[y];
+		const auto& buffY = drawTask.Buffer[y];
+		const auto fy = static_cast<float>(y) / allocVoid;
+		const auto startY = static_cast<uint16_t>(FLOOR(fy));
+		const auto ay = fy - startY;
+		const auto oy = 1.0f - ay;
+		for (auto x = 0; x < drawTask.ApplyWidth; ++x) {
+			const auto voidAmb = voidY[x] / drawTask.VoidDepthMax;
+			const auto fx = static_cast<float>(x) / allocVoid;
+			const auto startX = static_cast<uint16_t>(FLOOR(fx));
+			const auto ax = fx - startX;
+			const auto& vy0 = drawTask.VoidNoise[startY];
+			const auto& vy1 = drawTask.VoidNoise[startY + 1];
+			const auto ox = 1.0f - ax;
+			ditherFunc(ApplyAmbientNoise(
+				saturateFunc(Normalize(buffY[x], drawTask.LightNormalizer), SelectedSaturate),
+				voidAmb * SelectedAmbient, (1.0f - voidAmb) * voidAmb,
+				// bilinear interpolation of void noise
+				//alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX])
+				//	+ (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * vy0[startX])
+				(ox * oy) * vy0[startX] + (ax * oy) * vy0[startX + 1] + (ox * ay) * vy1[startX] + (ax * ay) * vy1[startX + 1]
+			), p);
+		}
+	}
+	VOIDTYPE FractalGenerator::NoNoise(const FractalTask& drawTask, const uint16_t y, uint8_t*& p) {
+		const auto& buffY = drawTask.Buffer[y];
+		const auto& voidY = drawTask.VoidDepth[y];
+		for (auto x = 0; x < drawTask.ApplyWidth; ++x)
+			ditherFunc(
+				Vector(SelectedAmbient * voidY[x] / drawTask.VoidDepthMax) + saturateFunc(Normalize(buffY[x], drawTask.LightNormalizer), SelectedSaturate
+			), p);
+	}
+	VOIDTYPE FractalGenerator::NoAmbient(const FractalTask& drawTask, const uint16_t y, uint8_t*& p) {
+		const auto& buffY = drawTask.Buffer[y];
+		for (auto x = 0; x < drawTask.ApplyWidth; ditherFunc(saturateFunc(Normalize(buffY[x++], drawTask.LightNormalizer), SelectedSaturate), p));
+	}
+	// Saturate:
+	const Vector FractalGenerator::Identity(const Vector& rgb, const double selectedSaturate) {
+		return rgb;
+	}
+	const Vector FractalGenerator::ApplySaturate(const Vector& rgb, const double selectedSaturate) {
+		// The saturation equation boosting up the saturation of the pixel (powered by the saturation slider setting)
+		float mMax; const auto min = MIN(MIN(rgb.X, rgb.Y), rgb.Z), max = MAX(MAX(rgb.X, rgb.Y), rgb.Z);
+		return max <= min ? rgb : Vector::MultiplyMinus(rgb, (mMax = max * selectedSaturate / (max - min)) + 1 - selectedSaturate, min * mMax);
+	}
+	// Dither:
+	VOIDTYPE FractalGenerator::Dithering(const Vector& rgb, uint8_t*& p) {
+		auto& dist = *nextDouble;
+		auto& gen = *random;
+		uint8_t r = static_cast<uint8_t>(rgb.X);
+		uint8_t g = static_cast<uint8_t>(rgb.Y);
+		uint8_t b = static_cast<uint8_t>(rgb.Z);
+		p[0] = dist(gen) < rgb.Z - b ? b + static_cast<uint8_t>(1) : b;
+		p[1] = dist(gen) < rgb.Y - g ? g + static_cast<uint8_t>(1) : g;
+		p[2] = dist(gen) < rgb.X - r ? r + static_cast<uint8_t>(1) : r;
+	}
+	VOIDTYPE FractalGenerator::NoDithering(const Vector& rgb, uint8_t*& p) {
+		p[0] = static_cast<uint8_t>(rgb.Z);	// Blue
+		p[1] = static_cast<uint8_t>(rgb.Y);	// Green
+		p[2] = static_cast<uint8_t>(rgb.X); // Red
+	}
+#pragma endregion
+
+#pragma region Unsorted
+	uint32_t FractalGenerator::GetGenerateLength() {
+		return allocGenerationType > GenerationType::OnlyImage && !allocPreviewMode ? bitmapLength : previewFrames + 1;
+	}
+#pragma endregion
 
 #pragma region Init
 	FractalGenerator::FractalGenerator() {
 		Fractal::initialize();
+
 		std::random_device rd;
-		randomGenerator = new std::mt19937(rd());
-		randomDist = new std::uniform_real_distribution<float>(0.0f, 1.0f);
-		hash = new std::map<std::string, uint32_t>();
+		random = new std::mt19937(rd());
+		nextDouble = new std::uniform_real_distribution<double>(0.0, 1.0);
+		Hash = new std::map<std::string, uint32_t>();
 		colorBlends = new std::map<int64_t, std::array<Vector, 3>>();
-		selectCutparam = debug = selectDefaultHue = selectDefaultZoom = selectDefaultAngle = selectExtraSpin = selectExtraHue = 0;
-		selectZoom = 1;
-		selectFractal = selectChildColor = selectChildAngle = selectCut = allocatedWidth = allocatedHeight = allocatedTasks = allocatedFrames = selectSpin = selectMaxIterations = -1;
-		selectParallelType = ParallelType::OfAnimation;
-		selectGenerationType = GenerationType::EncodeGIF;
+
+		filePrefix = "guid" + Guid::NewGuid().ToString("N");
+		SelectedParallelType = ParallelType::OfAnimation;
+		SelectedGenerationType = GenerationType::Animation;
+		SelectedPngType = PngType::No;
+		SelectedGifType = GifType::No;
+		debug = SelectedDefaultHue = SelectedCutSeed = SelectedDefaultZoom = SelectedDefaultAngle =
+			SelectedExtraSpin = SelectedExtraHue = debugPeriodOverride = 0;
+		SelectedZoom = 1;
+		allocFrames = SelectedSpin = SelectedHue = SelectedFractal = SelectedChildColor = SelectedChildAngle = SelectedCut =
+			allocWidth = allocHeight = allocTasks = maxIterations = -1;
 		f = nullptr;
+		bitmap = nullptr;
 		gifEncoder = nullptr;
-		cutFunction = nullptr;
+		selectedCutFunction = nullptr;
 		tuples = nullptr;
 		parallelTasks = nullptr;
-		childAngle = nullptr;
-		childColor = nullptr;
-		gifSuccess = false;
+		ChildAngle = nullptr;
+		ChildColor = nullptr;
+		gifSuccess = 0;
 		//taskSnapshot = gcnew System::Collections::Generic::List<Task^>();
-		emptyFloat = new float[1] { static_cast<float>(M_PI) };
+		//emptyDouble = new double[1] { M_PI };
 		// Constants
-		const float pi = static_cast<float>(M_PI), pi23 = 2 * pi / 3, pi43 = 4 * pi / 3, SYMMETRIC = 2 * pi,
-			stt = sqrt(.75f), sqrt2 = sqrt(2.0f),
-			pfs = 2 * (1 + static_cast<float>(cos(.4 * pi))),
-			cosc = static_cast<float>(cos(.4 * pi)) / pfs,
-			sinc = static_cast<float>(sin(.4 * pi)) / pfs,
-			v = 2 * (sinc * sinc + cosc * (cosc + pfs)) / (2 * sinc),
-			s0 = (2 + sqrt2) / sqrt2,
-			sx = 2 + sqrt2,
+		const double pi = M_PI, 
+			pi3 = pi / 3, 
+			pi2 = pi / 2, 
+			pi5 = pi / 5,
+			pi32 = 3 * pi2, 
+			pi23 = 2 * pi3, 
+			pi43 = 4 * pi3, 
+			pi4 = .4 * pi, 
+			SYMMETRIC = 2 * pi, 
+			s2 = sqrt(2.0),
+			stt = sqrt(.75),
+			pentaS = 2 * (1 + cos(pi4)),
+			cosP = cos(pi4) / pentaS,
+			sinP = sin(pi4) / pentaS,
+			v = 2 * (sinP * sinP + cosP * (cosP + pentaS)) / (2 * sinP),
+			s0 = (2 + s2) / s2,
+			sx = 2 + s2,
 			r = (1 / s0 + 1 / sx) / (1 / s0 + 1 / (2 * sx)),
-			diag = sqrt2 / 3;
+			diagonal = s2 / 3;
 		// X, Y
-		float* cx = new float[9], * cy = new float[9], * pfx = new float[6], * pfy = new float[6], * tfx = new float[4], * tfy = new float[4], * ttfx = new float[16], * ttfy = new float[16], * ofx = new float[9], * ofy = new float[9];
+		double* carpetX = new double[9], * carpetY = new double[9],
+			* carpet5X = new double[25], * carpet5Y = new double[25],
+			* pentaX = new double[6], * pentaY = new double[6],
+			* triX = new double[4], * triY = new double[4],
+			* tetraX = new double[16], * tetraY = new double[16],
+			* octX = new double[9], * octY = new double[9];
 		// Carpets
-		for (int i = 0; i < 4; ++i) {
-			float ipi = i * pi / 2, icos = diag * cos(i * pi / 2), isin = diag * sin(i * pi / 2);
-			cx[i * 2 + 1] = icos - isin;
-			cy[i * 2 + 1] = isin + icos;
-			cx[i * 2 + 2] = icos;
-			cy[i * 2 + 2] = isin;
+		{
+			auto& x = carpetX, & y = carpetY;
+			x[0] = y[0] = 0;
+			for (int i = 0; i < 4; ++i) {
+				const float iPi = i * pi2,
+					iCos = diagonal * cos(iPi),
+					iSin = diagonal * sin(iPi);
+				int ii = i * 2 + 1;
+				x[ii] = -iCos + iSin;
+				y[ii] = -iSin - iCos;
+				x[++ii] = iSin;
+				y[ii] = -iCos;
+			}
 		}
-		cx[0] = cy[0] = 0;
-		// Pentaflakes
-		for (int i = 1; i <= 5; i++) {
-			pfx[i] = v * static_cast<float>(cos(.4f * (i + 3) * pi));
-			pfy[i] = v * static_cast<float>(sin(.4f * (i + 3) * pi));
+		// PentaCarpets
+		{
+			auto& x = carpet5X, & y = carpet5Y;
+			x[0] = y[0] = 0;
+			for (int i = 0; i < 4; ++i) {
+				const double iPi = i * pi2,
+					iCos = diagonal * cos(iPi),
+					iSin = diagonal * sin(iPi),
+					iSin2 = iSin * 2, iCos2 = iCos * 2;
+				int ii = i * 2 + 1;
+				x[ii] = -iCos + iSin;
+				y[ii] = -iSin - iCos;
+				x[++ii] = iSin;
+				y[i * 2 + 2] = -iCos;
+				x[ii = (ii << 1) + 5] = -iCos2 + iSin2;
+				y[ii] = -iSin2 - iCos2;
+				x[++ii] = -iCos + iSin2;
+				y[ii] = -iSin - iCos2;
+				x[++ii] = iSin2;
+				y[ii] = -iCos2;
+				x[++ii] = iCos + iSin2;
+				y[ii] = iSin - iCos2;
+			}
 		}
-		pfx[0] = pfy[0] = 0;
-		// Triflakes
-		for (auto i = 1; i <= 3; i++) {
-			tfx[i] = .5f * static_cast<float>(cos(i * pi23));
-			tfy[i] = .5f * static_cast<float>(sin(i * pi23));
+		// PentaFlakes
+		{
+			auto& x = pentaX, & y = pentaY;
+			x[0] = y[0] = 0;
+			for (int i = 1; i <= 5; i++) {
+				const auto a = .4 * (i + 3) * pi;
+				x[i] = v * sin(a);
+				y[i] = v * cos(a);
+			}
 		}
-		tfx[0] = tfy[0] = 0;
+		// TriFlakes
+		{
+			auto& x = triX, & y = triY;
+			x[0] = y[0] = 0;
+			for (auto i = 1; i <= 3; i++) {
+				const auto a = i * pi23;
+				x[i] = .5f * sin(a);
+				y[i] = .5f * cos(a);
+			}
+
+		}
 		// Tetratriflakes
-		for (auto i = 1; i <= 3; i++) {
-			const auto ci = .5f * static_cast<float>(cos(i * pi23)), si = .5f * static_cast<float>(sin(i * pi23)),
-				ci1 = .5f * static_cast<float>(cos((i + 1) * pi23)), si1 = .5f * static_cast<float>(sin((i + 1) * pi23)),
-				ci2 = .5f * static_cast<float>(cos((i + 2) * pi23)), si2 = .5f * static_cast<float>(sin((i + 2) * pi23));
-			ttfx[i] = -ci;
-			ttfy[i] = -si;
-			ttfx[i + 3] = ci - ci1;
-			ttfy[i + 3] = si - si1;
-			ttfx[i + 6] = ci - ci2;
-			ttfy[i + 6] = si - si2;
-			ttfx[i + 9] = 2 * ci - ci1 - ci2;
-			ttfy[i + 9] = 2 * si - si1 - si2;
-			ttfx[i + 12] = ci - ci1 - ci2;
-			ttfy[i + 12] = si - si1 - si2;
+		{
+			auto& x = tetraX, & y = tetraY;
+			x[0] = y[0] = 0;
+			for (auto i = 1; i <= 3; i++) {
+				const auto ci = .5 * cos(i * pi23), si = .5 * sin(i * pi23),
+					ci1 = .5 * cos((i + 1) * pi23), si1 = .5 * sin((i + 1) * pi23),
+					ci2 = .5 * cos((i + 2) * pi23), si2 = .5 * sin((i + 2) * pi23);
+				y[i] = -ci;
+				x[i] = -si;
+				y[i + 6] = ci - ci2;
+				x[i + 6] = si - si2;
+				y[i + 9] = (y[i + 12] = (y[i + 3] = ci - ci1) - ci2) + ci;
+				x[i + 9] = (x[i + 12] = (x[i + 3] = si - si1) - si2) + si;
+			}
 		}
-		ttfx[0] = ttfy[0] = 0;
 		// Octaflakes (not working)
-		for (auto i = 1; i <= 8; i++) {
-			ofx[i] = r * static_cast<float>(cos(i * pi / 4.0));
-			ofy[i] = r * static_cast<float>(sin(i * pi / 4.0));
+		{
+			auto& x = octX, & y = octY;
+			x[0] = y[0] = 0;
+			for (auto i = 1; i <= 8; i++) {
+				x[i] = r * cos(i * pi / 4.0);
+				y[i] = r * sin(i * pi / 4.0);
+			}
 		}
 
 		// Rotations
 		// childAngle[0] = SYMMETRIC + symmetry when 2*pi is symmetric!
 		// childAngle[0] = symmetry when 2*pi is NOT symmetric!
 
-		/*const std::string& name,
-			const int8_t& childCount,
-			const float& childSize,
-			const float& maxSize,
-			const float& minSize,
-			const float& cutSize,
-			float* childX,
-			float* childY,
-			std::vector<std::pair<std::string, float*>> childAngle,
-			std::vector<std::pair<std::string, uint8_t*>> childColor,
-			std::vector<std::pair<int32_t, std::vector<int32_t>>> cutFunction*/
-
 		std::vector<int32_t> empty;
-
 		fractals = new std::vector<Fractal*>(0);
-		fractals->reserve(10);
+		fractals->reserve(11);
 
-		fractals->push_back(new Fractal("Void", 0, 1000, 1, .1f, 1, F(1) { 0 }, F(1) { 0 }, { { "X", F(1) { 0.0f } } }, { { "X", B(1) { 0 } } }, { { -1, { 0 } } }));
-
-		fractals->push_back(new Fractal("TriTree", 10, 4, .2f, .05f, .9f,
-			F(10) { 0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt },
-			F(10) { 0, -1.5f, 0, 1.5f, 1.5f, 3, 1.5f, -1.5f, -3, -1.5f },
-			{ 
-			{ "RingTree", F(10) { SYMMETRIC + pi23, pi, pi + pi23, pi + 2 * pi23, 0, 0, pi23, pi23, 2 * pi23, 2 * pi23 } },
-			{ "BeamTree_Beams", F(10) { pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43 } },
-			{ "BeamTree_OuterJoint", F(10) { pi / 3, 0, pi23, pi43, pi + pi23, pi + pi23, pi, pi, pi + pi43, pi + pi43 } },
-			{ "BeamTree_InnerJoint", F(10) { pi / 3, 0, pi23, pi43, pi, pi, pi, pi, pi, pi } }
+		fractals->push_back(new Fractal("Void", 0, 1000, 1, .1, 1,
+			D(1) { 0 },
+			D(1) { 0 },
+			{
+			{ "N", D(1) { pi } }
 			},
 			{
-			{ "Center", B(10) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-			{ "CenterNeighbors", B(10) { 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 } }
-			},						   
+			{ "N", B(1) { 0 } }
+			},
+			{
+				{ -1, { 0 } }
+			}
+		));
+
+		fractals->push_back(new Fractal("TriTree", 10, 4, .2, .1, 1.0,
+			D(10) { 0, -1.5, 0, 1.5, 1.5, 3, 1.5, -1.5, -3, -1.5 },
+			D(10) { 0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt },
+			{
+			{ "BASE: RingTree", D(10) { SYMMETRIC + pi23, pi, pi + pi23, pi + pi43, 0, 0, pi23, pi23, pi43, pi43 } },
+			{ "BASE: BeamTree_Beams", D(10) { pi3, 0, pi43, pi23, pi, pi, pi + pi43, pi + pi43, pi + pi23, pi + pi23 } },
+			},
+			{
+				{ "Center",		B(10) { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Neg",	B(10) {4, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Half",B(10) {3, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_One",	B(10) {1, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Y",			B(10) {0, 2, 2, 2, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_Neg",		B(10) {0, 4, 4, 4, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_Half",		B(10) {0, 3, 3, 3, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_One",		B(10) {0, 1, 1, 1, 0, 0, 0, 0, 0, 0 } },
+
+				{ "2",			B(10) {0, 0, 0, 0, 2, 2, 2, 0, 0, 0 } },
+				{ "2_Neg",		B(10) {0, 0, 0, 0, 4, 4, 4, 0, 0, 0 } },
+				{ "2_Half",		B(10) {0, 0, 0, 0, 3, 3, 3, 0, 0, 0 } },
+				{ "2_One",		B(10) {0, 0, 0, 0, 1, 1, 1, 0, 0, 0 } },
+
+				{ "3",			B(10) {0, 0, 0, 0, 0, 0, 0, 2, 2, 2 } },
+				{ "3_Neg",		B(10) {0, 0, 0, 0, 0, 0, 0, 4, 4, 4 } },
+				{ "3_Half",		B(10) {0, 0, 0, 0, 0, 0, 0, 3, 3, 3 } },
+				{ "3_One",		B(10) {0, 0, 0, 0, 0, 0, 0, 1, 1, 1 } }
+			},
 			{
 				{ 1, { -1534 } },	// NoChildComplex
 				{ 8, { } },			// NoBeam
@@ -200,131 +401,635 @@ namespace RgbFractalGenClr {
 			}
 		));
 
+		fractals->push_back(new Fractal("FlakeTree", 13, 4, .2, .1, .9,
+			D(13) { 0, -1.5, 0, 1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 1.5, 0, -1.5 },
+			D(13) { 0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, stt, -2 * stt, stt },
+			{
+				{ "BASE", D(13) { pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, 0, pi23, pi43 } },
+				{ "RotatedCenter", D(13) { pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "RotatedY", D(13) { 0, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "RotatedY2", D(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi } }
+			},
+			{
+				{ "Center",			B(13) { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Neg",		B(13) { 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Half",	B(13) { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_One",		B(13) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
 
+				{ "Y",				B(13) { 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_Neg",			B(13) { 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_Half",			B(13) { 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_One",			B(13) { 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
 
-		/*fractals = new Fractal * [10] {
-			new Fractal("TriComb", 13, 5, .2f, .05f, .9f,
-				F(13) { 0, 2 * stt, -stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, 2 * stt, -4 * stt, 2 * stt},
-				F(13) { 0, 0, 1.5f, -1.5f, 1.5f, 3, 1.5f, -1.5f, -3, -1.5f, 3, 0, -3 },
-				FA(2) { { "Classic",F(13) { pi / 3, 0, pi23, pi43, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, pi, pi43, 0, pi23 } }, FE },
-				BA(30) {
-					{ "Center", B(13) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-					{ "Bridges", B(13) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2 } },
-					BE
-				},
-				CA(2) { { "NoChild", Fractal::TriComb_Param }, CE }
-			), 
-			new Fractal("Triflake", 4, 2, 1.5f, .175f, .8f, tfx, tfy,
-				FA(2) { { "Center", F(4) { pi / 3, 0, 0, 0 } }, FE },
-				BA(2) { { "Center", B(4) { 1, 0, 0, 0 } }, BE },
-				CA(3) {
-					{ "NoChild", Fractal::NoChildComplexParam, nullptr },
-					{ "NoBackDiag", Fractal::NoBackDiag, nullptr },
-					CE
-				}
-			),
-			new Fractal("TetraTriflake", 16, 4, 1.5f, .15f, .8f, ttfx, ttfy,
-				FA(2) { { "Classic", F(16) { SYMMETRIC + pi23, pi, pi + pi23, pi + pi43, 0, pi23, pi43, 0, pi23, pi43, 0, pi23, pi43, pi, pi + pi23, pi + pi43 } }, FE },
-				BA(14) {
-					{ "Rad", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1 } },
-					{ "Corner", B(16) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0 } },
-					{ "Triangle", B(16) {0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-					{ "Swirl", B(16) { 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-					{ "Center", B(16) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-					{ "Center Rad", B(16) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1 } },
-					{ "Center Corner", B(16) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0 } },
-					{ "Center Triangle", B(16) { 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-					{ "Center Swirl", B(16) { 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-					{ "Center Rad 2", B(16) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2 } },
-					{ "Center Corner 2", B(16) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 } },
-					{ "Center Triangle 2", B(16) { 1, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-					{ "Center Swirl 2", B(16) { 1, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-					BE
-				}, CA(5) {
-					{ "NoCorner", Fractal::Tetraflake_NoCornerParam, nullptr },
-					{ "NoCorner + RadHoles", Fractal::Tetraflake_NoCornerRadHolesParam, nullptr },
-					{ "NoCorner + CornerHoles", Fractal::Tetraflake_NoCornerCornerHolesParam, nullptr },
-					{ "NoCorner + TriangleHoles", Fractal::Tetraflake_NoCornerTriangleHolesParam, nullptr },
-					CE
-				}
-			), 
-			new Fractal("SierpinskiCarpet", 9, 3, 1.0f, .175f, .9f, cx, cy,
-					FA(17) {
-						{ "Classic", F(9) { SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0 } },
-						{ "H-I De Rivera O (opposites)", F(9) { SYMMETRIC + pi, 0, 0, 0, pi / 2, 0, 0, 0, pi / 2 } },
-						{ "H-I De Rivera H (coloreds)", F(9) { SYMMETRIC + pi, 0, pi / 2, 0, 0, 0, pi / 2, 0, 0 } },
-						{ "H-I De Rivera OH", F(9) { SYMMETRIC + pi, 0, pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2 } },
-						{ "H-I De Rivera X (corners)", F(9) { SYMMETRIC + pi, pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2, 0 } },
-						{ "H-I De Rivera XO", F(9) { SYMMETRIC + pi, pi / 2, 0, pi / 2, pi / 2, pi / 2, 0, pi / 2, pi / 2 } },
-						{ "H-I De Rivera XH", F(9) { SYMMETRIC + pi, pi / 2, pi / 2, pi / 2, 0, pi / 2, pi / 2, pi / 2, 0 } },
-						{ "H-I De Rivera / (diagonals)", F(9) { SYMMETRIC + pi, pi / 2, 0, 0, 0, pi / 2, 0, 0, 0 } },
-						{ "H-I De Rivera C", F(9) { SYMMETRIC + pi / 2, 0, 0, 0, 0, 0, 0, 0, 0 } },
-						{ "H-I De Rivera CO", F(9) { SYMMETRIC + pi / 2, 0, 0, 0, pi / 2, 0, 0, 0, pi / 2 } },
-						{ "H-I De Rivera CH", F(9) { SYMMETRIC + pi / 2, 0, pi / 2, 0, 0, 0, pi / 2, 0, 0 } },
-						{ "H-I De Rivera COH", F(9) { SYMMETRIC + pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2 } },
-						{ "H-I De Rivera CX", F(9) { SYMMETRIC + pi / 2, pi / 2, 0, pi / 2, 0, pi / 2, 0, pi / 2, 0 } },
-						{ "H-I De Rivera CXO", F(9) { SYMMETRIC + pi / 2, pi / 2, 0, pi / 2, pi / 2, pi / 2, 0, pi / 2, pi / 2 } },
-						{ "H-I De Rivera CXH", F(9) { SYMMETRIC + pi / 2, pi / 2, pi / 2, pi / 2, 0, pi / 2, pi / 2, pi / 2, 0 } },
-						{ "H-I De Rivera C/", F(9) { SYMMETRIC + pi / 2, pi / 2, 0, 0, 0, pi / 2, 0, 0, 0 } },
-						FE
-					}, BA(3) {
-						{ "Sierpinski Carpet",  B(9) { 1, 0, 0, 0, 0, 0, 0, 0, 0 } },
-						{ "H-I De Rivera",  B(9) { 0, 0, 1, 0, 0, 0, 1, 0, 0 } },
-						BE
-					}, CA(3) {
-						{ "NoChild", Fractal::NoChildComplexParam, nullptr },
-						{ "NoBackDiag", Fractal::NoBackDiag, nullptr },
-						CE
-					 } 
-				),
-				new Fractal("Pentaflake", 6, pfs, .2f * pfs, .15f, .9f, pfx, pfy,
-					FA(3) { 
-						{ "Classic",  F(6) { 2 * pi / 10, 0, 0, 0, 0, 0 } }, 
-						{ "No Center Rotation",  F(6) { 2 * pi + 2 * pi / 5, 0, 0, 0, 0, 0 } }, 
-						FE 
-					}, BA(2) { { "Center", B(6) { 1, 0, 0, 0, 0, 0 } }, BE },
-					CA(3) {
-						{ "NoChild", Fractal::NoChildComplexParam, nullptr },
-						{ "NoBackDiag", Fractal::NoBackDiag, nullptr },
-						CE
-					}
-				),
-				new Fractal("Hexaflake", 7, 3, .5f, .1f, 1,
-					F(7) { 0, 0, 2 * stt, 2 * stt, 0, -2 * stt, -2 * stt },
-					F(7) { 0, -2, -1, 1, 2, 1, -1 },
-					FA(2) { { "Classic", F(7) { SYMMETRIC + pi / 3, 0, 0, 0, 0, 0, 0 } }, FE },
-					BA(3) {
-						{ "Center", B(7) { 1, 0, 0, 0, 0, 0, 0 } },
-						{ "Y", B(7) { 1, 0, 1, 0, 1, 0, 1 } },
-						BE
-					}, CA(3) {
-						{ "NoChild", Fractal::NoChildComplexParam, nullptr },
-						{ "NoBackDiag", Fractal::NoBackDiag, nullptr },
-						CE
-					}
-				),
-				new Fractal("HexaCircular", 19, 5, .2f, .05f, .9f,
-					F(19) { 0, 2 * stt, stt, -stt, -2 * stt, -stt, stt, 4 * stt, 3 * stt, stt, -stt, -3 * stt, -4 * stt, -4 * stt, -3 * stt, -stt, stt, 3 * stt, 4 * stt},
-					F(19) { 0, 0, 1.5f, 1.5f, 0, -1.5f, -1.5f, 1, 2.5f, 3.5f, 3.5f, 2.5f, 1, -1, -2.5f, -3.5f, -3.5f, -2.5f, -1},
-					FA(3) {
-						{ "180", F(19) { pi / 3, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0 } },
-						{ "Symmetric", F(19) { SYMMETRIC + pi23, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0 } },
-						FE
-					}, BA(5) {
-						{ "Center", B(19) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-						{ "Center Y", B(19) { 1, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-						{ "Y", B(19) { 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-						{ "Double Y", B(19) { 0, 2, 1, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-						BE
-				}, nullptr
-			), nullptr
-		};*/
+				{ "Corners",		B(13) { 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0 } },
+				{ "Corners_Neg",	B(13) { 0, 0, 0, 0, 4, 4, 4, 4, 4, 4, 0, 0, 0 } },
+				{ "Corners_Half",	B(13) { 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0 } },
+				{ "Corners_One",	B(13) { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0 } },
+
+				{ "Y2",				B(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2 } },
+				{ "Y2_Neg",			B(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4 } },
+				{ "Y2_Half",		B(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3 } },
+				{ "Y2_One",			B(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1 } }
+			},
+			{
+				{ -1, { 0 } }
+			}
+		));
+
+		fractals->push_back(new Fractal("TriComb", 13, 5, .2, .1, .9,
+			D(13) { 0, 0, 1.5, -1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 3, 0, -3 },
+			D(13) { 0, 2 * stt, -stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, 2 * stt, -4 * stt, 2 * stt},
+			{
+				{ "BASE", D(13) { pi / 3, 0, pi43, pi23, pi, pi + pi43, pi + pi43, pi + pi23, pi + pi23, pi, pi23, 0, pi43 } }
+			},
+			{
+				{ "Center",			B(13) { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Neg",		B(13) { 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Half",	B(13) { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_One",		B(13) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Bridges",		B(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2 } },
+				{ "Bridges_Neg",	B(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4 } },
+				{ "Bridges_Half",	B(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3 } },
+				{ "Bridges_One",	B(13) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1 } },
+
+				{ "Inner",			B(13) { 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Inner_Neg",		B(13) { 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Inner_Half",		B(13) { 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Inner_One",		B(13) { 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Outer",			B(13) { 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0 } },
+				{ "Outer_Neg",		B(13) { 0, 0, 0, 0, 4, 4, 4, 4, 4, 4, 0, 0, 0 } },
+				{ "Outer_Half",		B(13) { 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0 } },
+				{ "Outer_One",		B(13) { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0 } }
+			},
+			{
+				{ 3, { } }			// TriComb_Seeds
+			}
+		));
+
+		fractals->push_back(new Fractal("TriFlake", 4, 2, 1.5, .25, .8, triX, triY,
+			{
+				{ "BASE", D(4) { pi3, SYMMETRIC, SYMMETRIC, SYMMETRIC } },
+				
+				{ "Angles", D(4) { 0, 0, pi23, 2 * pi23 } }
+			},
+			{
+				{ "Center",		B(4) { 2, 0, 0, 0 } },
+				{ "CenterNeg",	B(4) { 4, 0, 0, 0 } },
+				{ "CenterHalf",	B(4) { 3, 0, 0, 0 } },
+				{ "CenterOne",	B(4) { 1, 0, 0, 0 } },
+
+				{ "Top",		B(4) { 0, 2, 0, 0 } },
+				{ "TopNeg",		B(4) { 0, 4, 0, 0 } },
+				{ "TopHalf",	B(4) { 0, 3, 0, 0 } },
+				{ "TopOne",		B(4) { 0, 1, 0, 0 } },
+
+				{ "Bottom",		B(4) { 0, 0, 2, 2 } },
+				{ "BottomNeg",	B(4) { 0, 0, 4, 4 } },
+				{ "BottomHalf",	B(4) { 0, 0, 3, 3 } },
+				{ "BottomOne",	B(4) { 0, 0, 1, 1 } }
+			},
+			{
+				{ 1, { -22 } },	// NoChildComplex
+				{ 2, { 0, 3 } }	// NoBackDiag
+			}
+		));
+
+		fractals->push_back(new Fractal("TetraTriFlake", 16, 4, 1.5, .15, .8, triX, triY,
+			{
+				{ "BASE", D(16) { SYMMETRIC + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi } },
+				
+				{ "Div", D(16) { 0, 0, pi43, pi23, pi23, 0, pi43, pi43, pi23, 0, 0, pi43, pi23, 0, pi43, pi23 } },
+				{ "In", D(16) { 0, 0, pi43, pi23, pi43, pi23, 0, pi23, 0, pi43, 0, pi43, pi23, 0, pi43, pi23 } },
+				{ "Out", D(16) { 0, 0, pi43, pi23, 0, pi43, pi23, 0, pi43, pi23, 0, pi43, pi23, 0, pi43, pi23 } }
+			},
+			{
+				{ "Center", B(16) { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Neg", B(16) { 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Half", B(16) { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_One", B(16) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "RaB", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2 } },
+				{ "RaB_Neg", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4 } },
+				{ "RaB_Half", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3 } },
+				{ "RaB_One", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1 } },
+
+				{ "Vertex", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 } },
+				{ "Vertex_Neg", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0 } },
+				{ "Vertex_Half", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0 } },
+				{ "Vertex_One", B(16) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0 } },
+
+				{ "Triangle", B(16) { 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Triangle_Neg", B(16) { 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Triangle_Half", B(16) { 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Triangle_One", B(16) { 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Swirl", B(16) { 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Swirl_Neg", B(16) { 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Swirl_Half", B(16) { 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Swirl_One", B(16) { 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Swirl2", B(16) { 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0 } },
+				{ "Swirl2_Neg", B(16) { 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0 } },
+				{ "Swirl2_Half", B(16) { 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0 } },
+				{ "Swirl2_One", B(16) { 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 } }
+			},
+			{
+				{ 4,{ } },// NoChildSymmetric
+				{ 5, { } },// NoChildRad
+				{ 6, {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,128,129,130,
+					131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,
+					156,157,158,159,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,
+					277,278,279,280,281,282,283,284,285,286,287,384,385,386,387,388,389,390,391,392,393,394,395,396,397,
+					398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415 } },// NoChildCorner
+				{ 7, {0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,
+					128,132,136,140,144,148,152,156,160,164,168,172,176,180,184,188,192,196,200,204,208,212,216,220,224,
+					228,232,236,240,244,248,252,256,260,264,268,272,276,280,284,288,292,296,300,304,308,312,316,320,324,
+					328,332,336,340,344,348,352,356,360,364,368,372,376,380,384,388,392,396,400,404,408,412,416,420,424,
+					428,432,436,440,444,448,452,456,460,464,468,472,476,480,484,488,492,496,500,504,508 } },// NoChildTriangle
+				{ 12, { -98303 } } // NoChildComplex
+			}
+		));
+		
+		fractals->push_back(new Fractal("SierpinskiCarpet", 9, 3, 1.0, .25, .9, carpetX, carpetY,
+			{
+				{ "BASE: Classic", D(9) { SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "BASE: Quarter", D(9) { SYMMETRIC + pi2, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "H-I De Rivera O (opposites)", D(9) { 0, 0, 0, 0, pi2, 0, 0, 0, pi2 } },
+				{ "H-I De Rivera H (coloreds)", D(9) { 0, 0, pi2, 0, 0, 0, pi2, 0, 0 } },
+				{ "H-I De Rivera OH", D(9) { 0, 0, pi2, 0, pi2, 0, pi2, 0, pi2 } },
+				{ "H-I De Rivera X (corners)", D(9) { 0, pi2, 0, pi2, 0, pi2, 0, pi2, 0 } },
+				{ "H-I De Rivera D", D(9) { 0, pi2, 0, 0, 0, pi2, 0, 0, 0 } },
+				{ "H-I De Rivera D2", D(9) { 0, 0, 0, pi2, 0, 0, 0, pi2, 0 } },
+				{ "Rotated", D(9) { 0, 0, 0, 0, pi2, 0, pi, 0, pi32 } },
+			},
+			{
+				{ "Sierpinski_Carpet",		B(9) { 2, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Sierpinski_Carpet_Neg",	B(9) { 4, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Sierpinski_Carpet_Half", B(9) { 3, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Sierpinski_Carpet_One",	B(9) { 1, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "H-I_De_Rivera",			B(9) { 0, 0, 2, 0, 0, 0, 2, 0, 0 } },
+				{ "H-I_De_Rivera_Neg",		B(9) { 0, 0, 4, 0, 0, 0, 4, 0, 0 } },
+				{ "H-I_De_Rivera_Half",		B(9) { 0, 0, 3, 0, 0, 0, 3, 0, 0 } },
+				{ "H-I_De_Rivera_One",		B(9) { 0, 0, 1, 0, 0, 0, 1, 0, 0 } },
+
+				{ "H-I_De_Rivera2",			B(9) { 0, 0, 0, 0, 2, 0, 0, 0, 2 } },
+				{ "H-I_De_Rivera2_Neg",		B(9) { 0, 0, 0, 0, 4, 0, 0, 0, 4 } },
+				{ "H-I_De_Rivera2_Half",	B(9) { 0, 0, 0, 0, 3, 0, 0, 0, 3 } },
+				{ "H-I_De_Rivera2_One",		B(9) { 0, 0, 0, 0, 1, 0, 0, 0, 1 } },
+
+				{ "Diag",					B(9) { 0, 2, 0, 0, 0, 2, 0, 0, 0 } },
+				{ "Diag_Neg",				B(9) { 0, 4, 0, 0, 0, 4, 0, 0, 0 } },
+				{ "Diag_Half",				B(9) { 0, 3, 0, 0, 0, 3, 0, 0, 0 } },
+				{ "Diag_One",				B(9) { 0, 1, 0, 0, 0, 1, 0, 0, 0 } },
+
+				{ "Diag2",					B(9) { 0, 0, 0, 2, 0, 0, 0, 2, 0 } },
+				{ "Diag2_Neg",				B(9) { 0, 0, 0, 4, 0, 0, 0, 4, 0 } },
+				{ "Diag2_Half",				B(9) { 0, 0, 0, 3, 0, 0, 0, 3, 0 } },
+				{ "Diag2_One",				B(9) { 0, 0, 0, 1, 0, 0, 0, 1, 0 } }
+			},
+			{
+				// Symmetric
+				{ 11, { -95 } },
+				// NoBackDiag (AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...
+				{ 2, { 0,4100,4104,4108,8194,8208,8210,8224,8226,8240,8242,12290,12292,12294,12296,12298,12300,12302,12304,12306,12308,12310,12312,12314,12316,12318,12320,12322,12324,12326,12328,12330,12332,12334,12336,12338,12340,12342,12344,12346,12348,12350,
+					16385,16448,16449,16512,16513,16576,16577,16640,16641,16704,16705,16768,16769,16832,16833,20481,20484,20485,20488,20489,20492,20493,20544,20545,20548,20549,20552,20553,20556,20557,20608,20609,20612,20613,20616,20617,20620,20621,20672,20673,
+					20676,20677,20680,20681,20684,20685,20736,20737,20740,20741,20744,20745,20748,20749,20800,20804,20805,20808,20809,20812,20813,20864,20865,20868,20869,20872,20873,20876,20877,20928,20929,20932,20933,20936,20937,20940,20941,24577,24578,24579,
+					24592,24593,24594,24595,24608,24609,24610,24611,24624,24625,24626,24627,24640,24641,24642,24643,24656,24657,24658,24659,24672,24673,24674,24675,24688,24689,24690,24691,24704,24705,24706,24707,24720,24721,24722,24723,24736,24737,24738,24739,
+					24752,24753,24754,24755,24768,24769,24770,24771,24784,24785,24786,24787,24800,24801,24802,24803,24816,24817,24818,24819,24832,24833,24834,24835,24848,24849,24850,24851,24864,24865,24866,24867,24880,24881,24882,24883,24896,24897,24898,24899,
+					24912,24913,24914,24915,24928,24929,24930,24931,24944,24945,24946,24947,24960,24961,24962,24963,24976,24977,24978,24979,24992,24993,24994,24995,25008,25009,25010,25011,25024,25025,25026,25027,25040,25041,25042,25043,25056,25057,25058,25059,
+					25072,25073,25074,25075,28673,28674,28675,28676,28677,28678,28679,28680,28681,28682,28683,28684,28685,28686,28687,28688,28689,28690,28691,28692,28693,28694,28695,28696,28697,28698,28699,28700,28701,28702,28703,28704,28705,28706,28707,28708,
+					28709,28710,28711,28712,28713,28714,28715,28716,28717,28718,28719,28720,28721,28722,28723,28724,28725,28726,28727,28728,28729,28730,28731,28732,28733,28734,28735,28736,28737,28738,28739,28740,28741,28742,28743,28744,28745,28746,28747,28748,
+					28749,28750,28751,28752,28753,28754,28755,28756,28757,28758,28759,28760,28761,28762,28763,28764,28765,28766,28767,28768,28769,28770,28771,28772,28773,28774,28775,28776,28777,28778,28779,28780,28781,28782,28783,28784,28785,28786,28787,28788,
+					28789,28790,28791,28792,28793,28794,28795,28796,28797,28798,28799,28800,28801,28802,28803,28804,28805,28806,28807,28808,28809,28810,28811,28812,28813,28814,28815,28816,28817,28818,28819,28820,28821,28822,28823,28824,28825,28826,28827,28828,
+					28829,28830,28831,28832,28833,28834,28835,28836,28837,28838,28839,28840,28841,28842,28843,28844,28845,28846,28847,28848,28849,28850,28851,28852,28853,28854,28855,28856,28857,28858,28859,28860,28861,28862,28863,28864,28865,28866,28867,28868,
+					28869,28870,28871,28872,28873,28874,28875,28876,28877,28878,28879,28880,28881,28882,28883,28884,28885,28886,28887,28888,28889,28890,28891,28892,28893,28894,28895,28896,28897,28898,28899,28900,28901,28902,28903,28904,28905,28906,28907,28908,
+					28909,28910,28911,28912,28913,28914,28915,28916,28917,28918,28919,28920,28921,28922,28923,28924,28925,28926,28927,28928,28929,28930,28931,28932,28933,28934,28935,28936,28937,28938,28939,28940,28941,28942,28943,28944,28945,28946,28947,28948,
+					28949,28950,28951,28952,28953,28954,28955,28956,28957,28958,28959,28960,28961,28962,28963,28964,28965,28966,28967,28968,28969,28970,28971,28972,28973,28974,28975,28976,28977,28978,28979,28980,28981,28982,28983,28984,28985,28986,28987,28988,
+					28989,28990,28991,28992,28993,28994,28995,28996,28997,28998,28999,29000,29001,29002,29003,29004,29005,29006,29007,29008,29009,29010,29011,29012,29013,29014,29015,29016,29017,29018,29019,29020,29021,29022,29023,29024,29025,29026,29027,29028,
+					29029,29030,29031,29032,29033,29034,29035,29036,29037,29038,29039,29040,29041,29042,29043,29044,29045,29046,29047,29048,29049,29050,29051,29052,29053,29054,29055,29056,29057,29058,29059,29060,29061,29062,29063,29064,29065,29066,29067,29068,
+					29069,29070,29071,29072,29073,29074,29075,29076,29077,29078,29079,29080,29081,29082,29083,29084,29085,29086,29087,29088,29089,29090,29091,29092,29093,29094,29095,29096,29097,29098,29099,29100,29101,29102,29103,29104,29105,29106,29107,29108,
+					29109,29110,29111,29112,29113,29114,29115,29116,29117,29118,29119,29120,29121,29122,29123,29124,29125,29126,29127,29128,29129,29130,29131,29132,29133,29134,29135,29136,29137,29138,29139,29140,29141,29142,29143,29144,29145,29146,29147,29148,
+					29149,29150,29151,29152,29153,29154,29155,29156,29157,29158,29159,29160,29161,29162,29163,29164,29165,29166,29167,29168,29169,29170,29171,29172,29173,29174,29175,29176,29177,29178,29179,29180,29181,29182,29183,33280,33792,34304,34816,35328,
+					35840,36352,36868,36872,36876,37376,37380,37384,37388,37888,37892,37896,37900,38400,38404,38408,38412,38912,38916,38920,38924,39424,39428,39432,39436,39936,39940,39944,39948,40448,40452,40456,40460,40962,40976,40978,40992,40994,41008,41010,
+					41472,41474,41488,41490,41504,41506,41520,41522,41984,41986,42000,42002,42016,42018,42032,42034,42496,42498,42512,42514,42528,42530,42544,42546,43008,43010,43024,43026,43040,43042,43056,43058,43520,43522,43536,43538,43552,43554,43568,43570,
+					44032,44034,44048,44050,44064,44066,44080,44082,44544,44546,44560,44562,44576,44578,44592,44594,45058,45060,45062,45064,45066,45068,45070,45072,45074,45076,45078,45080,45082,45084,45086,45088,45090,45092,45094,45096,45098,45100,45102,45104,
+					45106,45108,45110,45112,45114,45116,45118,45568,45570,45572,45574,45576,45578,45580,45582,45584,45586,45588,45590,45592,45594,45596,45598,45600,45602,45604,45606,45608,45610,45612,45614,45616,45618,45620,45622,45624,45626,45628,45630,46080,
+					46082,46084,46086,46088,46090,46092,46094,46096,46098,46100,46102,46104,46106,46108,46110,46112,46114,46116,46118,46120,46122,46124,46126,46128,46130,46132,46134,46136,46138,46140,46142,46592,46594,46596,46598,46600,46602,46604,46606,46608,
+					46610,46612,46614,46616,46618,46620,46622,46624,46626,46628,46630,46632,46634,46636,46638,46640,46642,46644,46646,46648,46650,46652,46654,47104,47106,47108,47110,47112,47114,47116,47118,47120,47122,47124,47126,47128,47130,47132,47134,47136,
+					47138,47140,47142,47144,47146,47148,47150,47152,47154,47156,47158,47160,47162,47164,47166,47616,47618,47620,47622,47624,47626,47628,47630,47632,47634,47636,47638,47640,47642,47644,47646,47648,47650,47652,47654,47656,47658,47660,47662,47664,
+					47666,47668,47670,47672,47674,47676,47678,48128,48130,48132,48134,48136,48138,48140,48142,48144,48148,48150,48152,48154,48156,48158,48160,48162,48164,48166,48168,48170,48172,48174,48176,48178,48180,48182,48184,48186,48188,48190,48640,48642,
+					48644,48646,48648,48650,48652,48654,48656,48658,48660,48662,48664,48666,48668,48670,48672,48674,48676,48678,48680,48682,48684,48686,48688,48690,48692,48694,48696,48698,48700,48702,49153,49216,49217,49280,49281,49344,49345,49408,49409,49472,
+					49473,49536,49537,49600,49601,49664,49665,49728,49729,49792,49793,49856,49857,49920,49921,49984,49985,50048,50049,50112,50113,50176,50177,50240,50241,50304,50305,50368,50369,50432,50433,50496,50497,50560,50561,50624,50625,50688,50689,50752,
+					50753,50816,50817,50880,50881,50944,50945,51008,51009,51072,51073,51136,51137,51200,51201,51264,51265,51328,51329,51392,51393,51456,51457,51520,51521,51584,51585,51648,51649,51712,51713,51776,51777,51840,51841,51904,51905,51968,51969,52032,
+					52033,52096,52097,52160,52161,52224,52225,52288,52289,52352,52353,52416,52417,52480,52481,52544,52545,52608,52609,52672,52673,52736,52737,52800,52801,52864,52865,52928,52929,52992,52993,53056,53057,53120,53121,53184,53185,53249,53252,53253,
+					53256,53257,53260,53261,53312,53313,53316,53317,53320,53321,53324,53325,53376,53377,53380,53381,53384,53385,53388,53389,53440,53441,53444,53445,53448,53449,53452,53453,53504,53505,53508,53509,53512,53513,53516,53517,53568,53569,53572,53573,
+					53576,53577,53580,53581,53632,53633,53636,53637,53640,53641,53644,53645,53696,53697,53700,53701,53704,53705,53708,53709,53760,53761,53764,53765,53768,53769,53772,53773,53824,53825,53828,53829,53832,53833,53836,53837,53888,53889,53892,53893,
+					53896,53897,53900,53901,53952,53953,53956,53957,53960,53961,53964,53965,54016,54017,54020,54021,54024,54025,54028,54029,54080,54081,54084,54085,54088,54089,54092,54093,54144,54145,54148,54149,54152,54153,54156,54157,54208,54209,54212,54213,
+					54216,54217,54220,54221,54272,54273,54276,54277,54280,54281,54284,54285,54336,54337,54340,54341,54344,54345,54348,54349,54400,54401,54404,54405,54408,54409,54412,54413,54464,54465,54468,54469,54472,54473,54476,54477,54528,54529,54532,54533,
+					54536,54537,54540,54541,54592,54593,54596,54597,54600,54601,54604,54605,54656,54657,54660,54661,54664,54665,54668,54669,54720,54721,54724,54725,54728,54729,54732,54733,54784,54785,54788,54789,54792,54793,54796,54797,54848,54849,54852,54853,
+					54856,54857,54860,54861,54912,54913,54916,54917,54920,54921,54924,54925,54976,54977,54980,54981,54984,54985,54988,54989,55040,55041,55044,55045,55048,55049,55052,55053,55104,55105,55108,55109,55112,55113,55116,55117,55168,55169,55172,55173,
+					55176,55177,55180,55181,55232,55233,55236,55237,55240,55241,55244,55245,55296,55297,55300,55301,55304,55305,55308,55309,55360,55361,55364,55365,55368,55369,55372,55373,55424,55425,55428,55429,55432,55433,55436,55437,55488,55489,55492,55493,
+					55496,55497,55500,55501,55552,55553,55556,55557,55560,55561,55564,55565,55616,55617,55620,55621,55624,55625,55628,55629,55680,55681,55684,55685,55688,55689,55692,55693,55744,55745,55748,55749,55752,55753,55756,55757,55808,55809,55812,55813,
+					55816,55817,55820,55821,55872,55873,55876,55877,55880,55881,55884,55885,55936,55937,55940,55941,55944,55945,55948,55949,56000,56001,56004,56005,56008,56009,56012,56013,56064,56065,56068,56069,56072,56073,56076,56077,56128,56129,56132,56133,
+					56136,56137,56140,56141,56192,56193,56196,56197,56200,56201,56204,56205,56256,56257,56260,56261,56264,56265,56268,56269,56320,56321,56324,56325,56328,56329,56332,56333,56384,56385,56388,56389,56392,56393,56396,56397,56448,56449,56452,56453,
+					56456,56457,56460,56461,56512,56513,56516,56517,56520,56521,56524,56525,56576,56577,56580,56581,56584,56585,56588,56589,56640,56641,56644,56645,56648,56649,56652,56653,56704,56705,56708,56709,56712,56713,56716,56717,56768,56769,56772,56773,
+					56776,56777,56780,56781,56832,56833,56836,56837,56840,56841,56844,56845,56896,56897,56900,56901,56904,56905,56908,56909,56960,56961,56964,56965,56968,56969,56972,56973,57024,57025,57028,57029,57032,57033,57036,57037,57088,57089,57092,57093,
+					57096,57097,57100,57101,57152,57153,57156,57157,57160,57161,57164,57165,57216,57217,57220,57221,57224,57225,57228,57229,57280,57281,57284,57285,57288,57289,57292,57293,57345,57346,57347,57360,57361,57362,57363,57376,57377,57378,57379,57392,
+					57393,57394,57395,57408,57409,57410,57411,57424,57425,57426,57427,57440,57441,57442,57443,57456,57457,57458,57459,57472,57473,57474,57475,57488,57489,57490,57491,57504,57505,57506,57507,57520,57521,57522,57523,57536,57537,57538,57539,57552,
+					57553,57554,57555,57568,57569,57570,57571,57584,57585,57586,57587,57600,57601,57602,57603,57616,57617,57618,57619,57632,57633,57634,57635,57648,57649,57650,57651,57664,57665,57666,57667,57680,57681,57682,57683,57696,57697,57698,57699,57712,
+					57713,57714,57715,57728,57729,57730,57731,57744,57745,57746,57747,57760,57761,57762,57763,57776,57777,57778,57779,57792,57793,57794,57795,57808,57809,57810,57811,57824,57825,57826,57827,57840,57841,57842,57843,57856,57857,57858,57859,57872,
+					57873,57874,57875,57888,57889,57890,57891,57904,57905,57906,57907,57920,57921,57922,57923,57936,57937,57938,57939,57952,57953,57954,57955,57968,57969,57970,57971,57984,57985,57986,57987,58000,58001,58002,58003,58016,58017,58018,58019,58032,
+					58033,58034,58035,58048,58049,58050,58051,58064,58065,58066,58067,58080,58081,58082,58083,58096,58097,58098,58099,58112,58113,58114,58115,58128,58129,58130,58131,58144,58145,58146,58147,58160,58161,58162,58163,58176,58177,58178,58179,58192,
+					58193,58194,58195,58208,58209,58210,58211,58224,58225,58226,58227,58240,58241,58242,58243,58256,58257,58258,58259,58272,58273,58274,58275,58288,58289,58290,58291,58304,58305,58306,58307,58320,58321,58322,58323,58336,58337,58338,58339,58352,
+					58353,58354,58355,58368,58369,58370,58371,58384,58385,58386,58387,58400,58401,58402,58403,58416,58417,58418,58419,58432,58433,58434,58435,58448,58449,58450,58451,58464,58465,58466,58467,58480,58481,58482,58483,58496,58497,58498,58499,58512,
+					58513,58514,58515,58528,58529,58530,58531,58544,58545,58546,58547,58560,58561,58562,58563,58576,58577,58578,58579,58592,58593,58594,58595,58608,58609,58610,58611,58624,58625,58626,58627,58640,58641,58642,58643,58656,58657,58658,58659,58672,
+					58673,58674,58675,58688,58689,58690,58691,58704,58705,58706,58707,58720,58721,58722,58723,58736,58737,58738,58739,58752,58753,58754,58755,58768,58769,58770,58771,58784,58785,58786,58787,58800,58801,58802,58803,58816,58817,58818,58819,58832,
+					58833,58834,58835,58848,58849,58850,58851,58864,58865,58866,58867,58880,58881,58882,58883,58896,58897,58898,58899,58912,58913,58914,58915,58928,58929,58930,58931,58944,58945,58946,58947,58960,58961,58962,58963,58976,58977,58978,58979,58992,
+					58993,58994,58995,59008,59009,59010,59011,59024,59025,59026,59027,59040,59041,59042,59043,59056,59057,59058,59059,59072,59073,59074,59075,59088,59089,59090,59091,59104,59105,59106,59107,59120,59121,59122,59123,59136,59137,59138,59139,59152,
+					59153,59154,59155,59168,59169,59170,59171,59184,59185,59186,59187,59200,59201,59202,59203,59216,59217,59218,59219,59232,59233,59234,59235,59248,59249,59250,59251,59264,59265,59266,59267,59280,59281,59282,59283,59296,59297,59298,59299,59312,
+					59313,59314,59315,59328,59329,59330,59331,59344,59345,59346,59347,59360,59361,59362,59363,59376,59377,59378,59379,59392,59393,59394,59395,59408,59409,59410,59411,59424,59425,59426,59427,59440,59441,59442,59443,59456,59457,59458,59459,59472,
+					59473,59474,59475,59488,59489,59490,59491,59504,59505,59506,59507,59520,59521,59522,59523,59536,59537,59538,59539,59552,59553,59554,59555,59568,59569,59570,59571,59584,59585,59586,59587,59600,59601,59602,59603,59616,59617,59618,59619,59632,
+					59633,59634,59635,59648,59649,59650,59651,59664,59665,59666,59667,59680,59681,59682,59683,59696,59697,59698,59699,59712,59713,59714,59715,59728,59729,59730,59731,59744,59745,59746,59747,59760,59761,59762,59763,59776,59777,59778,59779,59792,
+					59793,59794,59795,59808,59809,59810,59811,59824,59825,59826,59827,59840,59841,59842,59843,59856,59857,59858,59859,59872,59873,59874,59875,59888,59889,59890,59891,59904,59905,59906,59907,59920,59921,59922,59923,59936,59937,59938,59939,59952,
+					59953,59954,59955,59968,59969,59970,59971,59984,59985,59986,59987,60000,60001,60002,60003,60016,60017,60018,60019,60032,60033,60034,60035,60048,60049,60050,60051,60064,60065,60066,60067,60080,60081,60082,60083,60096,60097,60098,60099,60112,
+					60113,60114,60115,60128,60129,60130,60131,60144,60145,60146,60147,60160,60161,60162,60163,60176,60177,60178,60179,60192,60193,60194,60195,60208,60209,60210,60211,60224,60225,60226,60227,60240,60241,60242,60243,60256,60257,60258,60259,60272,
+					60273,60274,60275,60288,60289,60290,60291,60304,60305,60306,60307,60320,60321,60322,60323,60336,60337,60338,60339,60352,60353,60354,60355,60368,60369,60370,60371,60384,60385,60386,60387,60400,60401,60402,60403,60416,60417,60418,60419,60432,
+					60433,60434,60435,60448,60449,60450,60451,60464,60465,60466,60467,60480,60481,60482,60483,60496,60497,60498,60499,60512,60513,60514,60515,60528,60529,60530,60531,60544,60545,60546,60547,60560,60561,60562,60563,60576,60577,60578,60579,60592,
+					60593,60594,60595,60608,60609,60610,60611,60624,60625,60626,60627,60640,60641,60642,60643,60656,60657,60658,60659,60672,60673,60674,60675,60688,60689,60690,60691,60704,60705,60706,60707,60720,60721,60722,60723,60736,60737,60738,60739,60752,
+					60753,60754,60755,60768,60769,60770,60771,60784,60785,60786,60787,60800,60801,60802,60803,60816,60817,60818,60819,60832,60833,60834,60835,60848,60849,60850,60851,60864,60865,60866,60867,60880,60881,60882,60883,60896,60897,60898,60899,60912,
+					60913,60914,60915,60928,60929,60930,60931,60944,60945,60946,60947,60960,60961,60962,60963,60976,60977,60978,60979,60992,60993,60994,60995,61008,61009,61010,61011,61024,61025,61026,61027,61040,61041,61042,61043,61056,61057,61058,61059,61072,
+					61073,61074,61075,61088,61089,61090,61091,61104,61105,61106,61107,61120,61121,61122,61123,61136,61137,61138,61139,61152,61153,61154,61155,61168,61169,61170,61171,61184,61185,61186,61187,61200,61201,61202,61203,61216,61217,61218,61219,61232,
+					61233,61234,61235,61248,61249,61250,61251,61264,61265,61266,61267,61280,61281,61282,61283,61296,61297,61298,61299,61312,61313,61314,61315,61328,61329,61330,61331,61344,61345,61346,61347,61360,61361,61362,61363,61376,61377,61378,61379,61392,
+					61393,61394,61395,61408,61409,61410,61411,61424,61425,61426,61427,61441,61442,61443,61444,61445,61446,61447,61448,61449,61450,61451,61452,61453,61454,61455,61456,61457,61458,61459,61460,61461,61462,61463,61464,61465,61466,61467,61468,61469,
+					61470,61471,61472,61473,61474,61475,61476,61477,61478,61479,61480,61481,61482,61483,61484,61485,61486,61487,61488,61489,61490,61491,61492,61493,61494,61495,61496,61497,61498,61499,61500,61501,61502,61503,61504,61505,61506,61507,61508,61509,
+					61510,61511,61512,61513,61514,61515,61516,61517,61518,61519,61520,61521,61522,61523,61524,61525,61526,61527,61528,61529,61530,61531,61532,61533,61534,61535,61536,61537,61538,61539,61540,61541,61542,61543,61544,61545,61546,61547,61548,61549,
+					61550,61551,61552,61553,61554,61555,61556,61557,61558,61559,61560,61561,61562,61563,61564,61565,61566,61567,61568,61569,61570,61571,61572,61573,61574,61575,61576,61577,61578,61579,61580,61581,61582,61583,61584,61585,61586,61587,61588,61589,
+					61590,61591,61592,61593,61594,61595,61596,61597,61598,61599,61600,61601,61602,61603,61604,61605,61606,61607,61608,61609,61610,61611,61612,61613,61614,61615,61616,61617,61618,61619,61620,61621,61622,61623,61624,61625,61626,61627,61628,61629,
+					61630,61631,61632,61633,61634,61635,61636,61637,61638,61639,61640,61641,61642,61643,61644,61645,61646,61647,61648,61649,61650,61651,61652,61653,61654,61655,61656,61657,61658,61659,61660,61661,61662,61663,61664,61665,61666,61667,61668,61669,
+					61670,61671,61672,61673,61674,61675,61676,61677,61678,61679,61680,61681,61682,61683,61684,61685,61686,61687,61688,61689,61690,61691,61692,61693,61694,61695,61696,61697,61698,61699,61700,61701,61702,61703,61704,61705,61706,61707,61708,61709,
+					61710,61711,61712,61713,61714,61715,61716,61717,61718,61719,61720,61721,61722,61723,61724,61725,61726,61727,61728,61729,61730,61731,61732,61733,61734,61735,61736,61737,61738,61739,61740,61741,61742,61743,61744,61745,61746,61747,61748,61749,
+					61750,61751,61752,61753,61754,61755,61756,61757,61758,61759,61760,61762,61763,61764,61765,61766,61767,61768,61769,61770,61771,61772,61773,61774,61775,61776,61777,61778,61779,61780,61781,61782,61783,61784,61785,61786,61787,61788,61789,61790,
+					61791,61792,61793,61794,61795,61796,61797,61798,61799,61800,61801,61802,61803,61804,61805,61806,61807,61808,61809,61810,61811,61812,61813,61814,61815,61816,61817,61818,61819,61820,61821,61822,61823,61824,61825,61826,61827,61828,61829,61830,
+					61831,61832,61833,61834,61835,61836,61837,61838,61839,61840,61841,61842,61843,61844,61845,61846,61847,61848,61849,61850,61851,61852,61853,61854,61855,61856,61857,61858,61859,61860,61861,61862,61863,61864,61865,61866,61867,61868,61869,61870,
+					61871,61872,61873,61874,61875,61876,61877,61878,61879,61880,61881,61882,61883,61884,61885,61886,61887,61888,61889,61890,61891,61892,61893,61894,61895,61896,61897,61898,61899,61900,61901,61902,61903,61904,61905,61906,61907,61908,61909,61910,
+					61911,61912,61913,61914,61915,61916,61917,61918,61919,61920,61921,61922,61923,61924,61925,61926,61927,61928,61929,61930,61931,61932,61933,61934,61935,61936,61937,61938,61939,61940,61941,61942,61943,61944,61945,61946,61947,61948,61949,61950,
+					61951,61952,61953,61954,61955,61956,61957,61958,61959,61960,61961,61962,61963,61964,61965,61966,61967,61968,61969,61970,61971,61972,61973,61974,61975,61976,61977,61978,61979,61980,61981,61982,61983,61984,61985,61986,61987,61988,61989,61990,
+					61991,61992,61993,61994,61995,61996,61997,61998,61999,62000,62001,62002,62003,62004,62005,62006,62007,62008,62009,62010,62011,62012,62013,62014,62015,62016,62017,62018,62019,62020,62021,62022,62023,62024,62025,62026,62027,62028,62029,62030,
+					62031,62032,62033,62034,62035,62036,62037,62038,62039,62040,62041,62042,62043,62044,62045,62046,62047,62048,62049,62050,62051,62052,62053,62054,62055,62056,62057,62058,62059,62060,62061,62062,62063,62064,62065,62066,62067,62068,62069,62070,
+					62071,62072,62073,62074,62075,62076,62077,62078,62079,62080,62081,62082,62083,62084,62085,62086,62087,62088,62089,62090,62091,62092,62093,62094,62095,62096,62097,62098,62099,62100,62101,62102,62103,62104,62105,62106,62107,62108,62109,62110,
+					62111,62112,62113,62114,62115,62116,62117,62118,62119,62120,62121,62122,62123,62124,62125,62126,62127,62128,62129,62130,62131,62132,62133,62134,62135,62136,62137,62138,62139,62140,62141,62142,62143,62144,62145,62146,62147,62148,62149,62150,
+					62151,62152,62153,62154,62155,62156,62157,62158,62159,62160,62161,62162,62163,62164,62165,62166,62167,62168,62169,62170,62171,62172,62173,62174,62175,62176,62177,62178,62179,62180,62181,62182,62183,62184,62185,62186,62187,62188,62189,62190,
+					62191,62192,62193,62194,62195,62196,62197,62198,62199,62200,62201,62202,62203,62204,62205,62206,62207,62208,62209,62210,62211,62212,62213,62214,62215,62216,62217,62218,62219,62220,62221,62222,62223,62224,62225,62226,62227,62228,62229,62230,
+					62231,62232,62233,62234,62235,62236,62237,62238,62239,62240,62241,62242,62243,62244,62245,62246,62247,62248,62249,62250,62251,62252,62253,62254,62255,62256,62257,62258,62259,62260,62261,62262,62263,62264,62265,62266,62267,62268,62269,62270,
+					62271,62272,62273,62274,62275,62276,62277,62278,62279,62280,62281,62282,62283,62284,62285,62286,62287,62288,62289,62290,62291,62292,62293,62294,62295,62296,62297,62298,62299,62300,62301,62302,62303,62304,62305,62306,62307,62308,62309,62310,
+					62311,62312,62313,62314,62315,62316,62317,62318,62319,62320,62321,62322,62323,62324,62325,62326,62327,62328,62329,62330,62331,62332,62333,62334,62335,62336,62337,62338,62339,62340,62341,62342,62343,62344,62345,62346,62347,62348,62349,62350,
+					62351,62352,62353,62354,62355,62356,62357,62358,62359,62360,62361,62362,62363,62364,62365,62366,62367,62368,62369,62370,62371,62372,62373,62374,62375,62376,62377,62378,62379,62380,62381,62382,62383,62384,62385,62386,62387,62388,62389,62390,
+					62391,62392,62393,62394,62395,62396,62397,62398,62399,62400,62401,62402,62403,62404,62405,62406,62407,62408,62409,62410,62411,62412,62413,62414,62415,62416,62417,62418,62419,62420,62421,62422,62423,62424,62425,62426,62427,62428,62429,62430,
+					62431,62432,62433,62434,62435,62436,62437,62438,62439,62440,62441,62442,62443,62444,62445,62446,62447,62448,62449,62450,62451,62452,62453,62454,62455,62456,62457,62458,62459,62460,62461,62462,62463,62464,62465,62466,62467,62468,62469,62470,
+					62471,62472,62473,62474,62475,62476,62477,62478,62479,62480,62481,62482,62483,62484,62485,62486,62487,62488,62489,62490,62491,62492,62493,62494,62495,62496,62497,62498,62499,62500,62501,62502,62503,62504,62505,62506,62507,62508,62509,62510,
+					62511,62512,62513,62514,62515,62516,62517,62518,62519,62520,62521,62522,62523,62524,62525,62526,62527,62528,62529,62530,62531,62532,62533,62534,62535,62536,62537,62538,62539,62540,62541,62542,62543,62544,62545,62546,62547,62548,62549,62550,
+					62551,62552,62553,62554,62555,62556,62557,62558,62559,62560,62561,62562,62563,62564,62565,62566,62567,62568,62569,62570,62571,62572,62573,62574,62575,62576,62577,62578,62579,62580,62581,62582,62583,62584,62585,62586,62587,62588,62589,62590,
+					62591,62592,62593,62594,62595,62596,62597,62598,62599,62600,62601,62602,62603,62604,62605,62606,62607,62608,62609,62610,62611,62612,62613,62614,62615,62616,62617,62618,62619,62620,62621,62622,62623,62624,62625,62626,62627,62628,62629,62630,
+					62631,62632,62633,62634,62635,62636,62637,62638,62639,62640,62641,62642,62643,62644,62645,62646,62647,62648,62649,62650,62651,62652,62653,62654,62655,62656,62657,62658,62659,62660,62661,62662,62663,62664,62665,62666,62667,62668,62669,62670,
+					62671,62672,62673,62674,62675,62676,62677,62678,62679,62680,62681,62682,62683,62684,62685,62686,62687,62688,62689,62690,62691,62692,62693,62694,62695,62696,62697,62698,62699,62700,62701,62702,62703,62704,62705,62706,62707,62708,62709,62710,
+					62711,62712,62713,62714,62715,62716,62717,62718,62719,62720,62721,62722,62723,62724,62725,62726,62727,62728,62729,62730,62731,62732,62733,62734,62735,62736,62737,62738,62739,62740,62741,62742,62743,62744,62745,62746,62747,62748,62749,62750,
+					62751,62752,62753,62754,62755,62756,62757,62758,62759,62760,62761,62762,62763,62764,62765,62766,62767,62768,62769,62770,62771,62772,62773,62774,62775,62776,62777,62778,62779,62780,62781,62782,62783,62784,62785,62786,62787,62788,62789,62790,
+					62791,62792,62793,62794,62795,62796,62797,62798,62799,62800,62801,62802,62803,62804,62805,62806,62807,62808,62809,62810,62811,62812,62813,62814,62815,62816,62817,62818,62819,62820,62821,62822,62823,62824,62825,62826,62827,62828,62829,62830,
+					62831,62832,62833,62834,62835,62836,62837,62838,62839,62840,62841,62842,62843,62844,62845,62846,62847,62848,62849,62850,62851,62852,62853,62854,62855,62856,62857,62858,62859,62860,62861,62862,62863,62864,62865,62866,62867,62868,62869,62870,
+					62871,62872,62873,62874,62875,62876,62877,62878,62879,62880,62881,62882,62883,62884,62885,62886,62887,62888,62889,62890,62891,62892,62893,62894,62895,62896,62897,62898,62899,62900,62901,62902,62903,62904,62905,62906,62907,62908,62909,62910,
+					62911,62912,62913,62914,62915,62916,62917,62918,62919,62920,62921,62922,62923,62924,62925,62926,62927,62928,62929,62930,62931,62932,62933,62934,62935,62936,62937,62938,62939,62940,62941,62942,62943,62944,62945,62946,62947,62948,62949,62950,
+					62951,62952,62953,62954,62955,62956,62957,62958,62959,62960,62961,62962,62963,62964,62965,62966,62967,62968,62969,62970,62971,62972,62973,62974,62975,62976,62977,62978,62979,62980,62981,62982,62983,62984,62985,62986,62987,62988,62989,62990,
+					62991,62992,62993,62994,62995,62996,62997,62998,62999,63000,63001,63002,63003,63004,63005,63006,63007,63008,63009,63010,63011,63012,63013,63014,63015,63016,63017,63018,63019,63020,63021,63022,63023,63024,63025,63026,63027,63028,63029,63030,
+					63031,63032,63033,63034,63035,63036,63037,63038,63039,63040,63041,63042,63043,63044,63045,63046,63047,63048,63049,63050,63051,63052,63053,63054,63055,63056,63057,63058,63059,63060,63061,63062,63063,63064,63065,63066,63067,63068,63069,63070,
+					63071,63072,63073,63074,63075,63076,63077,63078,63079,63080,63081,63082,63083,63084,63085,63086,63087,63088,63089,63090,63091,63092,63093,63094,63095,63096,63097,63098,63099,63100,63101,63102,63103,63104,63105,63106,63107,63108,63109,63110,
+					63111,63112,63113,63114,63115,63116,63117,63118,63119,63120,63121,63122,63123,63124,63125,63126,63127,63128,63129,63130,63131,63132,63133,63134,63135,63136,63137,63138,63139,63140,63141,63142,63143,63144,63145,63146,63147,63148,63149,63150,
+					63151,63152,63153,63154,63155,63156,63157,63158,63159,63160,63161,63162,63163,63164,63165,63166,63167,63168,63169,63170,63171,63172,63173,63174,63175,63176,63177,63178,63179,63180,63181,63182,63183,63184,63185,63186,63187,63188,63189,63190,
+					63191,63192,63193,63194,63195,63196,63197,63198,63199,63200,63201,63202,63203,63204,63205,63206,63207,63208,63209,63210,63211,63212,63213,63214,63215,63216,63217,63218,63219,63220,63221,63222,63223,63224,63225,63226,63227,63228,63229,63230,
+					63231,63232,63233,63234,63235,63236,63237,63238,63239,63240,63241,63242,63243,63244,63245,63246,63247,63248,63249,63250,63251,63252,63253,63254,63255,63256,63257,63258,63259,63260,63261,63262,63263,63264,63265,63266,63267,63268,63269,63270,
+					63271,63272,63273,63274,63275,63276,63277,63278,63279,63280,63281,63282,63283,63284,63285,63286,63287,63288,63289,63290,63291,63292,63293,63294,63295,63296,63297,63298,63299,63300,63301,63302,63303,63304,63305,63306,63307,63308,63309,63310,
+					63311,63312,63313,63314,63315,63316,63317,63318,63319,63320,63321,63322,63323,63324,63325,63326,63327,63328,63329,63330,63331,63332,63333,63334,63335,63336,63337,63338,63339,63340,63341,63342,63343,63344,63345,63346,63347,63348,63349,63350,
+					63351,63352,63353,63354,63355,63356,63357,63358,63359,63360,63361,63362,63363,63364,63365,63366,63367,63368,63369,63370,63371,63372,63373,63374,63375,63376,63377,63378,63379,63380,63381,63382,63383,63384,63385,63386,63387,63388,63389,63390,
+					63391,63392,63393,63394,63395,63396,63397,63398,63399,63400,63401,63402,63403,63404,63405,63406,63407,63408,63409,63410,63411,63412,63413,63414,63415,63416,63417,63418,63419,63420,63421,63422,63423,63424,63425,63426,63427,63428,63429,63430,
+					63431,63432,63433,63434,63435,63436,63437,63438,63439,63440,63441,63442,63443,63444,63445,63446,63447,63448,63449,63450,63451,63452,63453,63454,63455,63456,63457,63458,63459,63460,63461,63462,63463,63464,63465,63466,63467,63468,63469,63470,
+					63471,63472,63473,63474,63475,63476,63477,63478,63479,63480,63481,63482,63483,63484,63485,63486,63487,63488,63489,63490,63491,63492,63493,63494,63495,63496,63497,63498,63499,63500,63501,63502,63503,63504,63505,63506,63507,63508,63509,63510,
+					63511,63512,63513,63514,63515,63516,63517,63518,63519,63520,63521,63522,63523,63524,63525,63526,63527,63528,63529,63530,63531,63532,63533,63534,63535,63536,63537,63538,63539,63540,63541,63542,63543,63544,63545,63546,63547,63548,63549,63550,
+					63551,63552,63553,63554,63555,63556,63557,63558,63559,63560,63561,63562,63563,63564,63565,63566,63567,63568,63569,63570,63571,63572,63573,63574,63575,63576,63577,63578,63579,63580,63581,63582,63583,63584,63585,63586,63587,63588,63589,63590,
+					63591,63592,63593,63594,63595,63596,63597,63598,63599,63600,63601,63602,63603,63604,63605,63606,63607,63608,63609,63610,63611,63612,63613,63614,63615,63616,63617,63618,63619,63620,63621,63622,63623,63624,63625,63626,63627,63628,63629,63630,
+					63631,63632,63633,63634,63635,63636,63637,63638,63639,63640,63641,63642,63643,63644,63645,63646,63647,63648,63649,63650,63651,63652,63653,63654,63655,63656,63657,63658,63659,63660,63661,63662,63663,63664,63665,63666,63667,63668,63669,63670,
+					63671,63672,63673,63674,63675,63676,63677,63678,63679,63680,63681,63682,63683,63684,63685,63686,63687,63688,63689,63690,63691,63692,63693,63694,63695,63696,63697,63698,63699,63700,63701,63702,63703,63704,63705,63706,63707,63708,63709,63710,
+					63711,63712,63713,63714,63715,63716,63717,63718,63719,63720,63721,63722,63723,63724,63725,63726,63727,63728,63729,63730,63731,63732,63733,63734,63735,63736,63737,63738,63739,63740,63741,63742,63743,63744,63745,63746,63747,63748,63749,63750,
+					63751,63752,63753,63754,63755,63756,63757,63758,63759,63760,63761,63762,63763,63764,63765,63766,63767,63768,63769,63770,63771,63772,63773,63774,63775,63776,63777,63778,63779,63780,63781,63782,63783,63784,63785,63786,63787,63788,63789,63790,
+					63791,63792,63793,63794,63795,63796,63797,63798,63799,63800,63801,63802,63803,63804,63805,63806,63807,63808,63809,63810,63811,63812,63813,63814,63815,63816,63817,63818,63819,63820,63821,63822,63823,63824,63825,63826,63827,63828,63829,63830,
+					63831,63832,63833,63834,63835,63836,63837,63838,63839,63840,63841,63842,63843,63844,63845,63846,63847,63848,63849,63850,63851,63852,63853,63854,63855,63856,63857,63858,63859,63860,63861,63862,63863,63864,63865,63866,63867,63868,63869,63870,
+					63871,63872,63873,63874,63875,63876,63877,63878,63879,63880,63881,63882,63883,63884,63885,63886,63887,63888,63889,63890,63891,63892,63893,63894,63895,63896,63897,63898,63899,63900,63901,63902,63903,63904,63905,63906,63907,63908,63909,63910,
+					63911,63912,63913,63914,63915,63916,63917,63918,63919,63920,63921,63922,63923,63924,63925,63926,63927,63928,63929,63930,63931,63932,63933,63934,63935,63936,63937,63938,63939,63940,63941,63942,63943,63944,63945,63946,63947,63948,63949,63950,
+					63951,63952,63953,63954,63955,63956,63957,63958,63959,63960,63961,63962,63963,63964,63965,63966,63967,63968,63969,63970,63971,63972,63973,63974,63975,63976,63977,63978,63979,63980,63981,63982,63983,63984,63985,63986,63987,63988,63989,63990,
+					63991,63992,63993,63994,63995,63996,63997,63998,63999,64000,64001,64002,64003,64004,64005,64006,64007,64008,64009,64010,64011,64012,64013,64014,64015,64016,64017,64018,64019,64020,64021,64022,64023,64024,64025,64026,64027,64028,64029,64030,
+					64031,64032,64033,64034,64035,64036,64037,64038,64039,64040,64041,64042,64043,64044,64045,64046,64047,64048,64049,64050,64051,64052,64053,64054,64055,64056,64057,64058,64059,64060,64061,64062,64063,64064,64065,64066,64067,64068,64069,64070,
+					64071,64072,64073,64074,64075,64076,64077,64078,64079,64080,64081,64082,64083,64084,64085,64086,64087,64088,64089,64090,64091,64092,64093,64094,64095,64096,64097,64098,64099,64100,64101,64102,64103,64104,64105,64106,64107,64108,64109,64110,
+					64111,64112,64113,64114,64115,64116,64117,64118,64119,64120,64121,64122,64123,64124,64125,64126,64127,64128,64129,64130,64131,64132,64133,64134,64135,64136,64137,64138,64139,64140,64141,64142,64143,64144,64145,64146,64147,64148,64149,64150,
+					64151,64152,64153,64154,64155,64156,64157,64158,64159,64160,64161,64162,64163,64164,64165,64166,64167,64168,64169,64170,64171,64172,64173,64174,64175,64176,64177,64178,64179,64180,64181,64182,64183,64184,64185,64186,64187,64188,64189,64190,
+					64191,64192,64193,64194,64195,64196,64197,64198,64199,64200,64201,64202,64203,64204,64205,64206,64207,64208,64209,64210,64211,64212,64213,64214,64215,64216,64217,64218,64219,64220,64221,64222,64223,64224,64225,64226,64227,64228,64229,64230,
+					64231,64232,64233,64234,64235,64236,64237,64238,64239,64240,64241,64242,64243,64244,64245,64246,64247,64248,64249,64250,64251,64252,64253,64254,64255,64256,64257,64258,64259,64260,64261,64262,64263,64264,64265,64266,64267,64268,64269,64270,
+					64271,64272,64273,64274,64275,64276,64277,64278,64279,64280,64281,64282,64283,64284,64285,64286,64287,64288,64289,64290,64291,64292,64293,64294,64295,64296,64297,64298,64299,64300,64301,64302,64303,64304,64305,64306,64307,64308,64309,64310,
+					64311,64312,64313,64314,64315,64316,64317,64318,64319,64320,64321,64322,64323,64324,64325,64326,64327,64328,64329,64330,64331,64332,64333,64334,64335,64336,64337,64338,64339,64340,64341,64342,64343,64344,64345,64346,64347,64348,64349,64350,
+					64351,64352,64353,64354,64355,64356,64357,64358,64359,64360,64361,64362,64363,64364,64365,64366,64367,64368,64369,64370,64371,64372,64373,64374,64375,64376,64377,64378,64379,64380,64381,64382,64383,64384,64385,64386,64387,64388,64389,64390,
+					64391,64392,64393,64394,64395,64396,64397,64398,64399,64400,64401,64402,64403,64404,64405,64406,64407,64408,64409,64410,64411,64412,64413,64414,64415,64416,64417,64418,64419,64420,64421,64422,64423,64424,64425,64426,64427,64428,64429,64430,
+					64431,64432,64433,64434,64435,64436,64437,64438,64439,64440,64441,64442,64443,64444,64445,64446,64447,64448,64449,64450,64451,64452,64453,64454,64455,64456,64457,64458,64459,64460,64461,64462,64463,64464,64465,64466,64467,64468,64469,64470,
+					64471,64472,64473,64474,64475,64476,64477,64478,64479,64480,64481,64482,64483,64484,64485,64486,64487,64488,64489,64490,64491,64492,64493,64494,64495,64496,64497,64498,64499,64500,64501,64502,64503,64504,64505,64506,64507,64508,64509,64510,
+					64511,64512,64513,64514,64515,64516,64517,64518,64519,64520,64521,64522,64523,64524,64525,64526,64527,64528,64529,64531,64532,64533,64534,64535,64536,64537,64538,64539,64540,64541,64542,64543,64544,64545,64546,64547,64548,64549,64550,64551,
+					64552,64553,64554,64555,64556,64557,64558,64559,64560,64561,64562,64563,64564,64565,64566,64567,64568,64569,64570,64571,64572,64573,64574,64575,64576,64577,64578,64579,64580,64581,64582,64583,64584,64585,64586,64587,64588,64589,64590,64591,
+					64592,64593,64594,64595,64596,64597,64598,64599,64600,64601,64602,64603,64604,64605,64606,64607,64608,64609,64610,64611,64612,64613,64614,64615,64616,64617,64618,64619,64620,64621,64622,64623,64624,64625,64626,64627,64628,64629,64630,64631,
+					64632,64633,64634,64635,64636,64637,64638,64639,64640,64641,64642,64643,64644,64645,64646,64647,64648,64649,64650,64651,64652,64653,64654,64655,64656,64657,64658,64659,64660,64661,64662,64663,64664,64665,64666,64667,64668,64669,64670,64671,
+					64672,64673,64674,64675,64676,64677,64678,64679,64680,64681,64682,64683,64684,64685,64686,64687,64688,64689,64690,64691,64692,64693,64694,64695,64696,64697,64698,64699,64700,64701,64702,64703,64704,64705,64706,64707,64708,64709,64710,64711,
+					64712,64713,64714,64715,64716,64717,64718,64719,64720,64721,64722,64723,64724,64725,64726,64727,64728,64729,64730,64731,64732,64733,64734,64735,64736,64737,64738,64739,64740,64741,64742,64743,64744,64745,64746,64747,64748,64749,64750,64751,
+					64752,64753,64754,64755,64756,64757,64758,64759,64760,64761,64762,64763,64764,64765,64766,64767,64768,64769,64770,64771,64772,64773,64774,64775,64776,64777,64778,64779,64780,64781,64782,64783,64784,64785,64786,64787,64788,64789,64790,64791,
+					64792,64793,64794,64795,64796,64797,64798,64799,64800,64801,64802,64803,64804,64805,64806,64807,64808,64809,64810,64811,64812,64813,64814,64815,64816,64817,64818,64819,64820,64821,64822,64823,64824,64825,64826,64827,64828,64829,64830,64831,
+					64832,64833,64834,64835,64836,64837,64838,64839,64840,64841,64842,64843,64844,64845,64846,64847,64848,64849,64850,64852,64853,64854,64855,64856,64857,64858,64859,64860,64861,64862,64863,64864,64865,64866,64867,64868,64869,64870,64871,64872,
+					64873,64874,64875,64876,64877,64878,64879,64880,64881,64882,64883,64884,64885,64886,64887,64888,64889,64890,64891,64892,64893,64894,64895,64896,64897,64898,64899,64900,64901,64902,64903,64904,64905,64906,64907,64908,64909,64910,64911,64912,
+					64913,64914,64915,64916,64917,64918,64919,64920,64921,64922,64923,64924,64925,64926,64927,64928,64929,64930,64931,64932,64933,64934,64935,64936,64937,64938,64939,64940,64941,64942,64943,64944,64945,64946,64947,64948,64949,64950,64951,64952,
+					64953,64954,64955,64956,64957,64958,64959,64960,64961,64962,64963,64964,64965,64966,64967,64968,64969,64970,64971,64972,64973,64974,64975,64976,64977,64978,64979,64980,64981,64982,64983,64984,64985,64986,64987,64988,64989,64990,64991,64992,
+					64993,64994,64995,64996,64997,64998,64999,65000,65001,65002,65003,65004,65005,65006,65007,65008,65009,65010,65011,65012,65013,65014,65015,65016,65017,65018,65019,65020,65021,65022,65023,65024,65025,65026,65027,65028,65029,65030,65031,65032,
+					65033,65034,65035,65036,65037,65038,65039,65040,65041,65042,65043,65044,65045,65046,65047,65048,65049,65050,65051,65052,65053,65054,65055,65056,65057,65058,65059,65060,65061,65062,65063,65064,65065,65066,65067,65068,65069,65070,65071,65072,
+					65073,65074,65075,65076,65077,65078,65079,65080,65081,65082,65083,65084,65085,65086,65087,65088,65089,65090,65091,65092,65093,65094,65095,65096,65097,65098,65099,65100,65101,65102,65103,65104,65105,65106,65107,65108,65109,65110,65111,65112,
+					65113,65114,65115,65116,65117,65118,65119,65120,65121,65122,65123,65124,65125,65126,65127,65128,65129,65130,65131,65132,65133,65134,65135,65136,65137,65138,65139,65140,65141,65142,65143,65144,65145,65146,65147,65148,65149,65150,65151,65152,
+					65153,65154,65155,65156,65157,65158,65159,65160,65161,65162,65163,65164,65165,65166,65167,65168,65169,65170,65171,65172,65173,65174,65175,65176,65177,65178,65179,65180,65181,65182,65183,65184,65185,65186,65187,65188,65189,65190,65191,65192,
+					65193,65194,65195,65196,65197,65198,65199,65200,65201,65202,65203,65204,65205,65206,65207,65208,65209,65210,65211,65212,65213,65214,65215,65216,65217,65218,65219,65220,65221,65222,65223,65224,65225,65226,65227,65228,65229,65230,65231,65232,
+					65233,65234,65235,65236,65237,65238,65239,65240,65241,65242,65243,65244,65245,65246,65247,65248,65249,65250,65251,65252,65253,65254,65255,65256,65257,65258,65259,65260,65261,65262,65263,65264,65265,65266,65267,65268,65269,65270,65271,65272,
+					65273,65274,65275,65276,65277,65278,65279,65280,65281,65282,65283,65284,65285,65286,65287,65288,65289,65290,65291,65292,65293,65294,65295,65296,65297,65298,65299,65300,65301,65302,65303,65304,65305,65306,65307,65308,65309,65310,65311,65312,
+					65313,65314,65315,65316,65317,65318,65319,65320,65321,65322,65323,65324,65325,65326,65327,65328,65329,65330,65331,65332,65333,65334,65335,65336,65337,65338,65339,65340,65341,65342,65343,65344,65345,65346,65347,65348,65349,65350,65351,65352,
+					65353,65354,65355,65356,65357,65358,65359,65360,65361,65362,65363,65364,65365,65366,65367,65368,65369,65370,65371,65372,65373,65374,65375,65376,65377,65378,65379,65380,65381,65382,65383,65384,65385,65386,65387,65388,65389,65390,65391,65392,
+					65393,65394,65395,65396,65397,65398,65399,65400,65401,65402,65403,65404,65405,65406,65407,65408,65409,65410,65411,65412,65413,65414,65415,65416,65417,65418,65419,65420,65421,65422,65423,65424,65425,65426,65427,65428,65429,65430,65431,65432,
+					65433,65434,65435,65436,65437,65438,65439,65440,65441,65442,65443,65444,65445,65446,65447,65448,65449,65450,65451,65452,65453,65454,65455,65456,65457,65458,65459,65460,65461,65462,65463,65464,65465,65466,65467,65468,65469,65470,65471,65472,
+					65473,65474,65475,65476,65477,65478,65479,65480,65481,65482,65483,65484,65485,65486,65487,65488,65489,65490,65491,65492,65493,65494,65495,65496,65497,65498,65499,65500,65501,65502,65503,65504,65505,65506,65507,65508,65509,65510,65511,65512,
+					65513,65514,65515,65516,65517,65518,65519,65520,65521,65522,65523,65524,65525,65526,65527,65528,65529,65530,65531,65532,65533,65534,65535 } },//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...)
+					// NoChildComplex
+				{ 1, { -766 } }
+			}
+		));
+
+		fractals->push_back(new Fractal("SierpinskiPentaCarpet", 25, 5, 1.0, .25, .9, carpet5X, carpet5Y,
+			{
+				{ "BASE: Classic", D(25) { SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "BASE: Quarter", D(25) { SYMMETRIC + pi2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "RotatedInner", D(25) { 0, 0, 0, 0, pi2, 0, pi, 0, pi32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "RotatedOuter", D(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi2, 0, 0, 0, pi, 0, 0, 0, pi32, 0 } },
+				{ "RotatedOuter2", D(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi2, 0, pi2, 0, pi, 0, pi, 0, pi32, 0, pi32 } }
+			},
+			{
+				{ "Center",			B(25) { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Neg",		B(25) { 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Half",	B(25) { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_One",		B(25) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Quad",			B(25) { 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Quad_Neg",		B(25) { 0, 4, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Quad_Half",		B(25) { 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Quad_One",		B(25) { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Quad2",			B(25) { 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Quad2_Neg",		B(25) { 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Quad2_Half",		B(25) { 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Quad2_One",		B(25) { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Plus",			B(25) { 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Plus_Neg",		B(25) { 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Plus_Half",		B(25) { 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Plus_One",		B(25) { 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Plus2",			B(25) { 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Plus2_Neg",		B(25) { 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Plus2_Half",		B(25) { 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Plus2_One",		B(25) { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Corner",			B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Corner_Neg",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Corner_Half",	B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Corner_One",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Corner2",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0 } },
+				{ "Corner2_Neg",	B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0 } },
+				{ "Corner2_Half",	B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0 } },
+				{ "Corner2_One",	B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 } },
+
+				{ "Swirl",			B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0 } },
+				{ "Swirl_Neg",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0 } },
+				{ "Swirl_Half",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0 } },
+				{ "Swirl_One",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0 } },
+
+				{ "Swirl2",			B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2 } },
+				{ "Swirl2_Neg",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4 } },
+				{ "Swirl2_Half",	B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3 } },
+				{ "Swirl2_One",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 } },
+
+				{ "PlusX",			B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0 } },
+				{ "PlusX_Neg",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0 } },
+				{ "PlusX_Half",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0 } },
+				{ "PlusX_One",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 } },
+
+				{ "PlusX2",			B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0 } },
+				{ "PlusX2_Neg",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0 } },
+				{ "PlusX2_Half",	B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0 } },
+				{ "PlusX2_One",		B(25) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0 } }
+			},
+			{
+				{ -1, { 0 } }
+			}
+		));
+
+		fractals->push_back(new Fractal("PentaFlake", 6, pentaS, .2 * pentaS, .25, .9, pentaX, pentaY,
+			{
+				{ "BASE: Classic", D(6) { pi5, 0, 0, 0, 0, 0 } },
+				{ "BASE: No Rotation", D(6) { SYMMETRIC + 2 * pi5, 0, 0, 0, 0, 0 } },
+
+				{ "Rotated", D(6) { 0, 0, 8 * pi5, 6 * pi5, 4 * pi5, 2 * pi5 } }
+			},
+			{
+				{ "Center",		B(6) { 2, 0, 0, 0, 0, 0 } },
+				{ "Center_Neg", B(6) { 4, 0, 0, 0, 0, 0 } },
+				{ "Center_Half",B(6) { 3, 0, 0, 0, 0, 0 } },
+				{ "Center_One", B(6) { 1, 0, 0, 0, 0, 0 } },
+
+				{ "Top",		B(6) { 0, 2, 0, 0, 0, 0 } },
+				{ "Top_Neg",	B(6) { 0, 4, 0, 0, 0, 0 } },
+				{ "Top_Half",	B(6) { 0, 3, 0, 0, 0, 0 } },
+				{ "Top_One",	B(6) { 0, 1, 0, 0, 0, 0 } },
+
+				{ "Upper",		B(6) { 0, 0, 2, 0, 0, 2 } },
+				{ "Upper_Neg",	B(6) { 0, 0, 4, 0, 0, 4 } },
+				{ "Upper_Half", B(6) { 0, 0, 3, 0, 0, 3 } },
+				{ "Upper_One",	B(6) { 0, 0, 1, 0, 0, 1 } },
+
+				{ "Bottom",		B(6) { 0, 0, 0, 2, 2, 0 } },
+				{ "Bottom_Neg", B(6) { 0, 0, 0, 4, 4, 0 } },
+				{ "Bottom_Half",B(6) { 0, 0, 0, 3, 3, 0 } },
+				{ "Bottom_One", B(6) { 0, 0, 0, 1, 1, 0 } }
+			},
+			{
+				// NoChildComplex
+				{ 1, { -94 } },
+				// NoBackDiag
+				{ 2, { 0,17,18,19,36,40,44,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 } }
+			}
+		));
+
+		fractals->push_back(new Fractal("HexaFlake", 7, 3, .5, .2, 1,
+			D(7) { 0, 0, 2 * stt, 2 * stt, 0, -2 * stt, -2 * stt },
+			D(7) { 0, -2, -1, 1, 2, 1, -1 },
+			{
+				{ "BASE", D(7) { SYMMETRIC + pi / 3, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Rotated", D(7) { 0, 0, pi3, pi23, pi, 4 * pi3, 5 * pi3 } }
+			},
+			{
+				{ "Center",		B(7) { 2, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Neg", B(7) { 4, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Half",B(7) { 3, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_One",	B(7) { 1, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Y",			B(7) { 0, 0, 2, 0, 2, 0, 2 } },
+				{ "Y_Neg",		B(7) { 0, 0, 4, 0, 4, 0, 4 } },
+				{ "Y_Half",		B(7) { 0, 0, 3, 0, 3, 0, 3 } },
+				{ "Y_One",		B(7) { 0, 0, 1, 0, 1, 0, 1 } },
+
+				{ "Top",		B(7) { 0, 2, 0, 0, 0, 0, 0 } },
+				{ "Top_Neg",	B(7) { 0, 4, 0, 0, 0, 0, 0 } },
+				{ "Top_Half",	B(7) { 0, 3, 0, 0, 0, 0, 0 } },
+				{ "Top_One",	B(7) { 0, 1, 0, 0, 0, 0, 0 } },
+
+				{ "Bottom",		B(7) { 0, 0, 0, 0, 2, 0, 0 } },
+				{ "Bottom_Neg", B(7) { 0, 0, 0, 0, 4, 0, 0 } },
+				{ "Bottom_Half",B(7) { 0, 0, 0, 0, 3, 0, 0 } },
+				{ "Bottom_One", B(7) { 0, 0, 0, 0, 1, 0, 0 } }
+			},
+			{
+				// NoChildComplex
+				{ 1, { -190 } },
+				// NoBackDiag
+				{ 2, { 0, 66, 129, 132, 133, 136, 137, 140, 141, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 272,
+				288, 304, 322, 336, 338, 352, 354, 368, 370, 385, 388, 389, 392, 393, 396, 397, 400, 401, 404, 405, 408, 409, 412, 413, 416, 417,
+				420, 421, 424, 425, 428, 429, 432, 433, 436, 437, 440, 441, 444, 445, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460,
+				461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 486, 487,
+				488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510 } }
+			}
+		));
+
+		fractals->push_back(new Fractal("HexaCircular", 19, 5, .2, .05, .9,
+			D(19) { 0, 2 * stt, stt, -stt, -2 * stt, -stt, stt, 4 * stt, 3 * stt, stt, -stt, -3 * stt, -4 * stt, -4 * stt, -3 * stt, -stt, stt, 3 * stt, 4 * stt },
+			D(19) { 0, 0, 1.5, 1.5, 0, -1.5, -1.5, 1, 2.5, 3.5, 3.5, 2.5, 1, -1, -2.5, -3.5, -3.5, -2.5, -1 },
+			{
+				{ "BASE : 180", D(19) {pi3, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0 } },
+				{ "BASE: Symmetric", D(19) { SYMMETRIC + pi23, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0 } }
+			},
+			{
+				{ "Center", B(19) { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Neg", B(19) { 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_Half", B(19) { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Center_One", B(19) { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Y", B(19) { 0, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_Neg", B(19) { 0, 0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_Half", B(19) { 0, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y_One", B(19) { 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "Y2", B(19) { 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y2_Neg", B(19) { 0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y2_Half", B(19) { 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+				{ "Y2_One", B(19) { 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+
+				{ "1", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2 } },
+				{ "1_Neg", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4 } },
+				{ "1_Half", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3 } },
+				{ "1_One", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 } },
+
+				{ "2", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0 } },
+				{ "2_Neg", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0 } },
+				{ "2_Half", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0 } },
+				{ "2_One", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0 } },
+
+				{ "3", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0 } },
+				{ "3_Neg", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0 } },
+				{ "3_Half", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0 } },
+				{ "3_One", B(19) { 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0 } },
+
+				{ "4", B(19) { 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0 } },
+				{ "4_Neg", B(19) { 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0 } },
+				{ "4_Half", B(19) { 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0 } },
+				{ "4_One", B(19) { 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0 } },
+			},
+			{
+				{ -1, { 0 } }
+			}
+		));
+
 		maxChildren = 1;
 		for (int32_t i = static_cast<int32_t>(fractals->size()); 0 <= --i;)
 			if ((*fractals)[i]->childCount > maxChildren)
 				maxChildren = (*fractals)[i]->childCount;
-		childColor = new uint8_t[maxChildren];
+		ChildColor = new uint8_t[maxChildren];
+		ChildAngle = new double[maxChildren];
 	}
+	VOIDTYPE FractalGenerator::MakeTemp() {
+		if (!Directory::Exists("temp"))
+			Directory::CreateDirectory("temp");
+	}
+#pragma endregion
+
+#pragma region Tasks
+	std::chrono::steady_clock::time_point* FractalGenerator::BeginTask() {
+#ifdef CUSTOMDEBUG
+		// start a debug task stopwatch
+		return &std::chrono::steady_clock::now();
+#else
+		return null;
+#endif
+	}
+	VOIDTYPE FractalGenerator::FinishTask(FractalTask& task, std::chrono::steady_clock::time_point* stop, STRING log) {
+		const auto elapsed = (std::chrono::steady_clock::now() - *stop).count();
+		STRING logTask = "";
+		Log(logTask, log + " time = " + elapsed + " ms.");
+		STARTLOCK
+			Log(logString, logTask);
+		ENDLOCK
+			task.State = TaskState::Done;
+	}
+	bool FractalGenerator::FinishTasks(bool mainLoop, uint8_t& i, bool& tasksRemaining, uint16_t& taskIndex) {
+		// bool tasksRemaining = true; uint8_t i = 3; uint16_t taskIndex = 0; while(FinishTasks(mainLoop, i, tasksRemaining, taskIndex)) tasksRemaining = lambda(taskIndex)
+		while (true) {
+			MakeDebugString();
+			if (i <= 0)
+				return false;
+			if (taskIndex == 0) {
+				if (!tasksRemaining)
+					return false;
+				else i = 3;
+				taskIndex = allocMaxTasks;
+				tasksRemaining = false;
+			}
+			while (0 <= --taskIndex) {
+				FractalTask& task = tasks[taskIndex];
+				if (IsTaskStillRunning(task)) {
+					tasksRemaining |= mainLoop || task.BitmapIndex >= 0 && bitmapState[task.BitmapIndex] <= BitmapState::Dots;
+				} else {
+					if (!token.IsCancellationRequested && ( // Cancel Request forbids any new threads to start
+														   !mainLoop || SelectedMaxTasks == allocMaxTasks && allocParallelType == SelectedParallelType && SelectedGenerationType == allocGenerationType // chaning these settings yout exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
+														   )) {
+						bool r = (mainLoop && (TryWriteBitmaps(task) || TryFinishBitmap(task)));
+						if (r) tasksRemaining = true;
+						else return true; // Let the outer caller call the lamba
+					}
+				}
+			}
+			--i;
+		}
+	}
+#pragma endregion
+	
 	VOIDTYPE FractalGenerator::DeleteEncoder() {
 		if (gifEncoder != nullptr) {
 			delete gifEncoder;
@@ -332,25 +1037,67 @@ namespace RgbFractalGenClr {
 		}
 	}
 	VOIDTYPE FractalGenerator::DeleteBuffer(const FractalTask& task, const uint16_t vh) {
-		const auto& buffT = task.buffer;
-		const auto& voidT = task.voidDepth;
-		const auto& noiseT = task.voidNoise;
-		for (auto y = 0; y < allocatedHeight; delete voidT[y++])
-			delete buffT[y];
-		for (auto y = 0; y < vh; delete noiseT[y++]);
+		const auto& buffT = task.Buffer;
+		const auto& voidT = task.VoidDepth;
+		const auto& noiseT = task.VoidNoise;
+		for (auto y = 0; y < allocHeight; delete[] voidT[y++])
+			delete[] buffT[y];
+		for (auto y = 0; y < vh; delete[] noiseT[y++]);
 		delete[] buffT;
 		delete[] voidT;
 		delete[] noiseT;
 	}
 	VOIDTYPE FractalGenerator::NewBuffer(FractalTask& task, const uint16_t vw, const uint16_t vh) {
-		const auto& voidT = task.voidDepth = new int16_t * [selectHeight];
-		const auto& buffT = task.buffer = new Vector * [selectHeight];
-		const auto& noiseT = task.voidNoise = new Vector*[vh];
-		for (auto y = 0; y < selectHeight; voidT[y++] = new int16_t[selectWidth]) {
-			const auto& buffY = buffT[y] = new Vector[selectWidth];
-			for (auto x = 0; x < selectWidth; buffY[x++] = zero);
+		const auto& voidT = task.VoidDepth = new int16_t * [SelectedHeight];
+		const auto& buffT = task.Buffer = new Vector * [SelectedHeight];
+		const auto& noiseT = task.VoidNoise = new Vector*[vh];
+		for (auto y = 0; y < SelectedHeight; voidT[y++] = new int16_t[SelectedWidth]) {
+			const auto& buffY = buffT[y] = new Vector[SelectedWidth];
+			for (auto x = 0; x < SelectedWidth; buffY[x++] = zero);
 		}
 		for (auto y = 0; y < vh; noiseT[y++] = new Vector[vw]);
+	}
+	VOIDTYPE FractalGenerator::FractalGenerator::NewOfDepthBuffer() {
+
+		// reinitialize 3D Vector*** array with all zeroes.
+		// allocBuffer T H W are the previous 3 dimensions already allocated
+		// allocMaxTasks allocHeight allocWidth are the new dimensions i want, from the outermost to innermost
+		bool newOuterDimension = buffer == nullptr || bufferLength0 != allocMaxTasks;
+		if (newOuterDimension || bufferLength2 != allocHeight) {
+			if (buffer) {
+				// delete buffer insides
+				for (int t = 0; t < bufferLength0; ++t) {
+					auto& buffT = buffer[t];
+					for (int h = 0; h < bufferLength2; delete[] buffT[h++]);
+					delete[] buffT;
+				}
+				// delete buffer itself to reinitialize task dimension
+				if (newOuterDimension)
+					delete[] buffer;
+			}
+			// reinitialzie the buffer
+			if (newOuterDimension)
+				buffer = new Vector * *[bufferLength0 = allocMaxTasks];
+			bufferLength2 = allocHeight;
+			bufferLength1 = allocWidth;
+			for (int t = 0; t < allocMaxTasks; ++t) {
+				auto& buffT = buffer[t] = new Vector * [allocHeight];
+				for (int h = 0; h < allocHeight; buffT[h++] = new Vector[allocWidth]());
+			}
+			return;
+		}
+		if (bufferLength1 == allocWidth)
+			return;
+		bufferLength1 = allocWidth;
+		for (int t = 0; t < bufferLength0; ++t) {
+			auto& buffT = buffer[t];
+			int h = 0;
+			while (h < allocHeight) {
+				auto& buffY = buffT[h++];
+				delete[] buffY;
+				buffY = new Vector[allocWidth]();
+			}
+		}
 	}
 #pragma endregion
 
@@ -367,27 +1114,27 @@ namespace RgbFractalGenClr {
 #endif
 		StartGif();
 		// Initialize the starting default animation values
-		auto size = 2400.0f, angle = selectDefaultAngle * (float)M_PI / 180.0f, hueAngle = selectDefaultHue / 120.0f;
+		auto size = 2400.0f, angle = SelectedDefaultAngle * (float)M_PI / 180.0f, hueAngle = SelectedDefaultHue / 120.0f;
 		uint8_t color = 0;
 		isWritingBitmaps = 2;
-		bloom1 = selectBloom + 1;
-		ambnoise = selectAmbient * selectNoise;
-		auto& dist = *randomDist;
-		auto& gen = *randomGenerator;
-		int8_t spin = static_cast<int8_t>(selectSpin < -1 ? (int8_t)(dist(gen) * 4 - 1) : selectSpin);
-		applyBlur = (short)(selectBlur + 1);
-		if (applyPreviewMode = selectPreviewMode) {
-			const auto w = MAX(selectWidth, selectHeight) * f->maxSize * 0.1f;
+		bloom1 = SelectedBloom + 1;
+		allocNoise = SelectedAmbient * SelectedNoise;
+		auto& dist = *nextDouble;
+		auto& gen = *random;
+		int8_t spin = static_cast<int8_t>(SelectedSpin < -1 ? (int8_t)(dist(gen) * 4 - 1) : SelectedSpin);
+		allocBlur = (short)(SelectedBlur + 1);
+		if (allocPreviewMode = SelectedPreviewMode) {
+			const auto w = MAX(SelectedWidth, SelectedHeight) * f->maxSize * 0.1f;
 			size = w * f->childSize * .9f;
 		}
 		auto toFinishAnimation = true;
-		for (auto i = selectDefaultZoom < 0
-			 ? (int8_t)(dist(gen) * selectPeriod * finalPeriodMultiplier)
-			 : (selectDefaultZoom % (selectPeriod * finalPeriodMultiplier));
-			 0 <= --i; IncFrameSize(size, selectPeriod));
+		for (auto i = SelectedDefaultZoom < 0
+			 ? (int8_t)(dist(gen) * SelectedPeriod * allocPeriodMultiplier)
+			 : (SelectedDefaultZoom % (SelectedPeriod * allocPeriodMultiplier));
+			 0 <= --i; IncFrameSize(size, SelectedPeriod));
 		// Pregenerate color blends
 		int64_t _startCutParam = startCutParam;
-		if (applyGenerationType < GenerationType::AllParam) 
+		if (allocGenerationType < GenerationType::AllSeeds) 
 			PregenerateParam(static_cast<int32_t>(0), colorBlends, _startCutParam);
 		startCutParam = _startCutParam;
 		// Generate the images
@@ -401,11 +1148,11 @@ namespace RgbFractalGenClr {
 				StopGif(-1);
 				StartGif();
 			}
-			if (bitmapsFinished < frames) {
+			if (bitmapsFinished < bitmapLength) {
 				// Initialize buffers (delete and reset if size changed)
-				if ((applyMaxTasks = MAX(static_cast<int16_t>(MINTASKS), selectMaxTasks)) != allocatedTasks) {
-					if (allocatedTasks >= 0) {
-						for (uint16_t t = 0; t < allocatedTasks; ++t) {
+				if ((allocMaxTasks = MAX(static_cast<int16_t>(MINTASKS), SelectedMaxTasks)) != allocTasks) {
+					if (allocTasks >= 0) {
+						for (uint16_t t = 0; t < allocTasks; ++t) {
 							auto& task = tasks[t];
 							if (task.taskStarted) {
 #ifdef PARALLELDEBUG
@@ -413,92 +1160,92 @@ namespace RgbFractalGenClr {
 #endif
 								Join(task);
 							}
-							DeleteBuffer(task, allocatedHeight / applyVoid + 2);
-							delete[] task.buffer;
-							delete[] task.voidDepth;
+							DeleteBuffer(task, allocHeight / allocVoid + 2);
+							delete[] task.Buffer;
+							delete[] task.VoidDepth;
 						}
 						delete[] tasks;
 						delete[] tuples;
 					}
-					allocatedWidth = selectWidth; 
-					allocatedHeight = selectHeight;
+					allocWidth = SelectedWidth; 
+					allocHeight = SelectedHeight;
 					SetRect();
-					tasks = new FractalTask[allocatedTasks = applyMaxTasks];
-					tuples = new std::tuple<uint16_t, TUPLEPACK, uint8_t, int64_t, uint8_t>[applyMaxTasks * 8];
-					applyVoid = (short)(selectVoid + 1); // already reallocated the noise buffer
-					uint32_t vw = selectWidth / applyVoid + 2, vh = selectHeight / applyVoid + 2;
-					for (int16_t t = applyMaxTasks; 0 <= --t;) {
+					tasks = new FractalTask[allocTasks = allocMaxTasks];
+					tuples = new std::tuple<uint16_t, TUPLEPACK, uint8_t, int64_t, uint8_t>[allocMaxTasks * 8];
+					allocVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
+					uint32_t vw = SelectedWidth / allocVoid + 2, vh = SelectedHeight / allocVoid + 2;
+					for (int16_t t = allocMaxTasks; 0 <= --t;) {
 						auto& task = tasks[t];
-						task.taskIndex = t;
+						task.TaskIndex = t;
 						NewBuffer(task, vw, vh);
 					}
-					parallelTasks = gcnew array<Task^>(applyMaxTasks);
-					for (uint16_t t = 0; t < applyMaxTasks; parallelTasks[t++] = nullptr);
+					parallelTasks = gcnew array<Task^>(allocMaxTasks);
+					for (uint16_t t = 0; t < allocMaxTasks; parallelTasks[t++] = nullptr);
 					SetMaxIterations();
 					
 				}
-				if (selectHeight != allocatedHeight) {
-					uint32_t ah = allocatedHeight / applyVoid + 2;
-					applyVoid = (short)(selectVoid + 1); // already reallocated the noise buffer
-					uint32_t vw = selectWidth / applyVoid + 2, vh = selectHeight / applyVoid + 2;
-					for (uint16_t t = 0; t < applyMaxTasks; ++t) {
+				if (SelectedHeight != allocHeight) {
+					uint32_t ah = allocHeight / allocVoid + 2;
+					allocVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
+					uint32_t vw = SelectedWidth / allocVoid + 2, vh = SelectedHeight / allocVoid + 2;
+					for (uint16_t t = 0; t < allocMaxTasks; ++t) {
 						auto& task = tasks[t];
 						DeleteBuffer(task, ah);
 						NewBuffer(task, vw, vh);
 					}
-					allocatedWidth = selectWidth;
-					allocatedHeight = selectHeight;
+					allocWidth = SelectedWidth;
+					allocHeight = SelectedHeight;
 					SetRect();
 				}
-				if (selectWidth != allocatedWidth) {
-					uint32_t ah = allocatedHeight / applyVoid + 2;
-					applyVoid = (short)(selectVoid + 1); // already reallocated the noise buffer
-					uint32_t vw = selectWidth / applyVoid + 2, vh = selectHeight / applyVoid + 2;
-					for (uint16_t t = 0; t < applyMaxTasks; ++t) {
+				if (SelectedWidth != allocWidth) {
+					uint32_t ah = allocHeight / allocVoid + 2;
+					allocVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
+					uint32_t vw = SelectedWidth / allocVoid + 2, vh = SelectedHeight / allocVoid + 2;
+					for (uint16_t t = 0; t < allocMaxTasks; ++t) {
 						const auto& task = tasks[t];
-						const auto& buffT = task.buffer;
-						const auto& voidT = task.voidDepth;
-						const auto& noiseT = task.voidNoise;
+						const auto& buffT = task.Buffer;
+						const auto& voidT = task.VoidDepth;
+						const auto& noiseT = task.VoidNoise;
 						// Reallocate voidDepth and buffer
-						for (uint16_t y = 0; y < allocatedHeight; voidT[y++] = new int16_t[selectWidth]) {
-							delete buffT[y];
-							delete voidT[y];
-							buffT[y] = new Vector[selectWidth];
+						for (uint16_t y = 0; y < allocHeight; voidT[y++] = new int16_t[SelectedWidth]) {
+							delete[] buffT[y];
+							delete[] voidT[y];
+							buffT[y] = new Vector[SelectedWidth];
 						}
-						for (uint16_t y = allocatedHeight; y < selectHeight; voidT[y++] = new int16_t[selectWidth])
-							buffT[y] = new Vector[selectWidth];
+						for (uint16_t y = allocHeight; y < SelectedHeight; voidT[y++] = new int16_t[SelectedWidth])
+							buffT[y] = new Vector[SelectedWidth];
 						// Reallocate voidNoise
 						for (uint16_t y = 0; y < ah; noiseT[y++] = new Vector[vw])
-							delete noiseT[y];
+							delete[] noiseT[y];
 						for (uint16_t y = ah; y < vh; noiseT[y++] = new Vector[vw]);
 					}
-					allocatedWidth = selectWidth;
+					allocWidth = SelectedWidth;
 					SetRect();
 				}
 				// reallocate noise buffer if the noise resolution has changed
-				if (applyVoid != selectVoid + 1) {
-					uint32_t ah = allocatedHeight / applyVoid + 2;
-					applyVoid = (short)(selectVoid + 1); // already reallocated the noise buffer
-					uint32_t vw = selectWidth / applyVoid + 2, vh = selectHeight / applyVoid + 2;
-					for (uint16_t t = 0; t < applyMaxTasks; ++t) {
+				if (allocVoid != SelectedVoid + 1) {
+					uint32_t ah = allocHeight / allocVoid + 2;
+					allocVoid = (short)(SelectedVoid + 1); // already reallocated the noise buffer
+					uint32_t vw = SelectedWidth / allocVoid + 2, vh = SelectedHeight / allocVoid + 2;
+					for (uint16_t t = 0; t < allocMaxTasks; ++t) {
 						const auto& task = tasks[t];
-						const auto& noiseT = task.voidNoise;
+						const auto& noiseT = task.VoidNoise;
 						// Reallocate voidNoise
 						for (uint16_t y = 0; y < ah; noiseT[y++] = new Vector[vw])
-							delete noiseT[y];
+							delete[] noiseT[y];
 						for (uint16_t y = ah; y < vh; noiseT[y++] = new Vector[vw]);
 					}
 				}
-				applyDetail = selectDetail;
-				if (selectMaxIterations != applyMaxIterations) {
-					applyMaxIterations = selectMaxIterations;
-					for (int t = 0; t < allocatedTasks; InitPreiterate(tasks[t++].preIterate));
+				allocDetail = SelectedDetail;
+				if (maxIterations != allocMaxIterations) {
+					allocMaxIterations = maxIterations;
+					for (int t = 0; t < allocTasks; InitPreiterate(tasks[t++].PreIterate));
 				}
 				// Wait if no more frames to generate
 				if (bitmapsFinished >= GetGenerateLength())
 					continue;
 				// Use the selected ParallelType, or OfDepth if OnlyImage (if you want a GenerateDots_SingleTask like OfAnimation with OnlyImage, set the maxTasks to <= 2)
-				applyParallelType = selectParallelType;
+				allocParallelType = SelectedParallelType;
 				// Image parallelism
 				//imageTasks = applyParallelType == 2 ? [] : null;
 				
@@ -506,15 +1253,15 @@ namespace RgbFractalGenClr {
 				for (int8_t i = 3; i > 0; --i) {
 					for (auto tasksRemaining = true; tasksRemaining; MakeDebugString()) {
 						tasksRemaining = false;
-						for (int16_t t = applyMaxTasks; 0 <= --t;) {
+						for (int16_t t = allocMaxTasks; 0 <= --t;) {
 							auto& task = tasks[t];
 							if (IsTaskStillRunning(task))
 								tasksRemaining = true; // Must finish all Dots threads, and if in main loop all secondary threads too (OnDepth can continu back to main loop when secondary threads are running so it could start a new OnDepth loop)
 							else {
 								if (token.IsCancellationRequested  // Cancel Request forbids any new threads to start
-									|| selectMaxTasks != applyMaxTasks // changing these settings yout exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
-									|| applyParallelType != selectParallelType
-									|| selectGenerationType != applyGenerationType
+									|| SelectedMaxTasks != allocMaxTasks // changing these settings yout exit, then they get updated and restart the main loop with them updated (except onDepth which must finish first)
+									|| allocParallelType != SelectedParallelType
+									|| SelectedGenerationType != allocGenerationType
 								) continue;
 								if (TryWriteBitmaps(task) || TryFinishBitmap(task))
 									tasksRemaining = true;  // in the main loop we try Bitmap finishing and writing secondary threads (onDepth loop would get stuck )
@@ -526,13 +1273,14 @@ namespace RgbFractalGenClr {
 									const float _size = bmp < previewFrames ? size / (1 << (previewFrames - bmp - 1)) : size;
 									//_angle = angle, _hueAngle = hueAngle;var _spin = spin;var _color = color;
 									//bitmapState[nextBitmap] = BitmapState.Dots; // i was getting queued state tasks, this solved that, so that just means they take a while to get started, not an error
-									if (applyParallelType > ParallelType::OfAnimation || applyMaxTasks <= MINTASKS || bmp < previewFrames)
+									if (allocParallelType > ParallelType::OfAnimation || allocMaxTasks <= MINTASKS || bmp < previewFrames)
 										GenerateDots(bmp, static_cast<int16_t>(-t - 1), _size, angle, spin, hueAngle, color);
-									else
+									else STARTTASK(t, bmp)
 #ifdef CLR
-										Start(t, bmp, gcnew Action<Object^>(this, &FractalGenerator::Task_Dots), gcnew array<System::Object^>{ bmp, static_cast<int16_t>(t + 1), size, angle, spin, hueAngle, color });
+										(gcnew Action<Object^>(this, &FractalGenerator::Task_Dots),
+										gcnew array<System::Object^>{ bmp, static_cast<int16_t>(t + 1), size, angle, spin, hueAngle, color });
 #else
-										tasks[t].Start(bmp).task = std::thread(&FractalGenerator::GenerateDots, this, bmp, static_cast<int16_t>(t + 1), size, angle, spin, hueAngle, color);
+										(&FractalGenerator::GenerateDots, this, bmp, static_cast<int16_t>(t + 1), size, angle, spin, hueAngle, color);
 #endif
 									if (bmp >= previewFrames)
 										IncFrameParameters(size, angle, spin, hueAngle, 1);
@@ -545,30 +1293,6 @@ namespace RgbFractalGenClr {
 					}
 					ApplyGenerationType();
 				}
-
-
-				/*
-				FINISHTASKS(true) {
-					if (nextBitmap >= GetGenerateLength())
-						return;// The task is finished, no need to wait for this one
-					const auto bmp = nextBitmap++;
-					//ModFrameParameters(task.applyWidth, task.applyHeight, bmp >= previewFrames, ref size, ref angle, ref spin, ref hueAngle, ref color);
-					const float _size = bmp < previewFrames ? size / (1 << (previewFrames - bmp - 1)) : size;
-					//_angle = angle, _hueAngle = hueAngle;var _spin = spin;var _color = color;
-					//bitmapState[nextBitmap] = BitmapState.Dots; // i was getting queued state tasks, this solved that, so that just means they take a while to get started, not an error
-					if (applyParallelType > ParallelType::OfAnimation || applyMaxTasks <= MINTASKS || bmp < previewFrames)
-						GenerateDots(bmp, -static_cast<int16_t>(taskIndex) - 1, _size, angle, spin, hueAngle, color);
-					else
-#ifdef CLR
-						Start(taskIndex, bmp, gcnew Action<Object^>(this, &FractalGenerator::Task_Dots), gcnew array<System::Object^>{ bmp, static_cast<int16_t>(taskIndex) + 1, size, angle, spin, hueAngle, color });
-#else
-						tasks[taskIndex].Start(bmp).task = std::thread(&FractalGenerator::GenerateDots, this, bmp, static_cast<int16_t>(taskIndex) + 1, size, angle, spin, hueAngle, color);
-#endif
-					if (bmp >= previewFrames)
-						IncFrameParameters(size, angle, spin, hueAngle, 1);
-					tasksRemaining = true; // A task finished, but started another one - keep checking before new master loop
-				}
-				*/
 			} else if (toFinishAnimation) {
 				toFinishAnimation = false;
 				//TestEncoder();
@@ -587,29 +1311,29 @@ namespace RgbFractalGenClr {
 		}
 	}
 	bool FractalGenerator::ApplyGenerationType() {
-		if (applyGenerationType == selectGenerationType)
+		if (allocGenerationType == SelectedGenerationType)
 			return false;
-		if (applyGenerationType >= GenerationType::OnlyImage && applyGenerationType <= GenerationType::AnimationRAM && selectGenerationType >= GenerationType::EncodeGIF) {
+		if (allocGenerationType >= GenerationType::OnlyImage && allocGenerationType <= GenerationType::Animation && SelectedGenerationType >= GenerationType::EncodeGIF) {
 			bitmapsFinished = MIN(static_cast<uint32_t>(previewFrames), bitmapsFinished);
 			if (gifEncoder == nullptr)
 				StartGif();
 		}
-		applyGenerationType = selectGenerationType;
+		allocGenerationType = SelectedGenerationType;
 		return true;
 	}
 	VOIDTYPE FractalGenerator::FinishAnimation() {
 		// Wait for threads to finish
 		bool tasksRunning = true;
 		while (tasksRunning) {
-			for (auto t = allocatedTasks; 0 <= --t; Join(tasks[t]));
+			for (auto t = allocTasks; 0 <= --t; Join(tasks[t]));
 			tasksRunning = false;
-			for (auto t = allocatedTasks; 0 <= --t; tasksRunning |= tasks[t].taskStarted);
+			for (auto t = allocTasks; 0 <= --t; tasksRunning |= tasks[t].taskStarted);
 		}
 		// Unlock unfinished bitmaps:
 		UnlockBitmaps();
 		FinishGif();
 		MakeDebugString();
-		if (applyGenerationType == GenerationType::HashParam) {
+		if (allocGenerationType == GenerationType::HashSeeds) {
 			// TODO HASH
 			/*std::string output = "";
 			foreach(var i in hash)
@@ -621,21 +1345,21 @@ namespace RgbFractalGenClr {
 		// Open a temp file to presave GIF to - Use xiaozhuai's GifEncoder
 		gifSuccess = false;
 		DeleteEncoder();
-		hash->clear();
+		Hash->clear();
 		uint8_t gifIndex = 0;
 #ifdef CLR
 		gifToken = (gifCancel = gcnew CancellationTokenSource())->Token;
 #endif
-		switch (selectGenerationType) {
+		switch (SelectedGenerationType) {
 		case GenerationType::EncodeGIF:
 		case GenerationType::GlobalGIF:
-		case GenerationType::AllParam:
+		case GenerationType::AllSeeds:
 
 			GifEncoder* e;
 			gifEncoder = e = new GifEncoder();
 			while (gifIndex < 255) {
 				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
-				if (!e->open_parallel(Fractal::ConvertToStdString(gifTempPath), selectWidth, selectHeight, 1, applyGenerationType == GenerationType::GlobalGIF, 0, GIFCANCEL)) {
+				if (!e->open_parallel(Fractal::ConvertToStdString(gifTempPath), SelectedWidth, SelectedHeight, 1, allocGenerationType == GenerationType::GlobalGIF, 0, GIFCANCEL)) {
 #ifdef CUSTOMDEBUG
 					Log(logString, "Error opening gif file: " + gifTempPath);
 #endif
@@ -645,21 +1369,8 @@ namespace RgbFractalGenClr {
 			}
 			if (gifIndex == 255)
 				DeleteEncoder();
-			else if (selectAmbient < 0)
+			else if (SelectedAmbient < 0)
 				e->setTransparent(0, 0, 0);
-			break;
-		case GenerationType::Mp4:
-			// TODO MP4
-			/*mp4Encoder = new();
-			while (gifIndex < 255) {
-				gifTempPath = "gif" + gifIndex.ToString() + ".tmp";
-				if (!mp4Encoder.Start(selectWidth, selectHeight, gifTempPath, selectFps)) {
-					++gifIndex;
-					continue;
-				} else break;
-			}
-			if (gifIndex == 255)
-				gifEncoder = null;*/
 			break;
 		}
 		// Flag the already encoded bitmaps to be encoded again;
@@ -669,7 +1380,7 @@ namespace RgbFractalGenClr {
 	VOIDTYPE FractalGenerator::FinishGif() {
 		// Save the temp GIF file
 		gifSuccess = 0;
-		if (!CANCEL && applyGenerationType >= GenerationType::EncodeGIF && applyGenerationType <= GenerationType::AllParam) {
+		if (!CANCEL && allocGenerationType >= GenerationType::EncodeGIF && allocGenerationType <= GenerationType::AllSeeds) {
 			if (gifEncoder != nullptr) {
 				GifEncoder* e = (GifEncoder*)gifEncoder;
 				if (!e->isFinishedAnimation())
@@ -687,7 +1398,7 @@ namespace RgbFractalGenClr {
 					case GifEncoderTryWriteResult::FinishedFrame:
 						break;
 					case GifEncoderTryWriteResult::FinishedAnimation:
-						gifSuccess = MAX(selectWidth, selectHeight);
+						gifSuccess = MAX(SelectedWidth, SelectedHeight);
 						// This will follow with gifEncoder.IsFinished()
 						break;
 					}
@@ -712,16 +1423,16 @@ namespace RgbFractalGenClr {
 #else
 		gifCancelRequested = true;
 #endif
-		applyGenerationType = GenerationType::AnimationRAM;
+		allocGenerationType = GenerationType::Animation;
 		for (int t = 0; t < taskIndex; ++t) {
 			auto& task = tasks[t];
-			if (task.bitmapIndex < 0) {
+			if (task.BitmapIndex < 0) {
 				if (taskIndex != t)
 					Join(task);
-			} else if (bitmapState[task.bitmapIndex] >= BitmapState::Encoding && bitmapState[task.bitmapIndex] <= BitmapState::EncodingFinished) {
+			} else if (bitmapState[task.BitmapIndex] >= BitmapState::Encoding && bitmapState[task.BitmapIndex] <= BitmapState::EncodingFinished) {
 				if (taskIndex != t)
 					Join(task);
-				bitmapState[task.bitmapIndex] = BitmapState::DrawingFinished;
+				bitmapState[task.BitmapIndex] = BitmapState::DrawingFinished;
 			}
 		}
 		((GifEncoder*)gifEncoder)->abort();
@@ -739,12 +1450,12 @@ namespace RgbFractalGenClr {
 		// Init buffer with zeroes
 		uint16_t taskIndex = ABS(stateIndex) - 1;
 		auto& task = tasks[taskIndex];
-		task.bitmapIndex = bitmapIndex;
-		auto& buffT = task.buffer;
+		task.BitmapIndex = bitmapIndex;
+		auto& buffT = task.Buffer;
 		PreviewResolution(task);
-		for (auto y = 0; y < task.applyHeight; ++y) {
+		for (auto y = 0; y < task.ApplyHeight; ++y) {
 			const auto& buffY = buffT[y];
-			for (auto x = 0; x < task.applyWidth; buffY[x++] = zero);
+			for (auto x = 0; x < task.ApplyWidth; buffY[x++] = zero);
 		}
 #ifdef CUSTOMDEBUG
 		const auto initElapsed = (std::chrono::steady_clock::now() - initTime).count();
@@ -755,16 +1466,16 @@ namespace RgbFractalGenClr {
 		// Generate the fractal frame recursively
 		//auto& H = task.H;
 		//auto& I = task.I;
-		for (int b = 0; b < applyBlur; ++b) {
-			ModFrameParameters(task.applyWidth, task.applyHeight, size, angle, spin, hueAngle, color);
+		for (int b = 0; b < allocBlur; ++b) {
+			ModFrameParameters(task.ApplyWidth, task.ApplyHeight, size, angle, spin, hueAngle, color);
 			// Preiterate values that change the same way as iteration goes deeper, so they only get calculated once
 			float inSize = size;
-			auto& preIterateTask = task.preIterate;
+			auto& preIterateTask = task.PreIterate;
 			if (preIterateTask == nullptr) 
 				InitPreiterate(preIterateTask);
-			for (int i = 0; i < applyMaxIterations; ++i) {
+			for (int i = 0; i < allocMaxIterations; ++i) {
 				auto& preIterated = preIterateTask[i];
-				const auto inDetail = -inSize * MAX(-1.0f, std::get<1>(preIterated) = static_cast<float>(LOG(applyDetail / (std::get<0>(preIterated) = inSize))) / logBase);
+				const auto inDetail = -inSize * MAX(-1.0f, std::get<1>(preIterated) = static_cast<float>(LOG(allocDetail / (std::get<0>(preIterated) = inSize))) / logBase);
 				auto& XY = std::get<2>(preIterated);
 				if (XY == nullptr)
 					XY = new std::pair<float, float>[maxChildren];
@@ -775,24 +1486,24 @@ namespace RgbFractalGenClr {
 			// Prepare Color blending per one dot (hueshifting + iteration correction) and starting cutparameter
 			// So that the color of the dot will slowly approach the combined colors of its childer before it splits
 			int64_t startParam = 0;
-			auto F = applyGenerationType >= GenerationType::AllParam ? &task.F : colorBlends;
-			if (applyGenerationType >= GenerationType::AllParam)
+			auto F = allocGenerationType >= GenerationType::AllSeeds ? &task.ColorBlends : colorBlends;
+			if (allocGenerationType >= GenerationType::AllSeeds)
 				PregenerateParam(bitmapIndex, F, startParam);
 			else startParam = startCutParam;
 			auto lerp = std::fmod(hueAngle, 1.0f);
-			task.H.clear();
+			task.FinalColors.clear();
 			task.huemod = static_cast<uint8_t>(std::fmod(hueAngle, 3.0f));
 			task.I[0] = Vector::Lerp(unitX, unitY, lerp); 
 			task.I[1] = Vector::Lerp(unitY, unitZ, lerp);
 			task.I[2] = Vector::Lerp(unitZ, unitX, lerp);
 			for(auto& c : *F) {
 				const auto& v = c.second;
-				task.H[c.first] = std::array<Vector, 3> { Vector::Lerp(v[0], v[1], lerp), Vector::Lerp(v[1], v[2], lerp), Vector::Lerp(v[2], v[0], lerp) };
+				task.FinalColors[c.first] = std::array<Vector, 3> { Vector::Lerp(v[0], v[1], lerp), Vector::Lerp(v[1], v[2], lerp), Vector::Lerp(v[2], v[0], lerp) };
 			}
-			if (applyMaxTasks <= MINTASKS || applyParallelType != ParallelType::OfDepth && bitmapIndex >= previewFrames)
+			if (allocMaxTasks <= MINTASKS || allocParallelType != ParallelType::OfDepth && bitmapIndex >= previewFrames)
 				GenerateDots_SingleTask(task, CHILDPARAMS);
 			else {
-				tuples[0] = { task.taskIndex, CHILDPARAMS };
+				tuples[0] = { task.TaskIndex, CHILDPARAMS };
 				GenerateDots_OfDepth(bitmapIndex);
 			}
 			/* //This OfRecursion parallelism mode is deprecated, use OfDepth instead, it's better anyway
@@ -829,7 +1540,7 @@ namespace RgbFractalGenClr {
 				break;
 				*/
 			if (bitmapIndex >= previewFrames)
-				IncFrameParameters(size, angle, spin, hueAngle, applyBlur);
+				IncFrameParameters(size, angle, spin, hueAngle, allocBlur);
 			if (CANCEL) CANCELDOTS
 		}
 #ifdef CUSTOMDEBUG
@@ -853,10 +1564,11 @@ namespace RgbFractalGenClr {
 		if (stateIndex >= 0) // OfAnimation - continue directly with the nexts steps such as void and gif in this same task:
 			GenerateImage(taskIndex);
 		else // OfDepth - start continuation in a new task:
+			STARTTASK(taskIndex, bitmapIndex)
 #ifdef CLR
-			Start(taskIndex, bitmapIndex, gcnew Action<Object^>(this, &FractalGenerator::Task_Image), gcnew array<System::Object^>{ taskIndex });
+			(gcnew Action<Object^>(this, &FractalGenerator::Task_Image), gcnew array<System::Object^>{ taskIndex });
 #else
-			task.Start(bmp).task = std::thread(&FractalGenerator::GenerateImage, this, taskIndex);
+			(&FractalGenerator::GenerateImage, this, taskIndex);
 #endif
 	}
 	VOIDTYPE FractalGenerator::GenerateImage(const uint16_t taskIndex) {
@@ -866,23 +1578,23 @@ namespace RgbFractalGenClr {
 #endif
 		auto& task = tasks[taskIndex];
 		// Generate the grey void areas
-		bitmapState[task.bitmapIndex] = BitmapState::Void;
-		auto& voidT = task.voidDepth;
-		auto& buffT = task.buffer;
-		auto& queueT = task.voidQueue;
-		task.lightNormalizer = 0.1f;
-		task.voidDepthMax = 1.0f;
+		bitmapState[task.BitmapIndex] = BitmapState::Void;
+		auto& voidT = task.VoidDepth;
+		auto& buffT = task.Buffer;
+		auto& queueT = task.VoidQueue;
+		task.LightNormalizer = 0.1f;
+		task.VoidDepthMax = 1.0f;
 		int16_t voidYX;
-		const uint16_t w1 = task.applyWidth - 1, h1 = task.applyHeight - 1;
+		const uint16_t w1 = task.ApplyWidth - 1, h1 = task.ApplyHeight - 1;
 		// Old SIMD vector code I couldn't get to work
 		//Vector<float> *buffY;
 		int16_t* voidY, * void0, * voidH, * voidP, * voidM;
-		if (selectAmbient > 0) {
+		if (SelectedAmbient > 0) {
 			// Void Depth Seed points (no points, no borders), leet the void depth generator know where to start incrementing the depth
 			float lightMax;
 			for (uint16_t y = 1; y < h1; ++y) {
 				if (CANCEL) {
-					task.state = TaskState::Done;
+					task.State = TaskState::Done;
 					std::swap(queueT, std::queue<std::pair<int16_t, int16_t>>()); // Fast swap-and-drop
 					return;
 				}
@@ -892,7 +1604,7 @@ namespace RgbFractalGenClr {
 					auto& buffYX = buffY[x];
 					// Old SIMD vector code I couldn't get to work
 					//lightNormalizer = MAX(lightNormalizer, lightMax = MAX(buffYX[0], MAX(buffYX[1], buffYX[2])));
-					task.lightNormalizer = MAX(task.lightNormalizer, lightMax = buffYX.Max());
+					task.LightNormalizer = MAX(task.LightNormalizer, lightMax = buffYX.Max());
 					if (lightMax > 0) {
 						voidY[x] = 0;
 						queueT.push({ y, x });
@@ -904,7 +1616,7 @@ namespace RgbFractalGenClr {
 			}
 			void0 = voidT[0];
 			voidH = voidT[h1];
-			for (uint16_t x = 0; x < task.applyWidth; ++x) {
+			for (uint16_t x = 0; x < task.ApplyWidth; ++x) {
 				void0[x] = voidH[x] = 0;
 				queueT.push({ 0, x });
 				queueT.push({ h1, x });
@@ -918,29 +1630,29 @@ namespace RgbFractalGenClr {
 				y = qt.first, ym = y - 1, yp = y + 1, x = qt.second, xm = x - 1, xp = x + 1;
 				voidY = voidT[y];
 				voidMax = MAX(voidMax, voidYX = voidY[x] + 1);
-				if (xp < task.applyWidth && (voidY[xp] == -1)) { voidY[xp] = voidYX; queueT.push({ y, xp }); }
-				if (yp < task.applyHeight && ((voidP = voidT[yp])[x] == -1)) { voidP[x] = voidYX;  queueT.push({ yp, x }); }
+				if (xp < task.ApplyWidth && (voidY[xp] == -1)) { voidY[xp] = voidYX; queueT.push({ y, xp }); }
+				if (yp < task.ApplyHeight && ((voidP = voidT[yp])[x] == -1)) { voidP[x] = voidYX;  queueT.push({ yp, x }); }
 				if (xm >= 0 && (voidY[xm] == -1)) { voidY[xm] = voidYX; queueT.push({ y, xm }); }
 				if (ym >= 0 && ((voidM = voidT[ym])[x] == -1)) { voidM[x] = voidYX;  queueT.push({ ym, x }); }
 			}
-			task.voidDepthMax = voidMax;
+			task.VoidDepthMax = voidMax;
 		} else
-			for (uint16_t y = 0; y < selectHeight; y++) {
+			for (uint16_t y = 0; y < SelectedHeight; y++) {
 				if (CANCEL) {
-					task.state = TaskState::Done;
+					task.State = TaskState::Done;
 					return;
 				}
 				const auto buffY = buffT[y];
-				for (uint16_t x = 0; x < task.applyWidth; x++) {
+				for (uint16_t x = 0; x < task.ApplyWidth; x++) {
 					auto& buffYX = buffY[x];
 					// Old SIMD vector code I couldn't get to work
 					//lightNormalizer = MAX(lightNormalizer, MAX(buffYX[0], MAX(buffYX[1], buffYX[2])));
-					task.lightNormalizer = MAX(task.lightNormalizer, buffYX.Max());
+					task.LightNormalizer = MAX(task.LightNormalizer, buffYX.Max());
 				}
 			}
-		task.lightNormalizer = selectBrightness * 2.55f / task.lightNormalizer;
+		task.LightNormalizer = SelectedBrightness * 2.55f / task.LightNormalizer;
 		if (CANCEL) {
-			task.state = TaskState::Done;
+			task.State = TaskState::Done;
 			return;
 		}
 #ifdef CUSTOMDEBUG
@@ -949,32 +1661,37 @@ namespace RgbFractalGenClr {
 		const auto drawTime{ std::chrono::steady_clock::now() };
 #endif
 		// Make a locked bitmap, remember the locked state
-		NewBitmap(task.bitmapIndex, task.applyWidth, task.applyHeight);
+		NewBitmap(task.BitmapIndex, task.ApplyWidth, task.ApplyHeight);
 
 
-		uint8_t* p = bitmap[task.bitmapIndex];
-		bitmapState[task.bitmapIndex] = BitmapState::Drawing;
+		uint8_t* p = bitmap[task.BitmapIndex];
+		bitmapState[task.BitmapIndex] = BitmapState::Drawing;
 		// Draw the bitmap with the buffer dat we calculated with GenerateFractal and Calculate void
 		// Switch between th selected settings such as saturation, noise, image parallelism...
 		const auto& cbuffT = const_cast<const Vector**&>(buffT);
 		const auto& cvoidT = const_cast<const int16_t**&>(voidT);
-		int16_t maxGenerationTasks = MAX(static_cast<int16_t>(1), static_cast<int16_t>(applyMaxTasks - 1));
-		uint16_t wv = task.applyWidth / applyVoid + 2;
-		auto stride = strides[task.bitmapIndex];//3 * selectWidth;
-		if ((applyParallelType > ParallelType::OfAnimation || task.bitmapIndex <= previewFrames) && maxGenerationTasks > 1) {
+		//int16_t maxGenerationTasks = MAX(static_cast<int16_t>(1), static_cast<int16_t>(applyMaxTasks - 1));
+		uint16_t wv = task.ApplyWidth / allocVoid + 2;
+		auto stride = strides[task.BitmapIndex];//3 * selectWidth;
+
+		SaturateFunc saturateFunc = SelectedSaturate > 0.0f
+			? &ApplySaturate
+			: &Identity;
+
+		if ((allocParallelType > ParallelType::OfAnimation || task.BitmapIndex <= previewFrames) && maxGenerationTasks > 1) {
 			// Multi Threaded:
-			if (ambnoise > 0 && applyGenerationType != GenerationType::HashParam) {
+			if (allocNoise > 0 && allocGenerationType != GenerationType::HashSeeds) {
 #pragma omp parallel for num_threads(maxGenerationTasks)
-				for (int y = 0; y < task.applyHeight / applyVoid + 2; ++y) {
+				for (int y = 0; y < task.ApplyHeight / allocVoid + 2; ++y) {
 					std::random_device rd;
 					std::mt19937 randGen(rd());
-					std::uniform_real_distribution<float> dist(0.0f, ambnoise);
-					auto& v = task.voidNoise[y];
+					std::uniform_real_distribution<float> dist(0.0f, allocNoise);
+					auto& v = task.VoidNoise[y];
 					for (int x = 0; x < wv; v[x++] = Vector(dist(randGen), dist(randGen), dist(randGen)));
 				}
-				if (selectSaturate > 0.0) {
+				if (SelectedSaturate > 0.0) {
 #pragma omp parallel for num_threads(maxGenerationTasks)
-					for (int16_t y = 0; y < task.applyHeight; ++y) {
+					for (int16_t y = 0; y < task.ApplyHeight; ++y) {
 						if (CANCEL)
 							continue;
 						auto rp = p + y * stride;
@@ -982,7 +1699,7 @@ namespace RgbFractalGenClr {
 					}
 				} else {
 #pragma omp parallel for num_threads(maxGenerationTasks)
-					for (int16_t y = 0; y < task.applyHeight; ++y) {
+					for (int16_t y = 0; y < task.ApplyHeight; ++y) {
 						if (CANCEL)
 							continue;
 						uint8_t* rp = p + y * stride;
@@ -990,9 +1707,9 @@ namespace RgbFractalGenClr {
 					}
 				}
 			} else {
-				if (selectSaturate > 0.0) {
+				if (SelectedSaturate > 0.0) {
 #pragma omp parallel for num_threads(maxGenerationTasks)
-					for (int16_t y = 0; y < task.applyHeight; ++y) {
+					for (int16_t y = 0; y < task.ApplyHeight; ++y) {
 						if (CANCEL)
 							continue;
 						auto rp = p + y * stride;
@@ -1000,7 +1717,7 @@ namespace RgbFractalGenClr {
 					}
 				} else {
 #pragma omp parallel for num_threads(maxGenerationTasks)
-					for (int16_t y = 0; y < task.applyHeight; ++y) {
+					for (int16_t y = 0; y < task.ApplyHeight; ++y) {
 						if (CANCEL)
 							continue;
 						auto rp = p + y * stride;
@@ -1011,32 +1728,32 @@ namespace RgbFractalGenClr {
 		} else {
 			uint8_t* rp;
 			// Single Threaded:
-			if (ambnoise > 0) {
-				for (int y = 0; y < task.applyHeight / applyVoid + 2; ++y) {
-					auto& v = task.voidNoise[y];
-					auto& dist = *randomDist;
-					auto& randGen = *randomGenerator;
+			if (allocNoise > 0) {
+				for (int y = 0; y < task.ApplyHeight / allocVoid + 2; ++y) {
+					auto& v = task.VoidNoise[y];
+					auto& dist = *nextDouble;
+					auto& randGen = *random;
 					for (int x = 0; x < wv; ++x)
-						v[x] = ambnoise * Vector(dist(randGen), dist(randGen), dist(randGen));
+						v[x] = allocNoise * Vector(dist(randGen), dist(randGen), dist(randGen));
 				};
-				if (selectSaturate > 0.0) for (uint16_t y = 0; y < task.applyHeight; ++y) {
+				if (SelectedSaturate > 0.0) for (uint16_t y = 0; y < task.ApplyHeight; ++y) {
 					if (CANCEL)
 						continue;
 					rp = p + y * stride;
 					NoiseSaturate(task, y, rp);
-				} else for (uint16_t y = 0; y < task.applyHeight; ++y) {
+				} else for (uint16_t y = 0; y < task.ApplyHeight; ++y) {
 					if (CANCEL)
 						continue;
 					rp = p + y * stride;
 					NoiseNoSaturate(task, y, rp);
 				}
 			} else {
-				if (selectSaturate > 0.0) for (uint16_t y = 0; y < task.applyHeight; ++y) {
+				if (SelectedSaturate > 0.0) for (uint16_t y = 0; y < task.ApplyHeight; ++y) {
 					if (CANCEL)
 						continue;
 					rp = p + y * stride;
 					NoNoiseSaturate(task, y, rp);
-				} else for (uint16_t y = 0; y < task.applyHeight; ++y) {
+				} else for (uint16_t y = 0; y < task.ApplyHeight; ++y) {
 					if (CANCEL)
 						continue;
 					rp = p + y * stride;
@@ -1045,7 +1762,7 @@ namespace RgbFractalGenClr {
 			}
 		}
 		if (CANCEL) {
-			task.state = TaskState::Done;
+			task.State = TaskState::Done;
 			return;
 		}
 #ifdef CUSTOMDEBUG
@@ -1066,16 +1783,16 @@ namespace RgbFractalGenClr {
 		taskLock.unlock();
 #endif
 #endif
-		if (task.bitmapIndex < previewFrames) {
-			bitmapState[task.bitmapIndex] = BitmapState::FinishedBitmap;
-			task.state = TaskState::Done;
+		if (task.BitmapIndex < previewFrames) {
+			bitmapState[task.BitmapIndex] = BitmapState::FinishedBitmap;
+			task.State = TaskState::Done;
 			TryFinishBitmaps(false);
 		} else {
-			if (applyGenerationType >= GenerationType::EncodeGIF && applyGenerationType <= GenerationType::AllParam && applyGenerationType != GenerationType::Mp4)
-				GenerateGif(task.taskIndex);
+			if (allocGenerationType >= GenerationType::EncodeGIF && allocGenerationType <= GenerationType::AllSeeds && allocGenerationType != GenerationType::Mp4)
+				GenerateGif(task.TaskIndex);
 			else {
-				bitmapState[task.bitmapIndex] = BitmapState::DrawingFinished;
-				task.state = TaskState::Done;
+				bitmapState[task.BitmapIndex] = BitmapState::DrawingFinished;
+				task.State = TaskState::Done;
 			}
 		}
 	}
@@ -1085,33 +1802,33 @@ namespace RgbFractalGenClr {
 		const auto gifsTime{ std::chrono::steady_clock::now() };
 #endif
 		auto& task = tasks[taskIndex];
-		if (applyGenerationType == GenerationType::Mp4) {
+		if (allocGenerationType == GenerationType::Mp4) {
 			if (mp4Encoder != nullptr) {
-				bitmapState[task.bitmapIndex] = BitmapState::Encoding; // Start encoding Frame to a temp GIF
+				bitmapState[task.BitmapIndex] = BitmapState::Encoding; // Start encoding Frame to a temp GIF
 				//const auto d = bitmapData[task.bitmapIndex];
 				//uint8_t* ptr = (uint8_t*)(void*)d->Scan0;
 				// TODO MP4
 				//mp4Encoder.AddFrame(bitmap[task.bitmapIndex], strides[task.bitmapindex]);
-				bitmapState[task.bitmapIndex] = BitmapState::EncodingFinished;
+				bitmapState[task.BitmapIndex] = BitmapState::EncodingFinished;
 			} else {
-				StopGif(task.taskIndex);
-				bitmapState[task.bitmapIndex] = BitmapState::DrawingFinished;
+				StopGif(task.TaskIndex);
+				bitmapState[task.BitmapIndex] = BitmapState::DrawingFinished;
 			}
 		} else {
 			if (gifEncoder != nullptr) {
-				bitmapState[task.bitmapIndex] = BitmapState::Encoding; // Start encoding Frame to a temp GIF	
+				bitmapState[task.BitmapIndex] = BitmapState::Encoding; // Start encoding Frame to a temp GIF	
 				//const auto d = bitmapData[task.bitmapIndex];
 				//uint8_t* ptr = (uint8_t*)(void*)d->Scan0;
 				((GifEncoder*)gifEncoder)->push_parallel(
-					bitmap[task.bitmapIndex],
-					selectWidth, selectHeight, 
-					selectDelay, task.bitmapIndex - previewFrames, 
-					strides[task.bitmapIndex], GIFCANCEL);
+					bitmap[task.BitmapIndex],
+					SelectedWidth, SelectedHeight, 
+					SelectedDelay, task.BitmapIndex - previewFrames, 
+					strides[task.BitmapIndex], GIFCANCEL);
 				//gifEncoder.AddFrameParallel(ptr, d.Stride, gifToken, task.bitmapIndex - previewFrames);
-				bitmapState[task.bitmapIndex] = BitmapState::EncodingFinished;
+				bitmapState[task.BitmapIndex] = BitmapState::EncodingFinished;
 			} else {
-				StopGif(task.taskIndex);
-				bitmapState[task.bitmapIndex] = BitmapState::DrawingFinished;
+				StopGif(task.TaskIndex);
+				bitmapState[task.BitmapIndex] = BitmapState::DrawingFinished;
 			}
 		}
 #ifdef CUSTOMDEBUG
@@ -1131,10 +1848,10 @@ namespace RgbFractalGenClr {
 		taskLock.unlock();
 #endif
 #endif
-		if (applyGenerationType == GenerationType::Mp4)
-			bitmapState[task.bitmapIndex] = BitmapState::FinishedBitmap;
+		if (allocGenerationType == GenerationType::Mp4)
+			bitmapState[task.BitmapIndex] = BitmapState::FinishedBitmap;
 		gifThread = false;
-		task.state = TaskState::Done;
+		task.State = TaskState::Done;
 	}
 	VOIDTYPE FractalGenerator::GenerateDots_SingleTask(const FractalTask& task, double inXY, double AA, const uint8_t inColor, const int64_t inFlags, uint8_t inDepth) {
 		STARTITERATION {
@@ -1146,7 +1863,7 @@ namespace RgbFractalGenClr {
 	VOIDTYPE FractalGenerator::GenerateDots_OfDepth(const uint32_t bitmapIndex) {
 
 		uint8_t index = 0, insertTo = 1,
-			max = applyMaxTasks * depthdiv,
+			max = allocMaxTasks * DepthDiv,
 			maxcount = max - f->childCount - 1,
 			count = (max + insertTo - index) % max;
 		while (count > 0 && count < maxcount) {
@@ -1175,10 +1892,11 @@ namespace RgbFractalGenClr {
 			if (count <= 0)
 				continue;
 			const auto tupleIndex = index++;
+			STARTTASK(taskIndex, bitmapIndex)
 #ifdef CLR
-			Start(taskIndex, bitmapIndex, gcnew Action<Object^>(this, &FractalGenerator::Task_OfDepth), gcnew array<System::Object^>{ taskIndex, index++ });
+			(gcnew Action<Object^>(this, &FractalGenerator::Task_OfDepth), gcnew array<System::Object^>{ taskIndex, index++ });
 #else
-			tasks[taskIndex].Start(bitmapIndex).task = std::thread(&FractalGenerator::TaskOfDepth, this, taskIndex, index++);
+			(&FractalGenerator::TaskOfDepth, this, taskIndex, index++);
 #endif
 			index %= max;
 			count = (max + insertTo - index) % max;
@@ -1202,28 +1920,26 @@ namespace RgbFractalGenClr {
 			}
 		}
 	}*/
-	bool FractalGenerator::IsTaskStillRunning(FractalTask& task) {
-		return task.state == TaskState::Done ? Join(task) : task.state != TaskState::Free;
-	}
 	bool FractalGenerator::TryWriteBitmaps(FractalTask& task) {
 		if (CANCEL // Do not write gid frames when cancelled
 			|| gifEncoder == nullptr // ...or if gifencoder doens't exist
 			|| ((GifEncoder*)gifEncoder)->isFinishedAnimation() // ...or if it's finished
-			|| applyGenerationType < GenerationType::EncodeGIF || applyGenerationType > GenerationType::AllParam || applyGenerationType == GenerationType::Mp4 // ...or we are not supposed to encode a gif
+			|| allocGenerationType < GenerationType::EncodeGIF || allocGenerationType > GenerationType::AllSeeds || allocGenerationType == GenerationType::Mp4 // ...or we are not supposed to encode a gif
 			|| isWritingBitmaps <= 0 // ...or this task is already running
 			|| --isWritingBitmaps > 0) // ...or we have already ran it not too long ago
 			return false;
+		STARTTASK(task.TaskIndex, -1)
 #ifdef CLR
-		Start(task.taskIndex, -1, gcnew Action<Object^>(this, &FractalGenerator::Task_TryWriteBitmap), gcnew array<System::Object^>{ task.taskIndex });
+		(gcnew Action<Object^>(this, &FractalGenerator::Task_TryWriteBitmap), gcnew array<System::Object^>{ task.TaskIndex });
 #else
-		task.Start(-1).task = std::thread(&FractalGenerator::TryWriteBitmap, this, task.taskIndex);
+		(&FractalGenerator::TryWriteBitmap, this, task.taskIndex);
 #endif
 		return true;
 	}
 	VOIDTYPE FractalGenerator::TryWriteBitmap(const uint16_t taskIndex) {
 		auto& task = tasks[taskIndex];
 		while (!CANCEL) {
-			if (bitmapsFinished >= frames && !((GifEncoder*)gifEncoder)->isFinishedAnimation())
+			if (bitmapsFinished >= bitmapLength && !((GifEncoder*)gifEncoder)->isFinishedAnimation())
 				((GifEncoder*)gifEncoder)->close(true, GIFCANCEL);
 			int unlock = ((GifEncoder*)gifEncoder)->getFinishedFrame();
 			// Try to finalize the previous encoder tasks
@@ -1232,7 +1948,7 @@ namespace RgbFractalGenClr {
 				// fallback to only display animation without encoding
 				StopGif(taskIndex);
 				isWritingBitmaps = 2;
-				task.state = TaskState::Done;
+				task.State = TaskState::Done;
 				return;
 			case GifEncoderTryWriteResult::FinishedFrame:
 				// mark the bitmap state as fully finished
@@ -1241,30 +1957,31 @@ namespace RgbFractalGenClr {
 			default:
 				// waiting or finished animation
 				isWritingBitmaps = 2;
-				task.state = TaskState::Done;
+				task.State = TaskState::Done;
 				return;
 			}
 		}
 		isWritingBitmaps = 2;
-		task.state = TaskState::Done;
+		task.State = TaskState::Done;
 	}
 	bool FractalGenerator::TryFinishBitmap(FractalTask& task) {
 		if (CANCEL)
 			return false;
-		bool gif = applyGenerationType >= GenerationType::EncodeGIF && applyGenerationType <= GenerationType::AllParam;
-		if (gif && bitmapsFinished < frames && bitmapsFinished >= previewFrames && !gifThread) {
+		bool gif = allocGenerationType >= GenerationType::EncodeGIF && allocGenerationType <= GenerationType::AllSeeds;
+		if (gif && bitmapsFinished < bitmapLength && bitmapsFinished >= previewFrames && !gifThread) {
 			int tryEncode = bitmapsFinished;
-			int32_t maxTry = MIN(static_cast<int32_t>(frames), static_cast<int32_t>(bitmapsFinished) + static_cast<int32_t>(applyMaxTasks));
+			int32_t maxTry = MIN(static_cast<int32_t>(bitmapLength), static_cast<int32_t>(bitmapsFinished) + static_cast<int32_t>(allocMaxTasks));
 			while (tryEncode < maxTry) {
 				if (bitmapState[tryEncode] >= BitmapState::DrawingFinished && bitmapState[tryEncode] <= BitmapState::UnlockedRAM) {
 					if (bitmapState[tryEncode] == BitmapState::UnlockedRAM)
 						ReLockBits(tryEncode);
 					bitmapState[tryEncode] = BitmapState::Encoding;
-					gifThread = applyGenerationType == GenerationType::Mp4;
+					gifThread = allocGenerationType == GenerationType::Mp4;
+					STARTTASK(task.TaskIndex, tryEncode)
 #ifdef CLR
-					Start(task.taskIndex, tryEncode, gcnew Action<Object^>(this, &FractalGenerator::Task_GenerateGif), gcnew array<System::Object^>{ task.taskIndex });
+					(gcnew Action<Object^>(this, &FractalGenerator::Task_GenerateGif), gcnew array<System::Object^>{ task.TaskIndex });
 #else
-					task.Start(tryEncode).task = std::thread(&FractalGenerator::GenerateGif, this, task.taskIndex);
+					std::thread(&FractalGenerator::GenerateGif, this, task.taskIndex);
 #endif
 					return true;
 				}
@@ -1281,9 +1998,9 @@ namespace RgbFractalGenClr {
 #else
 		taskLock.lock();
 #endif
-		while (bitmapsFinished < frames && bitmapState[bitmapsFinished] >= (gif || bitmapState[bitmapsFinished] == BitmapState::Encoding ? BitmapState::FinishedBitmap : BitmapState::DrawingFinished)) {
+		while (bitmapsFinished < bitmapLength && bitmapState[bitmapsFinished] >= (gif || bitmapState[bitmapsFinished] == BitmapState::Encoding ? BitmapState::FinishedBitmap : BitmapState::DrawingFinished)) {
 			bitmapState[bitmapsFinished] = gif || bitmapsFinished < previewFrames ? BitmapState::Unlocked : BitmapState::UnlockedRAM;
-			if (applyGenerationType == GenerationType::HashParam) {
+			if (allocGenerationType == GenerationType::HashSeeds) {
 				// TODO HASH
 				/*using SHA256 sha256 = SHA256.Create();
 				int bytenum = bitmapData[bitmapsFinished].Stride * selectHeight;
@@ -1314,15 +2031,15 @@ namespace RgbFractalGenClr {
 	VOIDTYPE FractalGenerator::ApplyDot(const FractalTask& task, const int64_t key, const float& inX, const float& inY, const float& inDetail, const uint8_t& inColor) {
 		const auto colorindex = (inColor + task.huemod) % 3;
 		std::map<int64_t, std::array<Vector, 3>>::const_iterator it;
-		const auto dotColor = applyPreviewMode ? task.I[colorindex] : Vector::Lerp(
-			(it = task.H.find(key)) != task.H.end() ? it->second[colorindex] : zero,
+		const auto dotColor = allocPreviewMode ? task.I[colorindex] : Vector::Lerp(
+			(it = task.FinalColors.find(key)) != task.FinalColors.end() ? it->second[colorindex] : zero,
 			task.I[colorindex], inDetail);
-		auto& buffT = task.buffer;
+		auto& buffT = task.Buffer;
 		// Iterated deep into a single point - Interpolate inbetween 4 pixels and Stop
-		const auto startX = MAX(static_cast<int16_t>(1), static_cast<int16_t>(FLOOR(inX - task.bloom0))),
-			endX = MIN(task.widthBorder, static_cast<int16_t>(CEIL(inX + task.bloom0))),
-			endY = MIN(task.heightBorder, static_cast<int16_t>(CEIL(inY + task.bloom0)));
-		for (int16_t x, y = MAX(static_cast<int16_t>(1), static_cast<int16_t>(FLOOR(inY - task.bloom0))); y <= endY; ++y) {
+		const auto startX = MAX(static_cast<int16_t>(1), static_cast<int16_t>(FLOOR(inX - task.Bloom0))),
+			endX = MIN(task.WidthBorder, static_cast<int16_t>(CEIL(inX + task.Bloom0))),
+			endY = MIN(task.HeightBorder, static_cast<int16_t>(CEIL(inY + task.Bloom0)));
+		for (int16_t x, y = MAX(static_cast<int16_t>(1), static_cast<int16_t>(FLOOR(inY - task.Bloom0))); y <= endY; ++y) {
 			const auto yd = bloom1 - ABS(y - inY);
 			const auto& buffY = buffT[y];
 			for (x = startX; x <= endX; ++x)
@@ -1331,7 +2048,7 @@ namespace RgbFractalGenClr {
 	}
 	inline bool FractalGenerator::FractalGenerator::TestSize(const FractalTask& task, const float& newX, const float& newY, const float& inSize) {
 		const auto testSize = inSize * f->cutSize;
-		return MIN(newX, newY) + testSize > task.upleftStart && newX - testSize < task.rightEnd && newY - testSize < task.downEnd;
+		return MIN(newX, newY) + testSize > task.UpLeftStart && newX - testSize < task.RightEnd && newY - testSize < task.DownEnd;
 	}
 	const Vector FractalGenerator::Normalize(const Vector& pixel, const float lightNormalizer) {
 		const float max = pixel.Max();
@@ -1354,81 +2071,15 @@ namespace RgbFractalGenClr {
 	const Vector FractalGenerator::ApplyAmbientNoise(const Vector& rgb, const float Amb, const float Noise, const Vector& rand) {
 		return rgb + Amb + Noise * rand;
 	}
-	const Vector FractalGenerator::ApplySaturate(const Vector& rgb) {
-		// The saturation equation boosting up the saturation of the pixel (powered by the saturation slider setting)
-		float m; const auto min = MIN(MIN(rgb.X, rgb.Y), rgb.Z), max = MAX(MAX(rgb.X, rgb.Y), rgb.Z);
-		return max <= min ? rgb : Vector::MultiplyMinus(rgb, (m = max * selectSaturate / (max - min)) + 1 - selectSaturate, min * m);
-	}
-	VOIDTYPE FractalGenerator::ApplyRGBToBytePointer(const Vector& rgb, uint8_t*& p) {
+	
+	/*VOIDTYPE FractalGenerator::selectDither(const Vector& rgb, uint8_t*& p) {
 		// Without gamma:
 		p[0] = static_cast<uint8_t>(rgb.Z);	// Blue
 		p[1] = static_cast<uint8_t>(rgb.Y);	// Green
 		p[2] = static_cast<uint8_t>(rgb.X);	// // With gamma:
-		// With gamma:
-			/*
-			p[0] = static_cast<uint8_t>(255.0f * Math.Sqrt(rgb.Z / 255.0f));
-			p[1] = static_cast<uint8_t>(255.0f * Math.Sqrt(rgb.Y / 255.0f));
-			p[2] = static_cast<uint8_t>(255.0f * Math.Sqrt(rgb.X / 255.0f));
-			*/
 		p += 3;
-	}
-	inline VOIDTYPE FractalGenerator::NoiseSaturate(const FractalTask& task, const uint16_t y, uint8_t*& p) {
-		const auto& voidY = task.voidDepth[y];
-		const auto& buffY = task.buffer[y];
-		const auto fy = static_cast<float>(y) / applyVoid;
-		const auto startY = static_cast<uint16_t>(FLOOR(fy));
-		const auto alphaY = fy - startY;
-		//if (selectAmbient <= 0) // noise is always 0 if ambient is zero, so it should't even get to this function
-		//	for (var x = 0; x < task.applyWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], lightNormalizer)), ref p)) ;
-		//else 
-		for (auto x = 0; x < task.applyWidth; ++x) {
-			const auto voidAmb = voidY[x] / task.voidDepthMax;
-			const auto fx = static_cast<float>(x) / applyVoid;
-			const auto startX = static_cast<uint16_t>(FLOOR(fx));
-			const auto alphaX = fx - startX;
-			const auto& vy0 = task.voidNoise[startY];
-			const auto& vy1 = task.voidNoise[startY + 1];
-			ApplyRGBToBytePointer(ApplyAmbientNoise(ApplySaturate(Normalize(buffY[x], task.lightNormalizer)), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb,
-				alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX]) + (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * vy0[startX])), p);
-		}
-	}
-	inline VOIDTYPE FractalGenerator::NoiseNoSaturate(const FractalTask& task, const uint16_t y, uint8_t*& p) {
-		const auto& voidY = task.voidDepth[y];
-		const auto& buffY = task.buffer[y];
-		const auto fy = static_cast<float>(y) / applyVoid;
-		const auto startY = static_cast<uint16_t>(FLOOR(fy));
-		const auto alphaY = fy - startY;
-		//if (selectAmbient <= 0) // noise is always 0 if ambient is zero, so it should't even get to this function
-		//	for (var x = 0; x < task.applyWidth; ApplyRGBToBytePointer(Normalize(buffY[x++], lightNormalizer), ref p)) ;
-		//else 
-		for (auto x = 0; x < task.applyWidth; ++x) {
-			const auto voidAmb = voidY[x] / task.voidDepthMax;
-			const auto fx = static_cast<float>(x) / applyVoid;
-			const auto startX = static_cast<uint16_t>(FLOOR(fx));
-			const auto alphaX = fx - startX;
-			const auto& vy0 = task.voidNoise[startY];
-			const auto& vy1 = task.voidNoise[startY + 1];
-			ApplyRGBToBytePointer(ApplyAmbientNoise(Normalize(buffY[x], task.lightNormalizer), voidAmb * selectAmbient, (1.0f - voidAmb) * voidAmb,
-				alphaY * (alphaX * vy1[startX + 1] + (1 - alphaX) * vy1[startX]) + (1 - alphaY) * (alphaX * vy0[startX + 1] + (1 - alphaX) * vy0[startX])), p);
-		}
-	}
-	inline VOIDTYPE FractalGenerator::NoNoiseSaturate(const FractalTask& task, const uint16_t y, uint8_t*& p) {
-		const auto& buffY = task.buffer[y];
-		if (selectAmbient > 0) {
-			const auto& voidY = task.voidDepth[y];
-			for (auto x = 0; x < task.applyWidth; ++x)
-				ApplyRGBToBytePointer(Vector(selectAmbient * voidY[x] / task.voidDepthMax) + ApplySaturate(Normalize(buffY[x], task.lightNormalizer)), p);
-		} else for (auto x = 0; x < task.applyWidth; ApplyRGBToBytePointer(ApplySaturate(Normalize(buffY[x++], task.lightNormalizer)), p));
-	}
-	inline VOIDTYPE FractalGenerator::NoNoiseNoSaturate(const FractalTask& task, const uint16_t y, uint8_t*& p) {
-		const auto& buffY = task.buffer[y];
-		if (selectAmbient > 0) {
-			const auto& voidY = task.voidDepth[y];
-			for (auto x = 0; x < task.applyWidth; ++x)
-				ApplyRGBToBytePointer(Vector(selectAmbient * voidY[x] / task.voidDepthMax) + Normalize(buffY[x], task.lightNormalizer), p);
-		} else for (auto x = 0; x < task.applyWidth; x++)
-			ApplyRGBToBytePointer(Normalize(buffY[x], task.lightNormalizer), p);
-	}
+	}*/
+	
 #pragma endregion
 
 #pragma region TaskWrappers
@@ -1451,53 +2102,7 @@ namespace RgbFractalGenClr {
 	VOIDTYPE FractalGenerator::TaskOfDepth(const uint16_t taskIndex, const uint16_t tupleIndex) {
 		const auto& params = tuples[tupleIndex];
 		GenerateDots_SingleTask(tasks[std::get<0>(params)], std::get<1>(params), std::get<2>(params), std::get<3>(params), std::get<4>(params), std::get<5>(params));
-		tasks[taskIndex].state = TaskState::Done;
-	}
-	inline bool FractalGenerator::Join(FractalTask& task) {
-		if (task.taskStarted) {
-			if (parallelTasks[task.taskIndex] != nullptr) {
-#ifdef PARALLELDEBUG
-				Debug::WriteLine("join" + task.index);
-#endif
-				parallelTasks[task.taskIndex]->Wait();
-				parallelTasks[task.taskIndex] = nullptr;
-			} else {
-#ifdef PARALLELDEBUG
-				Debug::WriteLine("ERROR not joinable " + task.index);
-#endif
-			}
-		} else {
-#ifdef PARALLELDEBUG
-			Debug::WriteLine("ERROR join: task not running " + task.index);
-#endif
-		}
-		task.state = TaskState::Free;
-		return task.taskStarted = false;
-	}
-	inline VOIDTYPE FractalGenerator::Start(const uint16_t taskIndex, int16_t bitmap, Action<Object^>^ action, Object^ state) {
-		auto& task = tasks[taskIndex];
-		if (task.taskStarted) {
-#ifdef PARALLELDEBUG
-			Debug::WriteLine("ERROR start: task already running " + task.index);
-#endif
-
-			if (parallelTasks[task.taskIndex] != nullptr) {
-				parallelTasks[task.taskIndex]->Wait();
-				parallelTasks[task.taskIndex] = nullptr;
-			} else {
-#ifdef PARALLELDEBUG
-				Debug::WriteLine("ERROR not joinable " + task.index);
-#endif
-			}
-		} else {
-#ifdef PARALLELDEBUG
-			Debug::WriteLine("start" + task.index);
-#endif
-		}
-		task.taskStarted = true;
-		task.bitmapIndex = bitmap;
-		task.state = TaskState::Running;
-		parallelTasks[taskIndex] = Task::Factory->StartNew(action, state);
+		tasks[taskIndex].State = TaskState::Done;
 	}
 	VOIDTYPE FractalGenerator::Task_Image(System::Object^ obj) {
 		GenerateImage(static_cast<uint16_t>(((array<System::Object^>^)obj)[0]));
@@ -1536,9 +2141,9 @@ namespace RgbFractalGenClr {
 
 #pragma region AnimationParameters
 	VOIDTYPE FractalGenerator::SwitchParentChild(float& angle, int8_t& spin, uint8_t& color) {
-		if (applyPreviewMode)
+		if (allocPreviewMode)
 			return;
-		color = (3 + color + applyZoom * childColor[0]) % 3;
+		color = (3 + color + allocZoom * ChildColor[0]) % 3;
 		if (ABS(spin) <= 1)
 			return;
 		// reverse angle and spin when antispinning, or else the direction would change when parent and child switches
@@ -1548,7 +2153,7 @@ namespace RgbFractalGenClr {
 	VOIDTYPE FractalGenerator::ModFrameParameters(const uint16_t width, const uint16_t height, float& size, float& angle, int8_t& spin, float& hueAngle, uint8_t& color) {
 		auto w = MAX(width, width) * f->maxSize;
 		const auto fp = f->childSize;
-		if (applyPreviewMode)
+		if (allocPreviewMode)
 			w *= 0.1f;
 		// Zoom Rotation
 		while (angle > 2 * M_PI)
@@ -1563,26 +2168,26 @@ namespace RgbFractalGenClr {
 		// Swap Parent<->CenterChild after a full period
 		while (size >= w * fp) {
 			size /= fp;
-			if (applyPreviewMode)
+			if (allocPreviewMode)
 				continue;
-			angle += childAngle[0];
+			angle += ChildAngle[0];
 			SwitchParentChild(angle, spin, color);
 		}
 		while (size < w) {
 			size *= fp;
-			if (applyPreviewMode)
+			if (allocPreviewMode)
 				continue;
-			angle -= childAngle[0];
+			angle -= ChildAngle[0];
 			SwitchParentChild(angle, spin, color);
 		}
 	}
 	VOIDTYPE FractalGenerator::IncFrameParameters(float& size, float& angle, const int8_t& spin, float& hueAngle, const uint16_t blur) {
-		if (applyGenerationType >= GenerationType::AllParam && applyGenerationType <= GenerationType::HashParam)
+		if (allocGenerationType >= GenerationType::AllSeeds && allocGenerationType <= GenerationType::HashSeeds)
 			return;
-		const auto blurPeriod = selectPeriod * blur;
+		const auto blurPeriod = SelectedPeriod * blur;
 		// Zoom Rotation angle and Zoom Hue Cycle and zoom Size
-		angle += spin * (applyPeriodAngle * (1 + selectExtraSpin)) / (finalPeriodMultiplier * blurPeriod);
-		hueAngle += (hueCycleMultiplier + 3 * selectExtraHue) * (float)applyHueCycle / (finalPeriodMultiplier * blurPeriod);
+		angle += spin * (applyPeriodAngle * (1 + SelectedExtraSpin)) / (allocPeriodMultiplier * blurPeriod);
+		hueAngle += (hueCycleMultiplier + 3 * SelectedExtraHue) * (float)applyHueCycle / (allocPeriodMultiplier * blurPeriod);
 		IncFrameSize(size, blurPeriod);
 	}
 #pragma endregion
@@ -1599,40 +2204,40 @@ namespace RgbFractalGenClr {
 	}
 	VOIDTYPE FractalGenerator::ResetGenerator() {
 		restartGif = false;
-		auto& dist = *randomDist;
-		auto& gen = *randomGenerator;
-		applyZoom = static_cast<int16_t>(selectZoom != 0 ? selectZoom : dist(gen) < .5f ? -1 : 1);
-		applyCutparam = selectCutparam < 0 ? static_cast<int64_t>(dist(gen) * GetMaxCutparam()) : selectCutparam;
+		auto& dist = *nextDouble;
+		auto& gen = *random;
+		allocZoom = static_cast<int16_t>(SelectedZoom != 0 ? SelectedZoom : dist(gen) < .5f ? -1 : 1);
+		allocCutSeed = SelectedCutSeed < 0 ? static_cast<int64_t>(dist(gen) * GetMaxCutparam()) : SelectedCutSeed;
 		SetupColor();
 		// Get the multiplier of the basic period required to get to a seamless loop
-		uint16_t m = applyHueCycle == 0 && childColor[0] > 0 ? selectPeriodMultiplier * 3 : selectPeriodMultiplier;
-		bool asymmetric = childAngle[0] < 2 * M_PI;
-		bool doubled = Math::Abs(selectSpin) > 1 || selectSpin == 0 && asymmetric;
-		finalPeriodMultiplier = doubled ? 2 * m : m;
+		uint16_t m = applyHueCycle == 0 && ChildColor[0] > 0 ? SelectedPeriodMultiplier * 3 : SelectedPeriodMultiplier;
+		bool asymmetric = ChildAngle[0] < 2 * M_PI;
+		bool doubled = Math::Abs(SelectedSpin) > 1 || SelectedSpin == 0 && asymmetric;
+		allocPeriodMultiplier = doubled ? 2 * m : m;
 		// A complex expression to calculate the minimum needed hue shift speed to match the loop:
-		hueCycleMultiplier = applyHueCycle == 0 ? 0 : childColor[0] % 3 == 0 ? 3 : 1 +
-			(childColor[0] % 3 == 1 == (1 == applyHueCycle) == (1 == applyZoom) ? 29999 - finalPeriodMultiplier : 2 + finalPeriodMultiplier) % 3;
+		hueCycleMultiplier = applyHueCycle == 0 ? 0 : ChildColor[0] % 3 == 0 ? 3 : 1 +
+			(ChildColor[0] % 3 == 1 == (1 == applyHueCycle) == (1 == allocZoom) ? 29999 - allocPeriodMultiplier : 2 + allocPeriodMultiplier) % 3;
 		// setup bitmap data
-		applyPeriodAngle = selectPeriodMultiplier % 2 == 0 && asymmetric && !doubled ? selectPeriodAngle * 2 : selectPeriodAngle;
+		applyPeriodAngle = SelectedPeriodMultiplier % 2 == 0 && asymmetric && !doubled ? selectPeriodAngle * 2 : selectPeriodAngle;
 		bitmapsFinished = nextBitmap = 0;
-		switch(applyGenerationType = selectGenerationType) {
-			case GenerationType::AllParam: frames = GetMaxCutparam() + 1; break;
-			case GenerationType::HashParam: frames = cutparamMaximum + 1; break;
-			default: frames = debug > 0 ? debug : selectPeriod * finalPeriodMultiplier; break;
+		switch(allocGenerationType = SelectedGenerationType) {
+			case GenerationType::AllSeeds: bitmapLength = GetMaxCutparam() + 1; break;
+			case GenerationType::HashSeeds: bitmapLength = CutSeed_Max + 1; break;
+			default: bitmapLength = debug > 0 ? debug : SelectedPeriod * allocPeriodMultiplier; break;
 		};
-		if ((frames += previewFrames = MAX(static_cast<uint8_t>(0), static_cast<uint8_t>(LOG(MIN(selectWidth, selectHeight)) / LOG(2) - 2))) != allocatedFrames) {
-			if (allocatedFrames >= 0) {
+		if ((bitmapLength += previewFrames = MAX(static_cast<uint8_t>(0), static_cast<uint8_t>(LOG(MIN(SelectedWidth, SelectedHeight)) / LOG(2) - 2))) != allocFrames) {
+			if (allocFrames >= 0) {
 				delete[] bitmapState;
 				delete[] bitmap;
 				delete[] strides;
 			}
-			allocatedFrames = frames;
+			allocFrames = bitmapLength;
 			AllocateBitmaps();
-			bitmapState = new BitmapState[frames + 1];
-			bitmap = new uint8_t * [frames];
-			strides = new uint16_t[frames];
+			bitmapState = new BitmapState[bitmapLength + 1];
+			bitmap = new uint8_t * [bitmapLength];
+			strides = new uint16_t[bitmapLength];
 		}
-		for (int16_t b = frames; b >= 0; bitmapState[b--] = BitmapState::Queued);
+		for (int16_t b = bitmapLength; b >= 0; bitmapState[b--] = BitmapState::Queued);
 	}
 	VOIDTYPE FractalGenerator::RequestCancel() {
 #ifdef CLR
@@ -1712,15 +2317,15 @@ namespace RgbFractalGenClr {
 		// if enabled you will be unable to use the settings interface!
 		SelectFractal(1);
 		SelectThreadingDepth();
-		selectPeriod = debug = 1;
-		selectWidth = 8;//1920;
-		selectHeight = 8;//1080;
+		SelectedPeriod = debug = 1;
+		SelectedWidth = 8;//1920;
+		SelectedHeight = 8;//1080;
 		maxDepth = -1;//= 2;
-		selectMaxTasks = MINTASKS;// 10;
-		selectSaturate = 1.0f;
-		selectDetail = .25f;
+		SelectedMaxTasks = MINTASKS;// 10;
+		SelectedSaturate = 1.0f;
+		SelectedDetail = .25f;
 		SelectThreadingDepth();
-		selectCut = selectChildAngle = selectChildColor = 0;
+		SelectedCut = SelectedChildAngle = SelectedChildColor = 0;
 		SetupColor();
 		SetupAngle();
 		SetupCutFunction();
@@ -1729,17 +2334,17 @@ namespace RgbFractalGenClr {
 		if (!debugmode)
 			return;
 		if (CANCEL) {
-			debugString = "ABORTING";
+			logString = "ABORTING";
 			return;
 		}
 		STRING _debugString = "TASKS:";
 		auto i = 0, li = 0;
-		while (i < applyMaxTasks) {
+		while (i < allocMaxTasks) {
 			auto& task = tasks[i];
 			_debugString += "\n" + TOSTRING(i++) + ": ";
-			switch (task.state) {
+			switch (task.State) {
 			case TaskState::Running:
-				_debugString += GetBitmapState(bitmapState[task.bitmapIndex]);
+				_debugString += GetBitmapState(bitmapState[task.BitmapIndex]);
 				break;
 			case TaskState::Done:
 				_debugString += "DONE";
@@ -1751,10 +2356,10 @@ namespace RgbFractalGenClr {
 		}
 		BitmapState state, laststate = bitmapState[0];
 		for(auto c = i = 0; c < 11; counter[c++] = 0);
-		for (_debugString += "\n\nIMAGES:"; i < frames; ++i)
+		for (_debugString += "\n\nIMAGES:"; i < bitmapLength; ++i)
 			++counter[(int)bitmapState[i]];
 		STRING _memoryString = "\n";
-		for (i = 0; i < frames; ++i, laststate = state) 
+		for (i = 0; i < bitmapLength; ++i, laststate = state) 
 			if ((state = bitmapState[i]) != laststate) {
 				if(i >= 0)
 					_memoryString += (li == i - 1 ? TOSTRING(li) + ": " : TOSTRING(li) + "-" + TOSTRING((i - 1)) + ": ") + GetBitmapState(laststate) + "\n";
@@ -1764,7 +2369,7 @@ namespace RgbFractalGenClr {
 		for (int c = 0; c < 11; ++c)
 			_debugString += "\n" + TOSTRING(counter[c]) + "x: " + GetBitmapState((BitmapState)c);
 		_debugString += "\n\nANIMATION:" + _memoryString;
-		debugString = i < frames ? _debugString + "\n" + TOSTRING(i) + "+: " + "QUEUED" : _debugString;
+		logString = i < bitmapLength ? _debugString + "\n" + TOSTRING(i) + "+: " + "QUEUED" : _debugString;
 	}
 	/*VOIDTYPE FractalGenerator::TestEncoder(array<Bitmap^>^ bitmap) {
 
@@ -1892,44 +2497,44 @@ namespace RgbFractalGenClr {
 
 #pragma region Interface_Settings
 	bool FractalGenerator::SelectFractal(const uint16_t select) {
-		if (this->selectFractal == select)
+		if (this->SelectedFractal == select)
 			return true;
 		// new fractal definition selected - let the form know to reset and restart me
-		this->selectFractal = select;
-		selectCut = selectChildAngle = selectChildColor = 0;
+		this->SelectedFractal = select;
+		SelectedCut = SelectedChildAngle = SelectedChildColor = 0;
 		return false;
 	}
 	VOIDTYPE FractalGenerator::SetupFractal() {
 		if (f != nullptr)
 			delete f;
-		f = new Fractal(*(*fractals)[selectFractal]);
+		f = new Fractal(*(*fractals)[SelectedFractal]);
 		logBase = static_cast<float>(LOG(f->childSize));
 		SetMaxIterations();
 	}
 	VOIDTYPE FractalGenerator::SetMaxIterations() {
-		selectMaxIterations = 2 + static_cast<int16_t>(CEIL(LOG(MAX(selectWidth, selectHeight) * f->maxSize / selectDetail) / logBase));
+		maxIterations = 2 + static_cast<int16_t>(CEIL(LOG(MAX(SelectedWidth, SelectedHeight) * f->maxSize / SelectedDetail) / logBase));
 	}
 	VOIDTYPE FractalGenerator::SetupAngle() {
-		childAngle = f->childAngle[selectChildAngle].second;
-		selectPeriodAngle = f->childCount <= 0 ? 0.0f : std::fmod(childAngle[0], 2.0f * static_cast<float>(M_PI));
+		ChildAngle = f->childAngle[SelectedChildAngle].second;
+		selectPeriodAngle = f->childCount <= 0 ? 0.0f : std::fmod(ChildAngle[0], 2.0f * static_cast<float>(M_PI));
 	}
 	VOIDTYPE FractalGenerator::SetupColor() {
 		// Unpack the color palette and hue cycling
-		if (selectHue < 0) {
-			auto& dist = *randomDist;
-			auto& gen = *randomGenerator;
+		if (SelectedHue < 0) {
+			auto& dist = *nextDouble;
+			auto& gen = *random;
 			applyHueCycle = static_cast<int16_t>(dist(gen) * 2 - 1);
-			applyColorPalette = static_cast<int16_t>(dist(gen) * 2);
+			allocColorPalette = static_cast<int16_t>(dist(gen) * 2);
 		} else {
-			applyHueCycle = static_cast<int16_t>((selectHue / 2 + 1) % 3 - 1);
-			applyColorPalette = static_cast<int16_t>(selectHue % 2);
+			applyHueCycle = static_cast<int16_t>((SelectedHue / 2 + 1) % 3 - 1);
+			allocColorPalette = static_cast<int16_t>(SelectedHue % 2);
 		}
 		// Setup colors
 		if (f->childCount > 0) {
-			for (int i = f->childCount; 0 <= --i; childColor[i] = f->childColor[selectChildColor].second[i]);
+			for (int i = f->childCount; 0 <= --i; ChildColor[i] = f->childColor[SelectedChildColor].second[i]);
 			// Setup palette
 			for (int i = 0; i < f->childCount; ++i)
-				childColor[i] = applyColorPalette == 0 ? childColor[i] : (3 - childColor[i]) % 3;
+				ChildColor[i] = allocColorPalette == 0 ? ChildColor[i] : (3 - ChildColor[i]) % 3;
 		}
 		// Prepare subiteration color blend
 		/*float* colorBlendF = new float[3];

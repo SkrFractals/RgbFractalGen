@@ -27,7 +27,7 @@
 	return newFlags;
 
 
-namespace RgbFractalGenClr {
+namespace RgbFractalGenCpp {
 
 	std::vector<std::pair<std::string, RgbFractalGenClr::Fractal::CutFunction>> Fractal::cutFunctions;
 
@@ -35,13 +35,13 @@ namespace RgbFractalGenClr {
 	Fractal::Fractal(
 		const std::string& name,
 		const int8_t& childCount,
-		const float& childSize,
-		const float& maxSize,
-		const float& minSize,
-		const float& cutSize,
-		float* childX,
-		float* childY,
-		std::vector<std::pair<std::string, float*>> childAngle,
+		const double& childSize,
+		const double& maxSize,
+		const double& minSize,
+		const double& cutSize,
+		double* childX,
+		double* childY,
+		std::vector<std::pair<std::string, double*>> childAngle,
 		std::vector<std::pair<std::string, uint8_t*>> childColor,
 		std::vector<std::pair<int32_t, std::vector<int32_t>>> cutFunction
 	) {

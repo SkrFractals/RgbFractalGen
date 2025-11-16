@@ -1491,7 +1491,7 @@ namespace RgbFractalGenCs {
 			// 
 			loadExport.Filter = "All files (*.*)|*.*";
 			loadExport.RestoreDirectory = true;
-			loadExport.FileOk += loadExport_FileOk;
+			loadExport.FileOk += LoadExport_FileOk;
 			// 
 			// GeneratorForm
 			// 
@@ -1531,7 +1531,6 @@ namespace RgbFractalGenCs {
 			Name = "GeneratorForm";
 			Text = "RGB Fractal Zoom Generator C# v1.12.0";
 			FormClosing += GeneratorForm_FormClosing;
-			Load += GeneratorForm_Load;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();
 			generatorPanel.ResumeLayout(false);

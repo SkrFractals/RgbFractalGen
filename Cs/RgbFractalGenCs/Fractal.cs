@@ -36,7 +36,7 @@ internal class Fractal {
 		ChildY;                 // Y coordinate shifts of children inside
 	internal readonly List<(string, double[])>
 		ChildAngle;             // Angle shifts of children inside
-	internal readonly List<(string, short[])>
+	internal readonly List<(string, byte[])>
 		ChildColor;             // Color shifts of children inside
 	internal readonly List<(int, int[])>
 		ChildCutFunction;            // Function that takes a bitarray transforms it and decides to cut some specific patterns of children
@@ -71,7 +71,7 @@ internal class Fractal {
 		double[] childX,
 		double[] childY,
 		List<(string, double[])> childAngle,
-		List<(string, short[])> childColor,
+		List<(string, byte[])> childColor,
 		List<(int, int[])> childCutFunction//,
 		//double hyperbolic = 1.0f
 	) {
@@ -103,7 +103,7 @@ internal class Fractal {
 		string name,
 		int childCount,
 		List<(string, double[])> childAngle,
-		List<(string, short[])> childColor,
+		List<(string, byte[])> childColor,
 		List<(int, int[])> cutFunction
 	) {
 		ChildSize = copy.ChildSize;
@@ -148,7 +148,7 @@ internal class Fractal {
 		string name,
 		int childCount,
 		List<(string, double[])> childAngle,
-		List<(string, short[])> childColor,
+		List<(string, byte[])> childColor,
 		List<(int, int[])> cutFunction
 	) => new(this, name, childCount, childAngle, childColor, cutFunction);
 	/// <summary>
@@ -162,7 +162,7 @@ internal class Fractal {
 	public Fractal Copy(
 		string name,
 		List<(string, double[])> childAngle,
-		List<(string, short[])> childColor,
+		List<(string, byte[])> childColor,
 		List<(int, int[])> cutFunction
 	) => new(this, name, ChildCount, childAngle, childColor, cutFunction);
 	/// <summary>

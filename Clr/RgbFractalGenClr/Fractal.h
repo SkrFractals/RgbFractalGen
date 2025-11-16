@@ -7,7 +7,7 @@
 
 #define CFP int8_t index, int64_t inFlags, const Fractal& f
 
-namespace RgbFractalGenClr {
+namespace RgbFractalGenCpp {
 
 	//using namespace System::Collections::Generic;
 
@@ -19,6 +19,7 @@ namespace RgbFractalGenClr {
 		static std::vector<std::pair<std::string, CutFunction>> cutFunctions;
 
 		static void initialize() {
+			cutFunctions.reserve(13);
 			cutFunctions.push_back({ "NoChildSimple", NoChildSimple });												// 0
 			cutFunctions.push_back({ "NoChildComplexAngled", NoChildComplexAngled });								// 1
 			cutFunctions.push_back({ "NoBackDiag", NoBackDiag });													// 2
@@ -37,13 +38,13 @@ namespace RgbFractalGenClr {
 		// Properties
 		std::string name;	// Fractal name (only for selection list)
 		int8_t childCount;	// ChildCount of Self Similars Inside (must equal the length of all the following arrays)
-		float childSize;	// Scale Of Self Similars Inside (how much to scale the image when switching parent<->child)
-		float maxSize;		// The root scale (if too small, the fractal might not fill the whole screen, if too large, it might hurt the performance)
-		float minSize;		// How tiny the iterations must have to get before rendering dots (if too large, it might crash, it too low it might look gray and have bad performance)
-		float cutSize;		// A scaling multiplier to test cutting off iterations that are completely outside the view (if you see pieces disappearing too early when zooming in, increase it, if not yo ucan decrease to boost performance)
-		float* childX;		// X coord shifts of Self Similars Inside
-		float* childY;		// Y coord shifts of Self Similars Inside
-		std::vector<std::pair<std::string, float*>> 
+		double childSize;	// Scale Of Self Similars Inside (how much to scale the image when switching parent<->child)
+		double maxSize;		// The root scale (if too small, the fractal might not fill the whole screen, if too large, it might hurt the performance)
+		double minSize;		// How tiny the iterations must have to get before rendering dots (if too large, it might crash, it too low it might look gray and have bad performance)
+		double cutSize;		// A scaling multiplier to test cutting off iterations that are completely outside the view (if you see pieces disappearing too early when zooming in, increase it, if not yo ucan decrease to boost performance)
+		double* childX;		// X coord shifts of Self Similars Inside
+		double* childY;		// Y coord shifts of Self Similars Inside
+		std::vector<std::pair<std::string, double*>>
 			childAngle;		// Angle shifts of Self Similars Inside
 		std::vector < std::pair<std::string, uint8_t*>>
 			childColor;		// Color shifts of Self Similars Inside
@@ -73,13 +74,13 @@ namespace RgbFractalGenClr {
 		Fractal(
 			const std::string& name,
 			const int8_t& childCount,
-			const float& childSize,
-			const float& maxSize,
-			const float& minSize,
-			const float& cutSize,
-			float* childX,
-			float* childY,
-			std::vector<std::pair<std::string, float*>> childAngle,
+			const double& childSize,
+			const double& maxSize,
+			const double& minSize,
+			const double& cutSize,
+			double* childX,
+			double* childY,
+			std::vector<std::pair<std::string, double*>> childAngle,
 			std::vector<std::pair<std::string, uint8_t*>> childColor,
 			std::vector<std::pair<int32_t, std::vector<int32_t>>> cutFunction
 		);

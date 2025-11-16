@@ -2,7 +2,7 @@
 #include "FractalGenerator.h"
 #include "DoubleBufferedPanel.h"
 
-namespace RgbFractalGenClr {
+namespace RgbFractalGenCpp {
 
 	using namespace System::Drawing;
 
@@ -382,7 +382,7 @@ private: System::Windows::Forms::SaveFileDialog^ convertMp4;
 		System::Void FillSelects();
 		//TODO CPP
 		System::Void SetupParallel(short newThreads) {
-			generator->selectMaxTasks = (short)(newThreads > 1 ? newThreads : 1);
+			generator->SelectedMaxTasks = (short)(newThreads > 1 ? newThreads : 1);
 			generator->SelectThreadingDepth();
 		}
 		System::Void AngleSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e);

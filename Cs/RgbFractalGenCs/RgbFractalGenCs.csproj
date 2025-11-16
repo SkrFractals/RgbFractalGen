@@ -18,6 +18,9 @@
     <Content Include="icon.ico" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="ComputeSharp" Version="3.2.0" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Update="DoubleBufferedPanel.cs">
       <SubType>Component</SubType>
     </Compile>

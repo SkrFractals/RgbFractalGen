@@ -18,7 +18,7 @@ void main(array<String^>^ args) {
 	Application::Run(% form);
 }
 
-namespace RgbFractalGenClr {
+namespace RgbFractalGenCpp {
 
 	using namespace System::IO;
 	using namespace System::Drawing::Imaging;
@@ -1256,7 +1256,7 @@ namespace RgbFractalGenClr {
 			}
 	}
 	System::Void GeneratorForm::SetRect() {
-		rect = System::Drawing::Rectangle(0, 0, generator->selectWidth, generator->selectHeight);
+		rect = System::Drawing::Rectangle(0, 0, generator->SelectedWidth, generator->SelectedHeight);
 	}
 	System::Void GeneratorForm::NewBitmap(const uint16_t bitmapIndex, const uint16_t w, const uint16_t h) {
 		generator->bitmap[bitmapIndex] = (uint8_t*)(void*)((bitmapData[bitmapIndex] = (bitmap[bitmapIndex] = gcnew Bitmap(w,h))->LockBits( // make a new bitmaps and lock it's bits
@@ -1321,7 +1321,7 @@ namespace RgbFractalGenClr {
 		for (int32_t i = 0; i < static_cast<int32_t>(fractals.size()); ++i)
 			fractalSelect->Items->Add(gcnew String((fractals[i]->name).c_str()));
 			
-		generator->selectFractal = -1;
+		generator->SelectedFractal = -1;
 		generator->restartGif = false;
 		generator->UpdatePreview += gcnew Action(this, &GeneratorForm::UpdatePreview);
 		generator->UnlockBitmaps += gcnew Action(this, &GeneratorForm::UnlockBitmaps);
@@ -1455,7 +1455,7 @@ namespace RgbFractalGenClr {
 	}
 	System::Void GeneratorForm::timer_Tick(System::Object^ sender, System::EventArgs^ e) {
 		if (generator->debugmode) {
-			debugLabel->Text = generator->debugString;
+			debugLabel->Text = generator->logString;
 			SetMinimumSize();
 		}
 		// Window Size Update
@@ -1553,14 +1553,14 @@ namespace RgbFractalGenClr {
 		if (editorPanel->Visible) {
 			
 			mem_generate = encodeSelect->SelectedIndex;
-			mem_blur = generator->selectBlur;
-			mem_bloom = generator->selectBloom;
+			mem_blur = generator->SelectedBlur;
+			mem_bloom = generator->SelectedBloom;
 			mem_hue = (short)hueSelect->SelectedIndex;
 
-			generator->selectGenerationType = GenerationType::AnimationRAM;
-			generator->selectBloom = generator->selectBlur = 0;
-			generator->selectHue = generator->selectDefaultHue = 0;
-			generator->selectPreviewMode = previewMode;
+			generator->SelectedGenerationType = GenerationType::Animation;
+			generator->SelectedBloom = generator->SelectedBlur = 0;
+			generator->SelectedHue = generator->SelectedDefaultHue = 0;
+			generator->SelectedPreviewMode = previewMode;
 			abortDelay = 10;
 
 			uint16_t n;
@@ -1569,7 +1569,7 @@ namespace RgbFractalGenClr {
 			if (uint16_t::TryParse(abortBox->Text, n))
 				mem_abort = n;
 		} else {
-			generator->selectPreviewMode = false;
+			generator->SelectedPreviewMode = false;
 		}
 		SetupFractal();
 	}
@@ -1577,8 +1577,8 @@ namespace RgbFractalGenClr {
 
 #pragma region Input
 	System::Void GeneratorForm::ResizeAll() {
-		generator->selectWidth = width;
-		generator->selectHeight = height;
+		generator->SelectedWidth = width;
+		generator->SelectedHeight = height;
 		generator->SetMaxIterations();
 		// Update the size of the window and display
 		SetMinimumSize();
@@ -1617,7 +1617,7 @@ namespace RgbFractalGenClr {
 			width = 80;
 		if (!int16_t::TryParse(rxy[1], height))
 			height = 80;
-		return generator->selectWidth != width || generator->selectHeight != height;
+		return generator->SelectedWidth != width || generator->SelectedHeight != height;
 	}
 	System::Void GeneratorForm::WindowSizeRefresh() {
 		if (fx == Width && fy == Height)
@@ -1858,15 +1858,15 @@ namespace RgbFractalGenClr {
 		}
 	}
 	System::Void GeneratorForm::AngleSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		DiffApply(static_cast<int16_t>(Math::Max(0, angleSelect->SelectedIndex)), &generator->selectChildAngle);
+		DiffApply(static_cast<int16_t>(Math::Max(0, angleSelect->SelectedIndex)), &generator->SelectedChildAngle);
 		SwitchChildAngle();
 	}
 	System::Void GeneratorForm::ColorSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		DiffApply(static_cast<int16_t>(Math::Max(0, colorSelect->SelectedIndex)), &generator->selectChildColor);
+		DiffApply(static_cast<int16_t>(Math::Max(0, colorSelect->SelectedIndex)), &generator->SelectesChildColor);
 		SwitchChildColor();
 	}
 	System::Void GeneratorForm::CutSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		if(!DiffApply(static_cast<int16_t>(Math::Max(0, cutSelect->SelectedIndex)), &generator->selectCut)) FillCutParams();
+		if(!DiffApply(static_cast<int16_t>(Math::Max(0, cutSelect->SelectedIndex)), &generator->SelectedCut)) FillCutParams();
 	}
 	/*
 #define DIFF_PARAM(NEW, GEN) if (generator->GEN == NEW) return;
@@ -1881,7 +1881,7 @@ namespace RgbFractalGenClr {
 	while (NEW < MIN)NEW += (MAX-MIN); while (NEW >= MAX)NEW -= (MAX-MIN); APPLY_DIFF_PARAM(NEW, GEN)
 	*/
 	System::Void GeneratorForm::CutparamBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(cutparamBox, &generator->selectCutparam, static_cast<int32_t>(-1), generator->GetMaxCutparam());
+		ParseClampRetextDiffApply(cutparamBox, &generator->SelectedCutSeed, static_cast<int32_t>(-1), generator->GetMaxCutparam());
 	}
 	bool GeneratorForm::CutSelectEnabled(std::vector<std::pair<int32_t, std::vector<int32_t>>>& cf) {
 		bool e = cf.size() > 0;
@@ -1889,7 +1889,7 @@ namespace RgbFractalGenClr {
 		return e;
 	}
 	bool GeneratorForm::CutParamBoxEnabled(Fractal::CutFunction* cf) {
-		bool e = 0 < (generator->cutparamMaximum = (int)(cf == nullptr || (*cf)(0, -1, *generator->GetFractal()) <= 0 ? 0 : ((*cf)(0, 1 - (1 << 30), *generator->GetFractal()) + 1) / (*cf)(0, -1, *generator->GetFractal())));
+		bool e = 0 < (generator->CutSeed_Max = (int)(cf == nullptr || (*cf)(0, -1, *generator->GetFractal()) <= 0 ? 0 : ((*cf)(0, 1 - (1 << 30), *generator->GetFractal()) + 1) / (*cf)(0, -1, *generator->GetFractal())));
 		cutparamBox->Enabled = e;
 		return e;
 	}
@@ -1898,65 +1898,65 @@ namespace RgbFractalGenClr {
 		cutparamBox->Text = "0";
 	}
 	System::Void GeneratorForm::PeriodBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(periodBox, &generator->selectPeriod, static_cast<int16_t>(-1), static_cast<int16_t>(1000));
+		ParseClampRetextDiffApply(periodBox, &generator->SelectedPeriod, static_cast<int16_t>(-1), static_cast<int16_t>(1000));
 	}
 	System::Void GeneratorForm::PeriodMultiplierBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(periodMultiplierBox, &generator->selectPeriodMultiplier, static_cast<int16_t>(1), static_cast<int16_t>(10));
+		ParseClampRetextDiffApply(periodMultiplierBox, &generator->SelectedPeriodMultiplier, static_cast<int16_t>(1), static_cast<int16_t>(10));
 	}
 	System::Void GeneratorForm::ZoomSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		DiffApply(static_cast<int16_t>((zoomSelect->SelectedIndex + 1) % 3 - 1), &generator->selectZoom);
+		DiffApply(static_cast<int16_t>((zoomSelect->SelectedIndex + 1) % 3 - 1), &generator->SelectedZoom);
 	}
 	System::Void GeneratorForm::DefaultZoom_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseDiffApply(defaultZoom, &generator->selectDefaultZoom);
+		ParseDiffApply(defaultZoom, &generator->SelectedDefaultZoom);
 	}
 	System::Void GeneratorForm::SpinSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		ClampDiffApply(static_cast<int16_t>(spinSelect->SelectedIndex - 2), &generator->selectSpin, static_cast<int16_t>(-2), static_cast<int16_t>(2));
+		ClampDiffApply(static_cast<int16_t>(spinSelect->SelectedIndex - 2), &generator->SelectedSpin, static_cast<int16_t>(-2), static_cast<int16_t>(2));
 	}
 	System::Void GeneratorForm::SpinSpeedBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(spinSpeedBox, &generator->selectExtraSpin, static_cast<int16_t>(0), static_cast<int16_t>(255));
+		ParseClampRetextDiffApply(spinSpeedBox, &generator->SelectedExtraSpin, static_cast<int16_t>(0), static_cast<int16_t>(255));
 	}
 	System::Void GeneratorForm::DefaultAngle_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseModDiffApply(defaultAngle, &generator->selectDefaultAngle, static_cast<int16_t>(0), static_cast<int16_t>(360));
+		ParseModDiffApply(defaultAngle, &generator->SelectedDefaultAngle, static_cast<int16_t>(0), static_cast<int16_t>(360));
 	}
 	System::Void GeneratorForm::HueSelect_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
-		DiffApply(static_cast<int16_t>(hueSelect->SelectedIndex == 0 ? -1 : (hueSelect->SelectedIndex - 1) % 6), &generator->selectHue);
+		DiffApply(static_cast<int16_t>(hueSelect->SelectedIndex == 0 ? -1 : (hueSelect->SelectedIndex - 1) % 6), &generator->SelectedHue);
 	}
 	System::Void GeneratorForm::HueSpeedBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		const auto newSpeed = ParseClampRetext(hueSpeedBox, static_cast<int16_t>(0), static_cast<int16_t>(255));
-		if (Diff(newSpeed, generator->selectExtraHue))
+		if (Diff(newSpeed, generator->SelectedExtraHue))
 			return;
 		// hue speed is different - change the setting and if it's actually huecycling restart generation
-		if (generator->selectHue < 0 || generator->selectHue > 1)
-			Apply(newSpeed, &generator->selectExtraHue);
-		else generator->selectExtraHue = newSpeed;
+		if (generator->SelectedHue < 0 || generator->SelectedHue > 1)
+			Apply(newSpeed, &generator->SelectedExtraHue);
+		else generator->SelectedExtraHue = newSpeed;
 	}
 	System::Void GeneratorForm::DefaultHue_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseModDiffApply(defaultHue, &generator->selectDefaultHue, static_cast<int16_t>(0), static_cast<int16_t>(360));
+		ParseModDiffApply(defaultHue, &generator->SelectedDefaultHue, static_cast<int16_t>(0), static_cast<int16_t>(360));
 	}
 	System::Void GeneratorForm::AmbBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextMulDiffApply(ambBox, &generator->selectAmbient, static_cast<int16_t>(-1), static_cast<int16_t>(30), static_cast<int16_t>(4));
+		ParseClampRetextMulDiffApply(ambBox, &generator->SelectedAmbient, static_cast<int16_t>(-1), static_cast<int16_t>(30), static_cast<int16_t>(4));
 	}
 	System::Void GeneratorForm::NoiseBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextMulDiffApply(noiseBox, &generator->selectNoise, static_cast<int16_t>(0), static_cast<int16_t>(30), .1f);
+		ParseClampRetextMulDiffApply(noiseBox, &generator->SelectedNoise, static_cast<int16_t>(0), static_cast<int16_t>(30), .1f);
 	}
 	System::Void GeneratorForm::SaturateBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextMulDiffApply(saturateBox, &generator->selectSaturate, static_cast<int16_t>(0), static_cast<int16_t>(10), .1f);
+		ParseClampRetextMulDiffApply(saturateBox, &generator->SelectedSaturate, static_cast<int16_t>(0), static_cast<int16_t>(10), .1f);
 	}
 	System::Void GeneratorForm::DetailBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		if (!ParseClampRetextMulDiffApply(detailBox, &generator->selectDetail, static_cast<int16_t>(0), static_cast<int16_t>(10), .1f * generator->GetFractal()->minSize)) 
+		if (!ParseClampRetextMulDiffApply(detailBox, &generator->SelectedDetail, static_cast<int16_t>(0), static_cast<int16_t>(10), .1f * generator->GetFractal()->minSize)) 
 			generator->SetMaxIterations();
 	}
 	System::Void GeneratorForm::BloomBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextMulDiffApply(bloomBox, &generator->selectBloom, static_cast<int16_t>(0), static_cast<int16_t>(40), .25f);
+		ParseClampRetextMulDiffApply(bloomBox, &generator->SelectedBloom, static_cast<int16_t>(0), static_cast<int16_t>(40), .25f);
 	}
 	System::Void GeneratorForm::BlurBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(blurBox, &generator->selectBlur, static_cast<int16_t>(0), static_cast<int16_t>(40));
+		ParseClampRetextDiffApply(blurBox, &generator->SelectedBlur, static_cast<int16_t>(0), static_cast<int16_t>(40));
 	}
 	System::Void GeneratorForm::BrightnessBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(brightnessBox, &generator->selectBrightness, static_cast<int16_t>(0), static_cast<int16_t>(300));
+		ParseClampRetextDiffApply(brightnessBox, &generator->SelectedBrightness, static_cast<int16_t>(0), static_cast<int16_t>(300));
 	}
 	System::Void GeneratorForm::VoidBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
-		ParseClampRetextDiffApply(voidBox, &generator->selectVoid, static_cast<int16_t>(0), static_cast<int16_t>(300));
+		ParseClampRetextDiffApply(voidBox, &generator->SelectedVoid, static_cast<int16_t>(0), static_cast<int16_t>(300));
 	}
 	System::Void GeneratorForm::Parallel_Changed(System::Object^ sender, System::EventArgs^ e) {
 		SetupParallel(ParseClampRetext(threadsBox, static_cast<int16_t>(MINTASKS), static_cast<int16_t>(maxTasks)));
@@ -1969,30 +1969,30 @@ namespace RgbFractalGenClr {
 				MessageBoxButtons::OK,
 				MessageBoxIcon::Warning);
 		}
-		generator->selectParallelType = (ParallelType)parallelTypeSelect->SelectedIndex;
+		generator->SelectedParallelType = (ParallelType)parallelTypeSelect->SelectedIndex;
 	}
 	System::Void GeneratorForm::AbortBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		abortDelay = ParseClampRetext(abortBox, static_cast<int16_t>(0), static_cast<int16_t>(10000));
 	}
 	System::Void GeneratorForm::DelayBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		auto newDelay = ParseClampRetext(delayBox, static_cast<int16_t>(1), static_cast<int16_t>(500));
-		if (generator->selectDelay == newDelay)
+		if (generator->SelectedDelay == newDelay)
 			return;
 		// Delay is diffenret, change it, and restart the generation if ou were encoding a gif
-		generator->selectDelay = newDelay;
-		if (100 / generator->selectFps != generator->selectDelay)
-			generator->selectFps = (short)(100 / generator->selectDelay);
-		timer->Interval = generator->selectDelay * 10;
-		if (generator->selectGenerationType >= GenerationType::EncodeGIF && generator->selectGenerationType <= GenerationType::AllParam)
+		generator->SelectedDelay = newDelay;
+		if (100 / generator->SelectedFps != generator->SelectedDelay)
+			generator->SelectedFps = (short)(100 / generator->SelectedDelay);
+		timer->Interval = generator->SelectedDelay * 10;
+		if (generator->SelectedGenerationType >= GenerationType::EncodeGIF && generator->SelectedGenerationType <= GenerationType::AllSeeds)
 			generator->restartGif = true;
 	}
 	System::Void GeneratorForm::FpsBox_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		auto newFps = ParseClampRetext(fpsBox, static_cast<int16_t>(1), static_cast<int16_t>(120));
-		if (generator->selectFps == newFps)
+		if (generator->SelectedFps == newFps)
 			return;
-		generator->selectFps = newFps;
+		generator->SelectedFps = newFps;
 		delayBox->Text = (100 / newFps).ToString();
-		timer->Interval = 1000 / generator->selectFps;
+		timer->Interval = 1000 / generator->SelectedFps;
 	}
 	System::Void GeneratorForm::MoveFrame(int16_t move) {
 		animated = false; const auto b = generator->GetBitmapsFinished(); currentBitmapIndex = b == 0 ? -1 : (currentBitmapIndex + b + move) % b;
@@ -2026,15 +2026,15 @@ namespace RgbFractalGenClr {
 					  "Unavailable");
 			return;
 		}
-		if ((GenerationType)encodeSelect->SelectedIndex == GenerationType::HashParam) {
+		if ((GenerationType)encodeSelect->SelectedIndex == GenerationType::HashSeeds) {
 			MessageBox::Show(
 				"This mode is not really meant for the end user, it only generates all parameters and export a hash.txt file will all the unique ones.\nIf you actually want an animation of all seeds, AllParam is recommended instead as that doesn't waste resources doing the hashing and encodes the animation for export.",
 				"Warning",
 				MessageBoxButtons::OK,
 				MessageBoxIcon::Warning);
 		}
-		auto prev = generator->selectGenerationType;
-		auto now = generator->selectGenerationType = (GenerationType)Math::Max(0, encodeSelect->SelectedIndex);
+		auto prev = generator->SelectedGenerationType;
+		auto now = generator->SelectedGenerationType = (GenerationType)Math::Max(0, encodeSelect->SelectedIndex);
 		if ((now >= GenerationType::OnlyImage && now <= GenerationType::Mp4) != (prev >= GenerationType::OnlyImage && prev <= GenerationType::Mp4))
 			QueueReset(true);
 	}
@@ -2067,7 +2067,7 @@ namespace RgbFractalGenClr {
 		}
 	}
 	System::Void GeneratorForm::PngButton_Click(System::Object^ sender, System::EventArgs^ e) {
-		if (generator->selectParallelType == ParallelType::OfDepth) {
+		if (generator->SelectedParallelType == ParallelType::OfDepth) {
 			auto result = MessageBox::Show(
 				"Warning: You have used OfDepth parallelism type. This can mess up some of the pixels, if you want to export, I highly recommend using OfAnimation instead.\nSwitch to OfAnimation to regenerate in high quality?",
 				"Warning",
@@ -2092,7 +2092,7 @@ namespace RgbFractalGenClr {
 		SaveVideo();
 	}
 	System::Windows::Forms::DialogResult GeneratorForm::SaveVideo() {
-		if (generator->selectParallelType == ParallelType::OfDepth) {
+		if (generator->SelectedParallelType == ParallelType::OfDepth) {
 			System::Windows::Forms::DialogResult result = MessageBox::Show(
 				"Warning: You have used OfDepth parallelism type. This can mess up some of the pixels, if you want to export, I highly recommend using OfAnimation instead.\nSwitch to OfAnimation to regenerate in high quality?",
 				"Warning",
@@ -2103,7 +2103,7 @@ namespace RgbFractalGenClr {
 				return System::Windows::Forms::DialogResult::Cancel;
 			}
 		}
-		return generator->selectGenerationType == GenerationType::Mp4 ? saveMp4->ShowDialog() : saveGif->ShowDialog();
+		return generator->SelectedGenerationType == GenerationType::Mp4 ? saveMp4->ShowDialog() : saveGif->ShowDialog();
 	}
 	System::Void GeneratorForm::Mp4Button_Click(System::Object^ sender, System::EventArgs^ e) {
 		auto ffmpegPath = Path::Combine(AppDomain::CurrentDomain->BaseDirectory, "ffmpeg.exe");
@@ -2203,10 +2203,10 @@ namespace RgbFractalGenClr {
 			auto ffmpegPath = Path::Combine(AppDomain::CurrentDomain->BaseDirectory, "ffmpeg.exe");
 			if (!File::Exists(ffmpegPath))
 				return;
-			double gifFps = 1000.0 / (10 * generator->selectDelay); // Convert to frames per second
+			double gifFps = 1000.0 / (10 * generator->SelectedDelay); // Convert to frames per second
 			auto arguments = System::String::Format(
 				"-y -i \"{0}\" -vf \"fps={1},setpts=PTS*({2}/{1})\" -c:v libx264 -crf 0 -preset veryslow \"{3}\"",
-				gifPath, generator->selectFps, gifFps, mp4Path);
+				gifPath, generator->SelectedFps, gifFps, mp4Path);
 			Process^ ffmpeg = gcnew Process();
 			ffmpeg->StartInfo->FileName = ffmpegPath;
 			ffmpeg->StartInfo->Arguments = arguments;
@@ -2243,7 +2243,7 @@ namespace RgbFractalGenClr {
 
 		auto f = generator->GetFractal();
 		for (int i = 0; i < f->childCount; ++i)
-			AddEditorPoint(f->childX, f->childY, f->childAngle[generator->selectChildAngle].second, f->childColor[generator->selectChildColor].second, false);
+			AddEditorPoint(f->childX, f->childY, f->childAngle[generator->SelectedChildAngle].second, f->childColor[generator->SelectesChildColor].second, false);
 		
 		bool e = f->edit;
 		sizeBox->Text = f->childSize.ToString();
@@ -2294,14 +2294,14 @@ namespace RgbFractalGenClr {
 		auto f = generator->GetFractal();
 		auto e = f->edit;
 		for (int i = 0; i < f->childCount; ++i)
-			editorPointA[i]->Text = f->childAngle[generator->selectChildAngle].second[i].ToString();
+			editorPointA[i]->Text = f->childAngle[generator->SelectedChildAngle].second[i].ToString();
 		f->edit = e;
 	}
 	System::Void GeneratorForm::SwitchChildColor() {
 		auto f = generator->GetFractal();
 		auto e = f->edit;
 		for (int i = 0; i < f->childCount; ++i) {
-			switch (f->childColor[generator->selectChildColor].second[i]) {
+			switch (f->childColor[generator->SelectesChildColor].second[i]) {
 			case 0: editorPointC[i]->BackColor = Color::Red; break;
 			case 1: editorPointC[i]->BackColor = Color::Green; break;
 			default: editorPointC[i]->BackColor = Color::Blue; break;
@@ -2339,8 +2339,8 @@ namespace RgbFractalGenClr {
 		auto ni = f->childCount;
 		auto cx = f->childX;
 		auto cy = f->childY;
-		auto ca = f->childAngle[generator->selectChildAngle].second;
-		auto cc = f->childColor[generator->selectChildColor].second;
+		auto ca = f->childAngle[generator->SelectedChildAngle].second;
+		auto cc = f->childColor[generator->SelectesChildColor].second;
 		auto j = cx[i];
 		cx[i] = cx[i1];
 		cx[i1] = j;
@@ -2395,15 +2395,15 @@ namespace RgbFractalGenClr {
 	System::Void GeneratorForm::OnA_TextChanged(System::Object^ sender, System::EventArgs^ e) {
 		int i;
 		int::TryParse(((Button^)sender)->Name, i);
-		if (ParseDiffApply((System::Windows::Forms::TextBox^)sender, &generator->GetFractal()->childAngle[generator->selectChildAngle].second[i])) return;
+		if (ParseDiffApply((System::Windows::Forms::TextBox^)sender, &generator->GetFractal()->childAngle[generator->SelectedChildAngle].second[i])) return;
 		generator->GetFractal()->edit = true;
 	}
 	System::Void GeneratorForm::OnC_Click(System::Object^ sender, System::EventArgs^ e) {
 		int i;
 		auto c = ((Button^)sender);
 		int::TryParse(c->Name, i);
-		uint8_t color = generator->GetFractal()->childColor[generator->selectChildColor].second[i];
-		generator->GetFractal()->childColor[generator->selectChildColor].second[i] = color = static_cast<uint8_t>((color + 1) % 3);
+		uint8_t color = generator->GetFractal()->childColor[generator->SelectesChildColor].second[i];
+		generator->GetFractal()->childColor[generator->SelectesChildColor].second[i] = color = static_cast<uint8_t>((color + 1) % 3);
 		switch (color) {
 		case 0: c->BackColor = Color::Red; break;
 		case 1: c->BackColor = Color::Green; break;
@@ -2423,9 +2423,9 @@ namespace RgbFractalGenClr {
 		auto nc = new uint8_t[ni];
 		auto cx = f->childX;
 		auto cy = f->childY;
-		auto ca2 = f->childAngle[generator->selectChildAngle];
+		auto ca2 = f->childAngle[generator->SelectedChildAngle];
 		auto ca = ca2.second;
-		auto cc2 = f->childColor[generator->selectChildColor];
+		auto cc2 = f->childColor[generator->SelectesChildColor];
 		auto cc = cc2.second;
 
 		pointPanel->SuspendLayout();
@@ -2454,8 +2454,8 @@ namespace RgbFractalGenClr {
 
 		f->childX = nx;
 		f->childY = ny;
-		f->childAngle[generator->selectChildAngle] = { ca2.first, na };
-		f->childColor[generator->selectChildColor] = { cc2.first, nc };
+		f->childAngle[generator->SelectedChildAngle] = { ca2.first, na };
+		f->childColor[generator->SelectesChildColor] = { cc2.first, nc };
 		QueueReset(f->edit = true);
 	}
 
@@ -2668,6 +2668,7 @@ namespace RgbFractalGenClr {
 		if (s->Length < 1)
 			return Error("No set of child angles", "Cannot load");
 		std::vector<std::pair<std::string, float*>> childAngle;
+		childAngle.reserve(s->Length);
 		for (int i = 0; i < s->Length; ++i) {
 			auto c = s[i];
 			auto angleSet = c->Split(':');
@@ -2685,7 +2686,8 @@ namespace RgbFractalGenClr {
 		s = arr[9]->Split(';');
 		if (s->Length < 1)
 			return Error("No set of child colors", "Cannot load");
-		std::vector<std::pair<std::string, uint8_t*>> childColor ;
+		std::vector<std::pair<std::string, uint8_t*>> childColor;
+		childColor.reserve(s->Length);
 		for (int i = 0; i < s->Length; ++i) {
 			auto c = s[i];
 			auto colorSet = c->Split(':');
@@ -2702,6 +2704,7 @@ namespace RgbFractalGenClr {
 		// Cuts
 		s = arr[10]->Split(';');
 		std::vector<std::pair<int32_t, std::vector<int32_t>>> cutFunction;
+		cutFunction.reserve(s->Length);
 		for (int i = 0; i < s->Length; ++i) {
 			auto c = s[i];
 			auto cutints = c->Split(':');
@@ -2726,25 +2729,25 @@ namespace RgbFractalGenClr {
 	System::Void GeneratorForm::modeButton_Click(System::Object^ sender, System::EventArgs^ e) {
 		if (editorPanel->Visible) {
 			// SelectParallelMode();
-			generator->selectBlur = mem_blur;
-			generator->selectBloom = mem_bloom;
-			generator->selectGenerationType = (GenerationType)mem_generate;
-			generator->selectHue = mem_hue;
-			generator->selectDefaultHue = mem_defaulthue;
+			generator->SelectedBlur = mem_blur;
+			generator->SelectedBloom = mem_bloom;
+			generator->SelectedGenerationType = (GenerationType)mem_generate;
+			generator->SelectedHue = mem_hue;
+			generator->SelectedDefaultHue = mem_defaulthue;
 			abortDelay = mem_abort;
-			generator->selectPreviewMode = false;
+			generator->SelectedPreviewMode = false;
 
 		} else {
-			mem_blur = generator->selectBlur;
-			mem_bloom = generator->selectBloom;
-			mem_generate = generator->selectGenerationType;
-			mem_hue = generator->selectHue;
-			mem_defaulthue = generator->selectDefaultHue;
+			mem_blur = generator->SelectedBlur;
+			mem_bloom = generator->SelectedBloom;
+			mem_generate = generator->SelectedGenerationType;
+			mem_hue = generator->SelectedHue;
+			mem_defaulthue = generator->SelectedDefaultHue;
 			mem_abort = abortDelay;
 			abortDelay = 10;
-			generator->selectGenerationType = GenerationType::AnimationRAM;
-			generator->selectBloom = generator->selectBlur = generator->selectHue = generator->selectDefaultHue = 0;
-			generator->selectPreviewMode = previewMode;
+			generator->SelectedGenerationType = GenerationType::Animation;
+			generator->SelectedBloom = generator->SelectedBlur = generator->SelectedHue = generator->SelectedDefaultHue = 0;
+			generator->SelectedPreviewMode = previewMode;
 		}
 		generatorPanel->Visible = editorPanel->Visible;
 		editorPanel->Visible = !generatorPanel->Visible;
@@ -2770,17 +2773,17 @@ namespace RgbFractalGenClr {
 		c->BackColor = Color::Red;
 		auto f = generator->GetFractal();
 		auto ni = f->childCount++;
-		delete generator->childColor;
-		generator->childColor = new uint8_t[f->childCount];
+		delete generator->ChildColor;
+		generator->ChildColor = new uint8_t[f->childCount];
 		float* nx = new float[ni + 1];
 		float* ny = new float[ni + 1];
 		float* na = new float[ni + 1];
 		uint8_t* nc = new byte[ni + 1];
 		auto cx = f->childX;
 		auto cy = f->childY;
-		auto ca2 = f->childAngle[generator->selectChildAngle];
+		auto ca2 = f->childAngle[generator->SelectedChildAngle];
 		auto ca = ca2.second;
-		auto cc2 = f->childColor[generator->selectChildColor];
+		auto cc2 = f->childColor[generator->SelectesChildColor];
 		auto cc = cc2.second;
 		for (int ci = 0; ci < ni; ++ci) {
 			nx[ci] = cx[ci];
@@ -2795,8 +2798,8 @@ namespace RgbFractalGenClr {
 		delete[] cc;
 		f->childX = nx;
 		f->childY = ny;
-		f->childAngle[generator->selectChildAngle] = { ca2.first, na };
-		f->childColor[generator->selectChildColor] = { cc2.first, nc };
+		f->childAngle[generator->SelectedChildAngle] = { ca2.first, na };
+		f->childColor[generator->SelectesChildColor] = { cc2.first, nc };
 		BindPoint(x, y, a, c, d, i, true);
 		f->edit = true;
 		QueueReset(true);
@@ -2846,9 +2849,9 @@ namespace RgbFractalGenClr {
 		}
 		auto& c = generator->GetFractal()->childAngle;
 		const int16_t ns = c.size() - 1;
-		for (int r = generator->selectChildAngle; r < ns; c[r] = c[++r]);
+		for (int r = generator->SelectedChildAngle; r < ns; c[r] = c[++r]);
 		c.resize(ns);
-		generator->selectChildAngle = Math::Min(ns, generator->selectChildAngle);
+		generator->SelectedChildAngle = Math::Min(ns, generator->SelectedChildAngle);
 		SwitchChildAngle();
 		generator->GetFractal()->edit = true;
 		QueueReset(true);
@@ -2882,9 +2885,9 @@ namespace RgbFractalGenClr {
 		}
 		auto& c = generator->GetFractal()->childColor;
 		const int16_t ns = c.size() - 1;
-		for (int r = generator->selectChildColor; r < ns; c[r] = c[++r]);
+		for (int r = generator->SelectesChildColor; r < ns; c[r] = c[++r]);
 		c.resize(ns);
-		generator->selectChildColor = Math::Min(ns, generator->selectChildColor);
+		generator->SelectesChildColor = Math::Min(ns, generator->SelectesChildColor);
 		SwitchChildColor();
 		generator->GetFractal()->edit = true;
 		QueueReset(true);
@@ -2920,7 +2923,7 @@ namespace RgbFractalGenClr {
 		saveFractal->ShowDialog();
 	}
 	System::Void GeneratorForm::preButton_Click(System::Object^ sender, System::EventArgs^ e) {
-		generator->selectPreviewMode = previewMode = !previewMode;
+		generator->SelectedPreviewMode = previewMode = !previewMode;
 		QueueReset(true);
 	}
 #pragma endregion
