@@ -830,8 +830,8 @@ public partial class GeneratorForm : Form {
 				case "cachestripe": if (p) stripeBox.Text = v; break;
 				case "cachebin": if (p) binBox.Text = v; break;
 				case "cachesize": if (p) l2Box.Text = v; break;
-				case "guivoid": if (p) voidSelect.SelectedIndex = Math.Min(voidSelect.Items.Count - 1, n); break;
-				case "guidraw": if (p) drawSelect.SelectedIndex = Math.Min(drawSelect.Items.Count - 1, n); break;
+				case "gpuvoid": if (p) voidSelect.SelectedIndex = Math.Min(voidSelect.Items.Count - 1, n); break;
+				case "gpudraw": if (p) drawSelect.SelectedIndex = Math.Min(drawSelect.Items.Count - 1, n); break;
 				case "png": if (p) encodePngSelect.SelectedIndex = Math.Min(encodePngSelect.Items.Count - 1, n); break;
 				case "gif": if (p) encodeGifSelect.SelectedIndex = Math.Min(encodeGifSelect.Items.Count - 1, n); break;
 				case "gen": if (p) generationSelect.SelectedIndex = Math.Min(generationSelect.Items.Count - 1, n); break;
@@ -1541,14 +1541,14 @@ public partial class GeneratorForm : Form {
 		if (generator.SelectedGpuVoidType == now)
 			return;
 		generator.SelectedGpuVoidType = now;
-		QueueReset();
+		//QueueReset(); // can be updated mid-generation
 	}
 	private void DrawSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		var now = (FractalGenerator.GpuDrawType)Math.Max(0, drawSelect.SelectedIndex);
 		if (generator.SelectedGpuDrawType == now)
 			return;
 		generator.SelectedGpuDrawType = now;
-		QueueReset();
+		//QueueReset(); // can be updated mid-generation
 	}
 	private void EncodeGifSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		var prev = generator.SelectedGifType;

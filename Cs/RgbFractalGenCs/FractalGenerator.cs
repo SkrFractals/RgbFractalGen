@@ -119,7 +119,7 @@ internal partial class FractalGenerator {
 
 		internal ushort StripeHeight, StripeCount;
 		internal uint PredictedBinsPerStripe;
-		private (long, float, float, byte)[][][] bin;
+		private List<(long, float, float, byte)[]>[] bin;
 		private ushort[] filledBins; // Which bidId is being filled in this stripeId?
 		private uint[] filledStripes; // How many dots are in the latest bin of this stripeId?
 		internal uint BinSize;
@@ -157,7 +157,8 @@ internal partial class FractalGenerator {
 			ushort s = (ushort)(dot.dotsY / StripeHeight); // find stripeId of this dot
 			if (filledStripes[s] >= BinSize) {
 				filledStripes[s] = 0; // reset to fill the new bin from zero index again
-				bin[s][++filledBins[s]] = new (long, float, float, byte)[BinSize]; // increment binId (start new bin in this stripe)
+				bin[s].Add(new (long, float, float, byte)[BinSize]); // increment binId (start new bin in this stripe)
+				++filledBins[s];
 			}
 			bin[s][filledBins[s]][filledStripes[s]++] = dot;
 		}
@@ -297,9 +298,10 @@ internal partial class FractalGenerator {
 			if (bin != null)
 				return; // already defined (OfDepth reuse)
 			StripeHeight = task.StripeHeight;
-			bin = new (long, float, float, byte)[StripeCount = task.StripeCount][][]; // allocate stripes of bins
-			for (int i = 0; i < task.StripeCount; ++i)
-				(bin[i] = new (long, float, float, byte)[task.PredictedBinsPerStripe][])[0] = new (long, float, float, byte)[BinSize = task.BinSize];
+			BinSize = task.BinSize;
+			bin = new List<(long, float, float, byte)[]>[StripeCount = task.StripeCount]; // allocate stripes of bins
+			for (int i = 0; i < task.StripeCount; ++i) 
+				(bin[i] = new List<(long, float, float, byte)[]>((int)PredictedBinsPerStripe)).Add(new (long, float, float, byte)[BinSize]);
 			//foreach (ref var dbin in bin) // make a fresh list with a fresh bin for each stripe
 			//	(dbin = new (long, float, float, byte)[PredictedBinsPerStripe][])[0] = new (long, float, float, byte)[task.BinSize];
 			filledBins = new ushort[task.StripeCount];
@@ -459,7 +461,7 @@ internal partial class FractalGenerator {
 		SelectedMaxTasks;               // Maximum allowed total tasks
 	internal ushort
 		SelectedL2Kilobytes = 0,		// Override L2 cache size (0 = automatic guess)
-		SelectedBinSize = 0,		// Override automatic BinSize (0 = automatic)
+		SelectedBinSize = 0,			// Override automatic BinSize (0 = automatic)
 		SelectedStripeHeight = 0,		// Override automatic StripeHeight (0 = automatic) 
 		SelectedMaxPreviewFrames = 16,	// How many preview frames are allowed? (0 to disable preview)
 		SelectedLessPreviewFrames = 0,	// How many highest resolution preview frames get skipped?
@@ -1042,7 +1044,7 @@ internal partial class FractalGenerator {
 			[(3, [])] // TriComb_Seeds
 			),
 
-			new("TriFlake", 4, 2, 1.5, .25, .8, triX, triY,
+			new("TriFlake", 4, 2, 1.5, /*.25*/0.5, .8, triX, triY,
 			[
 				("BASE", [pi / 3, SYMMETRIC, SYMMETRIC, SYMMETRIC]),
 
@@ -1069,7 +1071,7 @@ internal partial class FractalGenerator {
 			]
 			),
 
-			new("TetraTriFlake", 16, 4, 1.5, .15, .8, tetraX, tetraY,
+			new("TetraTriFlake", 16, 4, 1.5, .35, .8, tetraX, tetraY,
 			[
 				("BASE",    [SYMMETRIC + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi]),
 
@@ -1126,7 +1128,7 @@ internal partial class FractalGenerator {
 			),
 
 
-			new("SierpinskiCarpet", 9, 3, 1.0, .25, .9, carpetX, carpetY,
+			new("SierpinskiCarpet", 9, 3, 1.0, .5, .9, carpetX, carpetY,
 			[
 				("BASE: Classic", [SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("BASE: Quarter", [SYMMETRIC + pi2, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -1343,7 +1345,7 @@ internal partial class FractalGenerator {
 				(1, [-766])
 			]),
 
-			new("SierpinskiPentaCarpet", 25, 5, 1.0, .25, .9, carpet5X, carpet5Y,
+			new("SierpinskiPentaCarpet", 25, 5, 1.0, .2, .9, carpet5X, carpet5Y,
 			[
 				("BASE: Classic",	[SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("BASE: Quarter",	[SYMMETRIC + pi2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -1826,9 +1828,7 @@ internal partial class FractalGenerator {
 		startTime = new();
 		startTime.Start();
 #endif
-		// Are we using the new GPU optimizations?
-		allocGpuVoidType = SelectedGpuVoidType;
-		allocGpuDrawType = SelectedGpuDrawType;
+
 
 		// Setup palette: selected or random
 		allocPalette = Colors[(short)(SelectedPaletteType < 0 ? random.Next(0, Colors.Count) : SelectedPaletteType)].Item2;
@@ -2003,6 +2003,9 @@ internal partial class FractalGenerator {
 		// Generate the images
 		while (!token.IsCancellationRequested) {
 			void NewCache() {
+
+				
+
 				// Precalculate the caching:
 				if (allocCacheOpt = SelectedCacheOpt) {
 					var previewTask = tasks[0];
@@ -2052,7 +2055,7 @@ internal partial class FractalGenerator {
 				SetMaxIterations();
 				NewCache();
 			}
-
+			
 			/*if (SelectedWidth != allocWidth) {
 				for (short t = 0; t < allocMaxTasks; tasks[t++].Kernel = new float[SelectedWidth]) { }
 			}*/
@@ -2070,22 +2073,21 @@ internal partial class FractalGenerator {
 				allocVoid = (ushort)(SelectedVoid + 1); // already reallocated the noise buffer
 				noiseWidth = (ushort)(SelectedWidth / allocVoid + 2);
 				noiseHeight = (ushort)(SelectedHeight / allocVoid + 2);
-				if (SelectedGpuDrawType == GpuDrawType.CPU)
-					for (short t = 0; t < allocMaxTasks; t++) {
-						tasks[t].VoidNoise = new Vector3[noiseWidth * noiseHeight];
-						tasks[t].VoidNoiseF = null;
-					}
-				else for (short t = 0; t < allocMaxTasks; t++) {
-						tasks[t].VoidNoiseF = new Float3[noiseWidth * noiseHeight];
-						tasks[t].VoidNoise = null;
-					}
+				InitNoise();
 			}
+			if (SelectedGpuDrawType != allocGpuDrawType) {
+				allocGpuDrawType = SelectedGpuDrawType;
+				InitNoise();
+			}
+			// Are we using the new GPU optimizations?
+			allocGpuVoidType = SelectedGpuVoidType;
+
 			// If only Cache settings changed, then also update them
-			if (SelectedBinSize * 100 != allocBinSize || SelectedStripeHeight != allocStripeHeight
-				|| SelectedCacheOpt != allocCacheOpt || SelectedBinSize * SelectedStripeHeight == 0) // switched on/off or automatic
-			//if ((SelectedBinSize * 100 != allocBinSize || SelectedStripeHeight != allocStripeHeight) && SelectedBinSize + SelectedStripeHeight > 0 // Changed overrride settings
+			//if (SelectedBinSize * 100 != allocBinSize || SelectedStripeHeight != allocStripeHeight
 			//	|| SelectedCacheOpt != allocCacheOpt || SelectedBinSize * SelectedStripeHeight == 0) // switched on/off or automatic
-			NewCache();
+			if ((SelectedBinSize * 100 != allocBinSize || SelectedStripeHeight != allocStripeHeight) && SelectedBinSize + SelectedStripeHeight > 0 // Changed overrride settings
+				|| SelectedCacheOpt != allocCacheOpt || SelectedBinSize * SelectedStripeHeight == 0) // switched on/off or automatic
+				NewCache();
 			
 			// remember how many iterations deep are we going to go.
 			allocMaxIterations = maxIterations;
@@ -2114,6 +2116,13 @@ internal partial class FractalGenerator {
 			}
 			);
 		}
+
+		// The generation was finished or aborted:
+
+		//Clear any bin that weren't cleared possibly due to aborting:
+		foreach (var t in tasks)
+			t.ClearBin();
+		// task has finished:
 		mainTask = null;
 		return;
 		#endregion
@@ -2142,6 +2151,17 @@ internal partial class FractalGenerator {
 				//var buffT = newHeight ? buffer[t] = new Vector3[allocHeight][] : buffer[t];
 				//for (var y = 0; y < SelectedHeight; ++y) 
 				//	buffT[y] = new Vector3[allocWidth];
+		}
+		void InitNoise() {
+			if (SelectedGpuDrawType == GpuDrawType.CPU)
+				for (short t = 0; t < allocMaxTasks; t++) {
+					tasks[t].VoidNoise = new Vector3[noiseWidth * noiseHeight];
+					tasks[t].VoidNoiseF = null;
+				}
+			else for (short t = 0; t < allocMaxTasks; t++) {
+					tasks[t].VoidNoiseF = new Float3[noiseWidth * noiseHeight];
+					tasks[t].VoidNoise = null;
+				}
 		}
 		void CalculateCache(FractalTask task) {
 			// This is very simplistic estimator of L2, could use something more direct and precise, like:
@@ -2188,9 +2208,9 @@ internal partial class FractalGenerator {
 			/*task.UpLeftStart = -task.Bloom1;
 			task.RightEnd = task.WidthBorder + task.Bloom1;
 			task.DownEnd = task.HeightBorder + task.Bloom1;*/
-			task.UpLeftStart = 1 - task.Bloom0;
-			task.RightEnd = task.WidthBorder + task.Bloom0 - 1;
-			task.DownEnd = task.HeightBorder + task.Bloom0 - 1;
+			task.UpLeftStart = - task.Bloom0;
+			task.RightEnd = task.WidthBorder + task.Bloom0;
+			task.DownEnd = task.HeightBorder + task.Bloom0;
 			task.ApplyDetail = allocDetail * task.Bloom1;
 		}
 		float PreGenerateCutSeedAndBlends(int bitmapIndex, Dictionary<long, Vector3[]> blends, out long startSeed) {
@@ -2357,7 +2377,7 @@ internal partial class FractalGenerator {
 				}
 				var inSize = refSize;
 				// zooming into a non-center child needs to pre-iterate 6 levels deeper (or more precisely from 6 levels above)
-				int totalMaxIterations = allocMaxIterations, PreSimulatedDepth = 1;
+				int totalMaxIterations = allocMaxIterations, PreSimulatedDepth = 0;
 				//selectZoomChild > 0 ? applyMaxIterations : applyMaxIterations - 6;
 				for (var i = 0; i < totalMaxIterations; ++i) {
 					// get a new scale of the lower level, and also:
@@ -2433,8 +2453,15 @@ internal partial class FractalGenerator {
 								(float)(FractalAreaScale * f.ChildY[n])));
 						if (n <= 1)
 							return 0f;
-						// Sort by X, then Y
-						pts.Sort((p1, p2) => {
+						float ss = 0;
+						foreach (var p in pts) {
+							var d = p.Length();
+							ss += d;
+						}
+
+
+							// Sort by X, then Y
+							pts.Sort((p1, p2) => {
 							int cx = p1.X.CompareTo(p2.X);
 							return cx != 0 ? cx : p1.Y.CompareTo(p2.Y);
 						});
@@ -2476,7 +2503,7 @@ internal partial class FractalGenerator {
 					float DotDensityPerPixel = (float)Math.Pow(_AverageChildCount, PreSimulatedDepth) / Math.Max(GetConvexHull(), task.ApplyWidth * task.ApplyHeight);
 					// BinBytes = BinSize * (sizeof(float) * 2 + sizeof(long) + sizeof(byte)))
 					// How many dots to be expected per stripe * 2 / bin capacity  // 2 to account for irregular distribution
-					task.PredictedBinsPerStripe = (ushort)Math.Ceiling(2 * DotDensityPerPixel * task.StripeHeight * task.ApplyWidth / task.BinSize);
+					task.PredictedBinsPerStripe = (ushort)Math.Ceiling(6 * DotDensityPerPixel * task.StripeHeight * task.ApplyWidth / task.BinSize);
 					// We will use OfDepth, if generating previews, or if we selected so and have enough allowed threads for that
 					if (ofDepth) {
 						// Of depth may split areas of bitmap to threads, so each thread will only acccess about a square root of thread count (at least)
@@ -2564,12 +2591,20 @@ internal partial class FractalGenerator {
 
 			#region GenerateDots_Inline
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			bool TestSize(FractalTask dotsTask, double dotsX, double dotsY, double dotsSize) {
+			bool TestShapeSize(FractalTask dotsTask, double dotsX, double dotsY, double dotsSize) {
 				// tests whether at least a part of this shape is within the image, if not, it will get skipped
 				var testSize = dotsSize * f.CutSize;
 				return Math.Min(dotsX, dotsY) + testSize > dotsTask.UpLeftStart 
 					&& dotsX - testSize < dotsTask.RightEnd 
 					&& dotsY - testSize < dotsTask.DownEnd;
+			}
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			bool TestDotSize(FractalTask dotsTask, double dotsX, double dotsY, double dotsSize) {
+				// tests whether at least a part of this shape is within the image, if not, it will get skipped
+				var testSize = dotsSize * f.CutSize;
+				return Math.Min(dotsX, dotsY) > dotsTask.UpLeftStart
+					&& dotsX < dotsTask.RightEnd
+					&& dotsY < dotsTask.DownEnd;
 			}
 			#endregion
 
@@ -2726,7 +2761,7 @@ internal partial class FractalGenerator {
 						var xy = preIterated.Item3[i];
 						var newXy = NewXY(dotsXy, xy, dotsAngle.Item1);
 						// Outside View check, if inside view, it will continue iterating this child
-						if (TestSize(mainTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+						if (TestDotSize(mainTask, newXy.Item1, newXy.Item2, preIterated.Item1))
 							applier.Apply(binTask, (i + f.ChildCount * (newFlags & (((long)1 << f.ChildCount) - 1)), (float)newXy.Item1, (float)newXy.Item2,
 								allocPreviewMode && dotsDepth > 1 ? dotsColor : (byte)((dotsColor + ChildColor[i]) % allocPalette2)));
 					}
@@ -2744,7 +2779,7 @@ internal partial class FractalGenerator {
 					var xy = preIterated.Item3[i];
 					var newXy = NewXY(dotsXy, xy, dotsAngle.Item1);
 					// Outside View check, if inside view, it will continue iterating this child
-					if (TestSize(mainTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+					if (TestShapeSize(mainTask, newXy.Item1, newXy.Item2, preIterated.Item1))
 						GenerateDotsSingleTask(mainTask, binTask, newXy,
 							i == 0
 							? (dotsAngle.Item1 + ChildAngle[i] - dotsAngle.Item2, -dotsAngle.Item2)
@@ -2803,7 +2838,7 @@ internal partial class FractalGenerator {
 							// Outside View
 							var xy = preIterated.Item3[i]; // pre-iterated (f.ChildX[i] * dotsSize, f.ChildY[i] * dotsSize), since it's preiterated
 							var newXy = NewXY(tupleXy, xy, tupleAngle.Item1);
-							if (TestSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+							if (TestDotSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
 								applier.Apply(tupleTask, (i + f.ChildCount * (newFlags & ((1 << f.ChildCount) - 1)), (float)newXy.Item1, (float)newXy.Item2,
 									allocPreviewMode && tupleDepth > 1 ? tupleColor : (byte)((tupleColor + ChildColor[i]) % allocPalette2)));
 						}
@@ -2821,7 +2856,7 @@ internal partial class FractalGenerator {
 						// Outside View
 						var xy = preIterated.Item3[i];
 						var newXy = NewXY(tupleXy, xy, tupleAngle.Item1);
-						if (!TestSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+						if (!TestShapeSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
 							continue;
 						tuples[insertTo++] =
 							(tupleIndex, newXy,
