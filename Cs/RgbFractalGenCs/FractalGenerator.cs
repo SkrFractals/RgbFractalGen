@@ -21,8 +21,6 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ComputeSharp;
 using System.Runtime.InteropServices;
-using ComputeSharp.Resources;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RgbFractalGenCs;
 
@@ -41,9 +39,9 @@ internal partial class FractalGenerator {
 		Error = 7               // Unused, unless error obviously
 	}
 	private enum TaskState : byte {
-		Free = 0,		// The task has not been started yet, or already finished and joined and ready to be started again
-		Done = 1,		// The task if finished and ready to join without waiting
-		Running = 2		// The task is running
+		Free = 0,       // The task has not been started yet, or already finished and joined and ready to be started again
+		Done = 1,       // The task if finished and ready to join without waiting
+		Running = 2     // The task is running
 	}
 	public enum ParallelType : byte {
 		OfAnimation = 0,// Parallel batching of each animation image into its own single thread. No pixel conflicts, and more likely to use all the threads consistently. Recommended for animations.
@@ -56,32 +54,32 @@ internal partial class FractalGenerator {
 		HashSeeds = 3   // Same as All Seeds, but will also export a file with all detected unique seeds. (Only really useful for the developer, to hide the repeating seeds)
 	}
 	public enum PngType : byte {
-		No = 0,			// Will not encode PNGs durign the generation, but will encode them just as fast if not faster when you do an export
-		Yes = 1			// Will export animation as PNG series, that will enable you to export the PNGS or MP4 quicker after it's finished, but not really quicker overall.
+		No = 0,         // Will not encode PNGs durign the generation, but will encode them just as fast if not faster when you do an export
+		Yes = 1         // Will export animation as PNG series, that will enable you to export the PNGS or MP4 quicker after it's finished, but not really quicker overall.
 	}
 	public enum GifType : byte {
-		No = 0,			// Will not encode a gif, you will not be able to export a gif afterwards, but you can switch to a Local/Global later and it will not fully reset the generator, just catches up with missing frames.
-		Local = 1,		// Will encode a GIF during the generation, so you could save it when finished. With a local colormap (one for each frame). Higher color precision. Slow encoding, larger GIF file size. 
-		Global = 2		// Also encodes a GIF. But with a global color map learned from a first frame. Not recommended for changing colors. Much faster encoding, smaller GIF file size
+		No = 0,         // Will not encode a gif, you will not be able to export a gif afterwards, but you can switch to a Local/Global later and it will not fully reset the generator, just catches up with missing frames.
+		Local = 1,      // Will encode a GIF during the generation, so you could save it when finished. With a local colormap (one for each frame). Higher color precision. Slow encoding, larger GIF file size. 
+		Global = 2      // Also encodes a GIF. But with a global color map learned from a first frame. Not recommended for changing colors. Much faster encoding, smaller GIF file size
 	}
 	public enum GpuVoidType : byte {
-		CPU = 0,				// Original CPU Dijkstra BFS
-		VoidBFS = 1,			// GPU Distance flooding passes
-		VoidJumpFlood = 2,		// GPU Jump Flooding Passes
+		CPU = 0,                // Original CPU Dijkstra BFS
+		VoidBFS = 1,            // GPU Distance flooding passes
+		VoidJumpFlood = 2,      // GPU Jump Flooding Passes
 		VoidJumpBoundless = 3   // GPU branchless/boundless Jump Flooding Passes
 	}
 	public enum GpuDrawType : byte {
-		CPU = 0,		// Original CPU Drawing
-		Functions = 1,	// GPU shader variant switching
-		Pipeline = 2	// GPU multi-pass pipeline
+		CPU = 0,        // Original CPU Drawing
+		Functions = 1,  // GPU shader variant switching
+		Pipeline = 2    // GPU multi-pass pipeline
 	}
 	private enum ExportType : byte {
-		None = 0,		// Nothing
+		None = 0,       // Nothing
 		PngsToMp4 = 1,  // Convert PNG series into MP4
 		GifToMp4 = 2,   // Convert GIF into MP4
-		Png = 3,		// Export preview image as PNG
-		Pngs = 4,		// Export PNG series (lossless animation quality)
-		Gif = 5,		// Export GIF
+		Png = 3,        // Export preview image as PNG
+		Pngs = 4,       // Export PNG series (lossless animation quality)
+		Gif = 5,        // Export GIF
 	}
 
 	#endregion
@@ -127,17 +125,17 @@ internal partial class FractalGenerator {
 			ColorBlends = [];           // ???
 		internal readonly Dictionary<long, Vector3[]>
 			FinalColors = [];           // Mixed children color
-		internal int 
-			BitmapIndex;				// The bitmapIndex of which the task is working on
-		internal short 
-			TaskIndex,					// The task index
+		internal int
+			BitmapIndex;                // The bitmapIndex of which the task is working on
+		internal short
+			TaskIndex,                  // The task index
 			ApplyWidth, ApplyHeight,    // Can be smaller for previews
 			WidthBorder, HeightBorder;  // Slightly below the width and height
 		internal double
 			ApplyDetail;                // Allocated detail
 		internal float
-			ApplyBloom,					// How much bloom will be applied this task?
-			LightNormalizer,			// Maximum brightness found in the buffer, for normalizing the final image brightness
+			ApplyBloom,                 // How much bloom will be applied this task?
+			LightNormalizer,            // Maximum brightness found in the buffer, for normalizing the final image brightness
 			VoidDepthMax;               // Maximum reached void depth during the dijkstra search, for normalizing the void intensity
 		internal (double, double, (double, double)[])[]
 			PreIterate;                 // (childSize, childDetail, childSpread, (childX,childY)[])
@@ -276,7 +274,7 @@ internal partial class FractalGenerator {
 			StripeHeight = task.StripeHeight;
 			BinSize = task.BinSize;
 			bin = new List<(long, float, float, byte)[]>[StripeCount = task.StripeCount]; // allocate stripes of bins
-			for (int i = 0; i < task.StripeCount; ++i) 
+			for (int i = 0; i < task.StripeCount; ++i)
 				(bin[i] = new List<(long, float, float, byte)[]>((int)PredictedBinsPerStripe)).Add(new (long, float, float, byte)[BinSize]);
 			//foreach (ref var dbin in bin) // make a fresh list with a fresh bin for each stripe
 			//	(dbin = new (long, float, float, byte)[PredictedBinsPerStripe][])[0] = new (long, float, float, byte)[task.BinSize];
@@ -306,7 +304,7 @@ internal partial class FractalGenerator {
 			// Must find some nice balance
 
 			// safety margin of L2 cache size in bytes:
-			float L2_eff = L2bytes * 0.85f; 
+			float L2_eff = L2bytes * 0.85f;
 			// BinSize can't be way too small, or else it would explode
 			ushort MinBinBytes = 4096;
 			byte OnePixelBytes = 12; // Vector3 is 12 bytes
@@ -403,10 +401,10 @@ internal partial class FractalGenerator {
 		ChildColor;                 // A copy of childColor for allowing BGR and combinations
 	internal readonly Dictionary<string, uint>
 		Hash = [];                  // Seed hashes
-	private readonly List<Fractal> 
-		fractals;					// Fractal definitions
+	private readonly List<Fractal>
+		fractals;                   // Fractal definitions
 	private Fractal f;              // Selected fractal definition
-	private readonly Dictionary<long, Vector3[]> 
+	private readonly Dictionary<long, Vector3[]>
 		colorBlends = [];           // What mix of colors will a parent split into?
 	#endregion
 
@@ -436,11 +434,11 @@ internal partial class FractalGenerator {
 		SelectedAmbient,                // Void ambient strength (-1 - MaxAmbient)
 		SelectedMaxTasks;               // Maximum allowed total tasks
 	internal ushort
-		SelectedL2Kilobytes = 0,		// Override L2 cache size (0 = automatic guess)
-		SelectedBinSize = 0,			// Override automatic BinSize (0 = automatic)
-		SelectedStripeHeight = 0,		// Override automatic StripeHeight (0 = automatic) 
-		SelectedMaxPreviewFrames = 16,	// How many preview frames are allowed? (0 to disable preview)
-		SelectedLessPreviewFrames = 0,	// How many highest resolution preview frames get skipped?
+		SelectedL2Kilobytes = 0,        // Override L2 cache size (0 = automatic guess)
+		SelectedBinSize = 0,            // Override automatic BinSize (0 = automatic)
+		SelectedStripeHeight = 0,       // Override automatic StripeHeight (0 = automatic) 
+		SelectedMaxPreviewFrames = 16,  // How many preview frames are allowed? (0 to disable preview)
+		SelectedLessPreviewFrames = 0,  // How many highest resolution preview frames get skipped?
 		SelectedWidth,                  // Resolution width (1-X)
 		SelectedHeight,                 // Resolution height (1-X)
 		SelectedPeriod,                 // Parent to child frames period (1-X)
@@ -468,7 +466,7 @@ internal partial class FractalGenerator {
 	internal GpuDrawType
 		SelectedGpuDrawType = GpuDrawType.Functions;
 	internal bool
-		SelectedCacheOpt = false,		// Will we use the new cacche optimization algorithm?
+		SelectedCacheOpt = false,       // Will we use the new cacche optimization algorithm?
 		SelectedPreviewMode = false,    // Preview mode only renders a single smaller fractal with only one color shift at the highest level - for definition editor
 		SelectedEditorMode = false;     // In editor mode, we will only show the selected childColors and childAngles
 
@@ -486,12 +484,12 @@ internal partial class FractalGenerator {
 		buffer;                 // Buffer for points to print into bmp - separated for OfDepth
 	private float AverageChildCount;
 	private FractalTask[]
-		tasks;					// All available tasks
-	private Bitmap[] 
-		bitmap;					// Prerender as an array of bitmaps
-	private BitmapState[] 
+		tasks;                  // All available tasks
+	private Bitmap[]
+		bitmap;                 // Prerender as an array of bitmaps
+	private BitmapState[]
 		bitmapState;            // What stage is the bitmap in? Created? Drawing? Exporting?
-	private BitmapData[] 
+	private BitmapData[]
 		bitmapData;             // Locked Bits for bitmaps
 	private bool[]
 		lockedBmp;              // Is this bitmap locked?
@@ -502,14 +500,14 @@ internal partial class FractalGenerator {
 	private double
 		logBase,                // Size Log Base
 		allocPeriodAngle,       // Angle symmetry corrected for periodMultiplier
-		allocDetail;       
+		allocDetail;
 	private long
 		allocCutSeed,           // Allocated cutSeed (selected or random)
 		startCutSeed = 0;       // What cut seed will the generator start with?
 	private int
 		allocFrames,            // How many bitmap frames are currently allocated?
 		nextBitmap,             // How many bitmaps have started generating? (next task should begin with this one)
-		allocNoise;				// Normalizer for maximum void depth - Precomputed amb * noise
+		allocNoise;             // Normalizer for maximum void depth - Precomputed amb * noise
 	private uint
 		allocBinSize,           // Cache Bin Size
 		bitmapsFinished;        // How many bitmaps are completely finished generating? (ready to display, encoded if possible)
@@ -520,12 +518,12 @@ internal partial class FractalGenerator {
 		allocHue,               // Allocated hue setting
 		allocTasks,             // How many buffer tasks are currently allocated?
 		allocMaxIterations,
-		allocMaxTasks,			// Safely copy maxTasks in here, so it doesn't change in the middle of generation
+		allocMaxTasks,          // Safely copy maxTasks in here, so it doesn't change in the middle of generation
 		isWritingBitmaps = 2,   // counter and lock to try writing bitmap to a file once every 2 threads
 		isFinishingBitmaps = 2; // counter and lock to try finishing bitmaps once every 2 threads
 	private ushort
 		allocStripeHeight,      // Full resolution Cache Stripe Height
-		allocStripeCount,		// Full resolution Cache Stripe Height
+		allocStripeCount,       // Full resolution Cache Stripe Height
 		allocLessPreviewFrames, // How many highest resolution preview frames get skipped?
 		allocPeriodMultiplier,  // How much will the period get finally stretched? (calculated for seamless + user multiplier)
 		allocExtraSpin,         // Allocated extra spin setting
@@ -543,12 +541,12 @@ internal partial class FractalGenerator {
 		allocBuffers = false;   // Will we preallocate the buffers to tasks? (true not implemented yet)	
 	private bool
 		allocDithering,
-		allocCacheOpt,			// Will we use the new cacche optimization algorithm?
-		allocPreviewMode;		// Will render a simpliefied fractal colored 1 layer deep definition showing it's structure
+		allocCacheOpt,          // Will we use the new cacche optimization algorithm?
+		allocPreviewMode;       // Will render a simpliefied fractal colored 1 layer deep definition showing it's structure
 	private GenerationType
 		allocGenerationType;
 	private ParallelType
-		allocParallelType;		// Safely copy parallelType in here, so it doesn't change in the middle of generation
+		allocParallelType;      // Safely copy parallelType in here, so it doesn't change in the middle of generation
 	private PngType
 		allocPngType;
 	private GifType
@@ -565,28 +563,28 @@ internal partial class FractalGenerator {
 	#endregion
 
 	#region Variables_Export
-	private AnimatedGifEncoder 
+	private AnimatedGifEncoder
 		gifEncoder;                 // Export GIF encoder
 	private MemoryStream[]
-		msPngs;						// MemoryStreams for Png Exporting
-	private short 
-		gifSuccess,					// Temp GIF file "gif.tmp" successfully created
-		tryPng;						// how many sequential Pngs have been exported?
+		msPngs;                     // MemoryStreams for Png Exporting
+	private short
+		gifSuccess,                 // Temp GIF file "gif.tmp" successfully created
+		tryPng;                     // how many sequential Pngs have been exported?
 	internal string
 		GifTempPath;                // Temporary GIF file name
 	private byte[]
-		encodedGif,					// 0 - not encoded, 1 - encoding, 2 - encoded, 3 - written
-		encodedPng;					// 0 - not encoded, 1 - encoding, 2 - encoded
-	private int 
+		encodedGif,                 // 0 - not encoded, 1 - encoding, 2 - encoded, 3 - written
+		encodedPng;                 // 0 - not encoded, 1 - encoding, 2 - encoded
+	private int
 		tryGif;                     // how many sequential gif frames have been exported
 	private ushort
-		encodedMp4,					// report of how many mp4 frames have been encoded
-		pngFailed;					// how many attempts to write a png have failed?
+		encodedMp4,                 // report of how many mp4 frames have been encoded
+		pngFailed;                  // how many attempts to write a png have failed?
 	private Rectangle
-		rect;						// Bitmap rectangle
-	private readonly string 
+		rect;                       // Bitmap rectangle
+	private readonly string
 		filePrefix;                 // Specific file identifier
-	private ExportType 
+	private ExportType
 		exportType = ExportType.None;
 
 	#endregion
@@ -596,11 +594,11 @@ internal partial class FractalGenerator {
 	internal bool DebugAnim = false;    // export bitmap states to realtime debug string
 	internal bool DebugPng = false;     // export png states to realtime debug string
 	internal bool DebugGif = false;     // export gif states to realtime debug string
-	internal string DebugString = "";	// realtime debug string
+	internal string DebugString = "";   // realtime debug string
 
-	private readonly short[] 
-		counter = new short[7];			// counter of bitmap states
-	private readonly short[] 
+	private readonly short[]
+		counter = new short[7];         // counter of bitmap states
+	private readonly short[]
 		counterE = new short[4];        // counter of encode states
 
 #if CustomDebug
@@ -622,7 +620,7 @@ internal partial class FractalGenerator {
 		UpdateCache;
 
 	private readonly object
-		taskLock = new();			// Monitor lock
+		taskLock = new();           // Monitor lock
 	private CancellationTokenSource
 		cancel;                     // Cancellation Token Source
 	private CancellationToken
@@ -631,7 +629,7 @@ internal partial class FractalGenerator {
 		gifCancel;                  // Cancellation Token Source for gif encoder
 	private CancellationToken
 		gifToken;                   // Cancellation token for gif encoder
-	private Task 
+	private Task
 		mainTask;          // Main Generation Task
 
 	unsafe private delegate*<Vector3, ref byte*, Random, void> ditherFunc = &NoDithering;
@@ -649,19 +647,19 @@ internal partial class FractalGenerator {
 				var startY = (int)Math.Floor(fy);
 				var ay = fy - startY;
 				var oy = 1f - ay;
-				fixed(Vector3* NoiseY = &drawTask.Noise[startY * self.noiseWidth])
-				for (var x = 0; x < drawTask.ApplyWidth; ++x) {
-					var fx = (float)x / self.allocVoid;
-					var startX = (int)Math.Floor(fx);
-					float voidAmb = voidY[x] / drawTask.VoidDepthMax,
-						ax = fx - startX, ox = 1f - ax, b0 = ox * oy, b1 = ax * oy, b2 = ox * ay, b3 = ax * ay;
-					self.ditherFunc(ApplyAmbientNoise(
-						self.saturateFunc(Normalize(buffY[x], drawTask.LightNormalizer), self.SelectedSaturate),
-						voidAmb * self.SelectedAmbient, (1.0f - voidAmb) * voidAmb,
-						// bilinear interpolation of the scaled void noise:
-						b0 * NoiseY[startX] + b1 * NoiseY[startX + 1] + b2 * NoiseY[startX + self.noiseWidth] + b3 * NoiseY[startX + self.noiseWidth + 1]
-					), ref ptr, self.random);
-				}
+				fixed (Vector3* NoiseY = &drawTask.Noise[startY * self.noiseWidth])
+					for (var x = 0; x < drawTask.ApplyWidth; ++x) {
+						var fx = (float)x / self.allocVoid;
+						var startX = (int)Math.Floor(fx);
+						float voidAmb = voidY[x] / drawTask.VoidDepthMax,
+							ax = fx - startX, ox = 1f - ax, b0 = ox * oy, b1 = ax * oy, b2 = ox * ay, b3 = ax * ay;
+						self.ditherFunc(ApplyAmbientNoise(
+							self.saturateFunc(Normalize(buffY[x], drawTask.LightNormalizer), self.SelectedSaturate),
+							voidAmb * self.SelectedAmbient, (1.0f - voidAmb) * voidAmb,
+							// bilinear interpolation of the scaled void noise:
+							b0 * NoiseY[startX] + b1 * NoiseY[startX + 1] + b2 * NoiseY[startX + self.noiseWidth] + b3 * NoiseY[startX + self.noiseWidth + 1]
+						), ref ptr, self.random);
+					}
 			}
 		}
 	}
@@ -791,10 +789,10 @@ internal partial class FractalGenerator {
 		SelectedGenerationType = GenerationType.Animation;
 		SelectedPngType = PngType.No;
 		SelectedGifType = GifType.No;
-		SelectedDefaultHue = SelectedCutSeed = SelectedDefaultZoom = SelectedDefaultAngle = 
+		SelectedDefaultHue = SelectedCutSeed = SelectedDefaultZoom = SelectedDefaultAngle =
 			SelectedExtraSpin = SelectedExtraHue = debugPeriodOverride = 0;
 		SelectedZoom = 1;
-		allocFrames = SelectedSpin = SelectedHue = SelectedFractal = SelectedChildColor = SelectedChildAngle = SelectedCut = 
+		allocFrames = SelectedSpin = SelectedHue = SelectedFractal = SelectedChildColor = SelectedChildAngle = SelectedCut =
 			allocWidth = allocHeight = allocTasks = maxIterations = -1;
 		f = null;
 		bitmap = null;
@@ -805,13 +803,13 @@ internal partial class FractalGenerator {
 		ChildColor = null;
 		gifSuccess = 0;
 		// Constants
-		const double pi = Math.PI, 
-			pi3 = pi / 3, 
-			pi2 = pi / 2, 
+		const double pi = Math.PI,
+			pi3 = pi / 3,
+			pi2 = pi / 2,
 			pi5 = pi / 5,
-			pi32 = 3 * pi2, 
-			pi23 = 2 * pi3, 
-			pi43 = 4 * pi3, 
+			pi32 = 3 * pi2,
+			pi23 = 2 * pi3,
+			pi43 = 4 * pi3,
 			pi4 = .4 * pi,
 			SYMMETRIC = 2 * pi;
 		double s2 = Math.Sqrt(2);
@@ -827,10 +825,10 @@ internal partial class FractalGenerator {
 			diagonal = s2 / 3;
 
 		// X, Y
-		double[] carpetX = new double[9], carpetY = new double[9], 
-			carpet5X = new double[25], carpet5Y = new double[25], 
-			pentaX = new double[6], pentaY = new double[6], 
-			triX = new double[4], triY = new double[4], 
+		double[] carpetX = new double[9], carpetY = new double[9],
+			carpet5X = new double[25], carpet5Y = new double[25],
+			pentaX = new double[6], pentaY = new double[6],
+			triX = new double[4], triY = new double[4],
 			tetraX = new double[16], tetraY = new double[16],
 			octX = new double[9], octY = new double[9];
 		// Carpets
@@ -925,8 +923,8 @@ internal partial class FractalGenerator {
 		fractals = [
 			new("Void", 0, 1000, 1, .1, 1, [0], [0], [("N",[pi])], [("N",[0])], null),
 
-			new("TriTree", 10, 4, .2, .1, 1.0, 
-				[0, -1.5, 0, 1.5, 1.5, 3, 1.5, -1.5, -3, -1.5], 
+			new("TriTree", 10, 4, .2, .1, 1.0,
+				[0, -1.5, 0, 1.5, 1.5, 3, 1.5, -1.5, -3, -1.5],
 				[0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt],
 			[
 				("BASE: RingTree",[SYMMETRIC + pi23, pi, pi + pi23, pi + pi43, 0, 0, pi23, pi23, pi43, pi43]),
@@ -938,15 +936,15 @@ internal partial class FractalGenerator {
 				//("BeamTree_OuterJoint", [pi3, 0, pi43, pi23, pi + pi43, pi + pi43, pi, pi, pi + pi23, pi + pi23]),
 				//("BeamTree_InnerJoint", [pi3, 0, pi43, pi23, pi, pi, pi, pi, pi, pi])
 			], [
-				("Center",		[2, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Center_Neg",	[4, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center",      [2, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_Neg",  [4, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_Half", [3, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Center_One",	[1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_One",  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Y",			[0, 2, 2, 2, 0, 0, 0, 0, 0, 0]),
-				("Y_Neg",		[0, 4, 4, 4, 0, 0, 0, 0, 0, 0]),
-				("Y_Half",		[0, 3, 3, 3, 0, 0, 0, 0, 0, 0]),
-				("Y_One",		[0, 1, 1, 1, 0, 0, 0, 0, 0, 0]),
+				("Y",           [0, 2, 2, 2, 0, 0, 0, 0, 0, 0]),
+				("Y_Neg",       [0, 4, 4, 4, 0, 0, 0, 0, 0, 0]),
+				("Y_Half",      [0, 3, 3, 3, 0, 0, 0, 0, 0, 0]),
+				("Y_One",       [0, 1, 1, 1, 0, 0, 0, 0, 0, 0]),
 
 				("2",           [0, 0, 0, 0, 2, 2, 2, 0, 0, 0]),
 				("2_Neg",       [0, 0, 0, 0, 4, 4, 4, 0, 0, 0]),
@@ -966,7 +964,7 @@ internal partial class FractalGenerator {
 			),
 
 			new("FlakeTree", 13, 4, .2, .1, .9,
-				[0, -1.5, 0, 1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 1.5, 0, -1.5], 
+				[0, -1.5, 0, 1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 1.5, 0, -1.5],
 				[0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, stt, -2 * stt, stt],
 			[
 				("BASE", [pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, 0, pi23, pi43]),
@@ -979,12 +977,12 @@ internal partial class FractalGenerator {
 				("Center_Half", [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_One",  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Y",			[0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y",           [0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Y_Neg",       [0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Y_Half",      [0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Y_One",       [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Corners",		[0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0]),
+				("Corners",     [0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0]),
 				("Corners_Neg", [0, 0, 0, 0, 4, 4, 4, 4, 4, 4, 0, 0, 0]),
 				("Corners_Half",[0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0]),
 				("Corners_One", [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0]),
@@ -997,32 +995,32 @@ internal partial class FractalGenerator {
 			),
 
 			new("TriComb", 13, 5, .2, .1, .9,
-				[0, 0, 1.5, -1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 3, 0, -3], 
+				[0, 0, 1.5, -1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 3, 0, -3],
 				[0, 2 * stt, -stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, 2 * stt, -4 * stt, 2 * stt],
 			[
 				//("Classic", [pi / 3, 0, pi23, pi43, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, pi, pi43, 0, pi23])
 				("BASE", [pi / 3, 0, pi43, pi23, pi, pi + pi43, pi + pi43, pi + pi23, pi + pi23, pi, pi23, 0, pi43])
 			],
 			[
-				("Center",		[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center",      [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_Neg",  [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_Half", [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Center_One",	[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_One",  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Bridges",		[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2]),
+				("Bridges",     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2]),
 				("Bridges_Neg", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4]),
 				("Bridges_Half",[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3]),
 				("Bridges_One", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]),
 
-				("Inner",		[0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Inner_Neg",	[0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Inner_Half",	[0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Inner_One",	[0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Inner",       [0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Inner_Neg",   [0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Inner_Half",  [0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Inner_One",   [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Outer",		[0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0]),
-				("Outer_Neg",	[0, 0, 0, 0, 4, 4, 4, 4, 4, 4, 0, 0, 0]),
-				("Outer_Half",	[0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0]),
-				("Outer_One",	[0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0])
+				("Outer",       [0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0]),
+				("Outer_Neg",   [0, 0, 0, 0, 4, 4, 4, 4, 4, 4, 0, 0, 0]),
+				("Outer_Half",  [0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0]),
+				("Outer_One",   [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0])
 			],
 			[(3, [])] // TriComb_Seeds
 			),
@@ -1033,15 +1031,15 @@ internal partial class FractalGenerator {
 
 				("Angles", [0, 0, pi23, 2 * pi23])],
 			[
-				("Center",		[2, 0, 0, 0]),
+				("Center",      [2, 0, 0, 0]),
 				("CenterNeg",   [4, 0, 0, 0]),
 				("CenterHalf",  [3, 0, 0, 0]),
-				("CenterOne",	[1, 0, 0, 0]),
+				("CenterOne",   [1, 0, 0, 0]),
 
-				("Top",			[0, 2, 0, 0]),
-				("TopNeg",		[0, 4, 0, 0]),
-				("TopHalf",		[0, 3, 0, 0]),
-				("TopOne",		[0, 1, 0, 0]),
+				("Top",         [0, 2, 0, 0]),
+				("TopNeg",      [0, 4, 0, 0]),
+				("TopHalf",     [0, 3, 0, 0]),
+				("TopOne",      [0, 1, 0, 0]),
 
 				("Bottom",      [0, 0, 2, 2]),
 				("BottomNeg",   [0, 0, 4, 4]),
@@ -1124,12 +1122,12 @@ internal partial class FractalGenerator {
 				("H-I De Rivera D2", [0, 0, 0, pi2, 0, 0, 0, pi2, 0]),
 				("Rotated", [0, 0, 0, 0, pi2, 0, pi, 0, pi32]),
 			], [
-				("Sierpinski_Carpet",		[2, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Sierpinski_Carpet_Neg",	[4, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Sierpinski_Carpet_Half",	[3, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Sierpinski_Carpet_One",	[1, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Sierpinski_Carpet",       [2, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Sierpinski_Carpet_Neg",   [4, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Sierpinski_Carpet_Half",  [3, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Sierpinski_Carpet_One",   [1, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("H-I_De_Rivera",			[0, 0, 2, 0, 0, 0, 2, 0, 0]),
+				("H-I_De_Rivera",           [0, 0, 2, 0, 0, 0, 2, 0, 0]),
 				("H-I_De_Rivera_Neg",       [0, 0, 4, 0, 0, 0, 4, 0, 0]),
 				("H-I_De_Rivera_Half",      [0, 0, 3, 0, 0, 0, 3, 0, 0]),
 				("H-I_De_Rivera_One",       [0, 0, 1, 0, 0, 0, 1, 0, 0]),
@@ -1139,15 +1137,15 @@ internal partial class FractalGenerator {
 				("H-I_De_Rivera2_Half",     [0, 0, 0, 0, 3, 0, 0, 0, 3]),
 				("H-I_De_Rivera2_One",      [0, 0, 0, 0, 1, 0, 0, 0, 1]),
 
-				("Diag",					[0, 2, 0, 0, 0, 2, 0, 0, 0]),
-				("Diag_Neg",				[0, 4, 0, 0, 0, 4, 0, 0, 0]),
-				("Diag_Half",				[0, 3, 0, 0, 0, 3, 0, 0, 0]),
-				("Diag_One",				[0, 1, 0, 0, 0, 1, 0, 0, 0]),
+				("Diag",                    [0, 2, 0, 0, 0, 2, 0, 0, 0]),
+				("Diag_Neg",                [0, 4, 0, 0, 0, 4, 0, 0, 0]),
+				("Diag_Half",               [0, 3, 0, 0, 0, 3, 0, 0, 0]),
+				("Diag_One",                [0, 1, 0, 0, 0, 1, 0, 0, 0]),
 
-				("Diag2",					[0, 0, 0, 2, 0, 0, 0, 2, 0]),
-				("Diag2_Neg",				[0, 0, 0, 4, 0, 0, 0, 4, 0]),
-				("Diag2_Half",				[0, 0, 0, 3, 0, 0, 0, 3, 0]),
-				("Diag2_One",				[0, 0, 0, 1, 0, 0, 0, 1, 0])
+				("Diag2",                   [0, 0, 0, 2, 0, 0, 0, 2, 0]),
+				("Diag2_Neg",               [0, 0, 0, 4, 0, 0, 0, 4, 0]),
+				("Diag2_Half",              [0, 0, 0, 3, 0, 0, 0, 3, 0]),
+				("Diag2_One",               [0, 0, 0, 1, 0, 0, 0, 1, 0])
 			], [
 				// Symmetric
 				(11, [-95]),
@@ -1330,29 +1328,29 @@ internal partial class FractalGenerator {
 
 			new("SierpinskiPentaCarpet", 25, 5, 1.0, .2, .9, carpet5X, carpet5Y,
 			[
-				("BASE: Classic",	[SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("BASE: Quarter",	[SYMMETRIC + pi2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("BASE: Classic",   [SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("BASE: Quarter",   [SYMMETRIC + pi2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("RotatedInner",	[0, 0, 0, 0, pi2, 0, pi, 0, pi32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("RotatedInner",    [0, 0, 0, 0, pi2, 0, pi, 0, pi32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("RotatedOuter",    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi2, 0, 0, 0, pi, 0, 0, 0, pi32, 0]),
 				("RotatedOuter2",   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi2, 0, pi2, 0, pi, 0, pi, 0, pi32, 0, pi32])
 			], [
-				("Center",		[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center",      [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_Neg",  [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_Half", [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_One",  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Quad",		[0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Quad_Neg",	[0, 4, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Quad_Half",	[0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Quad_One",	[0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Quad",        [0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Quad_Neg",    [0, 4, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Quad_Half",   [0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Quad_One",    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
 				("Quad2",       [0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Quad2_Neg",   [0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Quad2_Half",  [0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Quad2_One",   [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Plus",		[0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Plus",        [0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Plus_Neg",    [0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Plus_Half",   [0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Plus_One",    [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -1362,7 +1360,7 @@ internal partial class FractalGenerator {
 				("Plus2_Half",  [0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Plus2_One",   [0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Corner",		[0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0]),
+				("Corner",      [0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0]),
 				("Corner_Neg",  [0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0]),
 				("Corner_Half", [0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0]),
 				("Corner_One",  [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]),
@@ -1372,7 +1370,7 @@ internal partial class FractalGenerator {
 				("Corner2_Half",[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0]),
 				("Corner2_One", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
 
-				("Swirl",		[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0]),
+				("Swirl",       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0]),
 				("Swirl_Neg",   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0]),
 				("Swirl_Half",  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0]),
 				("Swirl_One",   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0]),
@@ -1405,15 +1403,15 @@ internal partial class FractalGenerator {
 
 				("Rotated", [0, 0, 8 * pi5, 6 * pi5, 4 * pi5, 2 * pi5])
 			], [
-				("Center",		[2, 0, 0, 0, 0, 0]),
-				("Center_Neg",	[4, 0, 0, 0, 0, 0]),
+				("Center",      [2, 0, 0, 0, 0, 0]),
+				("Center_Neg",  [4, 0, 0, 0, 0, 0]),
 				("Center_Half", [3, 0, 0, 0, 0, 0]),
 				("Center_One",  [1, 0, 0, 0, 0, 0]),
 
-				("Top",			[0, 2, 0, 0, 0, 0]),
-				("Top_Neg",		[0, 4, 0, 0, 0, 0]),
-				("Top_Half",	[0, 3, 0, 0, 0, 0]),
-				("Top_One",		[0, 1, 0, 0, 0, 0]),
+				("Top",         [0, 2, 0, 0, 0, 0]),
+				("Top_Neg",     [0, 4, 0, 0, 0, 0]),
+				("Top_Half",    [0, 3, 0, 0, 0, 0]),
+				("Top_One",     [0, 1, 0, 0, 0, 0]),
 
 				("Upper",       [0, 0, 2, 0, 0, 2]),
 				("Upper_Neg",   [0, 0, 4, 0, 0, 4]),
@@ -1442,12 +1440,12 @@ internal partial class FractalGenerator {
 				("Rotated", [0, 0, pi3, pi23, pi, 4 * pi3, 5 * pi3])
 			],
 			[
-				("Center",		[2, 0, 0, 0, 0, 0, 0]),
-				("Center_Neg",	[4, 0, 0, 0, 0, 0, 0]),
+				("Center",      [2, 0, 0, 0, 0, 0, 0]),
+				("Center_Neg",  [4, 0, 0, 0, 0, 0, 0]),
 				("Center_Half", [3, 0, 0, 0, 0, 0, 0]),
-				("Center_One",	[1, 0, 0, 0, 0, 0, 0]),
+				("Center_One",  [1, 0, 0, 0, 0, 0, 0]),
 
-				("Y",			[0, 0, 2, 0, 2, 0, 2]),
+				("Y",           [0, 0, 2, 0, 2, 0, 2]),
 				("Y_Neg",       [0, 0, 4, 0, 4, 0, 4]),
 				("Y_Half",      [0, 0, 3, 0, 3, 0, 3]),
 				("Y_One",       [0, 0, 1, 0, 1, 0, 1]),
@@ -1465,10 +1463,10 @@ internal partial class FractalGenerator {
 				// NoChildComplex
 				(1, [-190]),
 				// NoBackDiag
-				(2, [0, 66, 129, 132, 133, 136, 137, 140, 141, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 272, 
+				(2, [0, 66, 129, 132, 133, 136, 137, 140, 141, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 272,
 					288, 304, 322, 336, 338, 352, 354, 368, 370, 385, 388, 389, 392, 393, 396, 397, 400, 401, 404, 405, 408, 409, 412, 413, 416, 417,
 					420, 421, 424, 425, 428, 429, 432, 433, 436, 437, 440, 441, 444, 445, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460,
-					461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 486, 487, 
+					461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 486, 487,
 					488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510])
 			]
 			),
@@ -1489,20 +1487,20 @@ internal partial class FractalGenerator {
 				("BASE: 180", [pi3, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0]),
 				("BASE: Symmetric", [SYMMETRIC + pi23, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0])
 			], [
-				("Center",		[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Center_Neg",	[4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center",      [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_Neg",  [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("Center_Half", [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Center_One",	[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Center_One",  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Y",			[0, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Y_Neg",		[0, 0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Y_Half",		[0, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Y_One",		[0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y",           [0, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y_Neg",       [0, 0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y_Half",      [0, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y_One",       [0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
-				("Y2",			[0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Y2_Neg",		[0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Y2_Half",		[0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-				("Y2_One",		[0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y2",          [0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y2_Neg",      [0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y2_Half",     [0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+				("Y2_One",      [0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 
 				("1",           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2]),
 				("1_Neg",       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4]),
@@ -1699,7 +1697,7 @@ internal partial class FractalGenerator {
 			// Only called with bitmapIndex -2 is a unique task that needs to mark itself done, otherwise it's a previewImage called within another task
 			var task = tasks[taskIndex];
 			if (task.BitmapIndex < 0)
-				FinishTask(task, stop, "UNLOCK:" + startFinished + "->" + bitmapsFinished );
+				FinishTask(task, stop, "UNLOCK:" + startFinished + "->" + bitmapsFinished);
 		} finally { Monitor.Exit(taskLock); }
 		isFinishingBitmaps = 2;
 	}
@@ -1751,7 +1749,7 @@ internal partial class FractalGenerator {
 			return false;
 		// this one is avaiable, so do it:
 		encodedPng[bitmapIndex] = 1;
-		if (token.IsCancellationRequested) 
+		if (token.IsCancellationRequested)
 			return false; // Do not write gif frames when cancelled
 		task.Start(-3, () => TryPngBitmap(task.TaskIndex, bitmapIndex));
 		return true;
@@ -1759,7 +1757,7 @@ internal partial class FractalGenerator {
 	void TryPngBitmap(short taskIndex, int bitmapIndex) {
 		var stop = BeginTask();
 		//  try to save png, if it failed, decrease the png index to this one so it can be tried again later
-		if (SavePng(bitmapIndex - previewFrames)) 
+		if (SavePng(bitmapIndex - previewFrames))
 			tryPng = Math.Min(tryPng, (short)bitmapIndex);
 		FinishTask(tasks[taskIndex], stop, "PNG:" + bitmapIndex);
 	}
@@ -1944,7 +1942,7 @@ internal partial class FractalGenerator {
 				? random.Next(0, SelectedPeriod * allocPeriodMultiplier)
 				: SelectedDefaultZoom % (SelectedPeriod * allocPeriodMultiplier);
 			0 <= --i;
-		    IncFrameSize(ref size, SelectedPeriod)) { }
+			IncFrameSize(ref size, SelectedPeriod)) { }
 		// Pre-generate color blends
 		if (allocGenerationType < GenerationType.AllSeeds)
 			AverageChildCount = PreGenerateCutSeedAndBlends(0, colorBlends, out startCutSeed);
@@ -1995,8 +1993,8 @@ internal partial class FractalGenerator {
 				allocVoid = (ushort)(SelectedVoid + 1); // already reallocated the noise buffer
 				noiseWidth = (ushort)(SelectedWidth / allocVoid + 2);
 				noiseHeight = (ushort)(SelectedHeight / allocVoid + 2);
-				allocGpuDrawType = SelectedGpuDrawType;
 				// Regular NeBuffer
+				allocGpuDrawType = SelectedGpuDrawType;
 				for (var t = allocMaxTasks; 0 <= --t;) {
 					var task = tasks[t] = new FractalTask();
 					task.TaskIndex = t;
@@ -2036,7 +2034,7 @@ internal partial class FractalGenerator {
 			if ((SelectedBinSize * 100 != allocBinSize || SelectedStripeHeight != allocStripeHeight) && SelectedBinSize + SelectedStripeHeight > 0 // Changed overrride settings
 				|| SelectedCacheOpt != allocCacheOpt || SelectedBinSize * SelectedStripeHeight == 0) // switched on/off or automatic
 				NewCache();
-			
+
 			// remember how many iterations deep are we going to go.
 			allocMaxIterations = maxIterations;
 			// Let this master thread sleep fo a tiny bit if nothing needs to be done (no more frames to generate or encode)
@@ -2141,7 +2139,7 @@ internal partial class FractalGenerator {
 			task.Void = new int[area];
 			task.VoidQueue = new int[area];
 			task.Buffer = new Vector3[area];
-			if (SelectedGpuDrawType == GpuDrawType.CPU)
+			if(allocGpuDrawType == GpuDrawType.CPU)
 				InitNoise(task, noiseWidth * noiseHeight);
 			else
 				InitNoiseF(task, noiseWidth * noiseHeight);
@@ -2166,9 +2164,9 @@ internal partial class FractalGenerator {
 			for (var t = allocMaxTasks; 0 <= --t; buffer[t] = new Vector3[allocWidth * allocHeight]) { }
 		}
 		void InitNoises() {
-			var area  = noiseWidth * noiseHeight;
+			var area = noiseWidth * noiseHeight;
 			if (SelectedGpuDrawType == GpuDrawType.CPU)
-				for (short t = 0; t < allocMaxTasks; t++) 
+				for (short t = 0; t < allocMaxTasks; t++)
 					InitNoise(tasks[t], area);
 			else for (short t = 0; t < allocMaxTasks; t++)
 					InitNoiseF(tasks[t], area);
@@ -2176,15 +2174,14 @@ internal partial class FractalGenerator {
 		void InitNoise(FractalTask task, int area) {
 			task.Noise = allocNoise > 0 ? (task.Noise == null || task.Noise.Length != area) ? new Vector3[area] : task.Noise : null;
 			task.NoiseF = null;
-			/*if (!task.isNoiseBuffer && (task.isNoiseBuffer = SelectedAmbient > 0 && SelectedNoise > 0)) {
-				task.NoiseB?.Dispose();
-				task.NoiseB = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(noiseWidth * noiseHeight, AllocationMode.Default);
-			}*/
+		/*if (!task.isNoiseBuffer && (task.isNoiseBuffer = SelectedAmbient > 0 && SelectedNoise > 0)) {
+			task.NoiseB?.Dispose();
+			task.NoiseB = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(noiseWidth * noiseHeight, AllocationMode.Default);
+		}*/
 		}
 		void InitNoiseF(FractalTask task, int area) {
+			task.NoiseF = allocNoise > 0 ? (task.NoiseF == null || task.NoiseF.Length != area) ? new Float3[area] : task.NoiseF : null;
 			task.Noise = null;
-			//task.Noise = allocNoise > 0 && (task.Noise == null || task.Noise.Length != area) ? new Vector3[area] : null;
-			task.NoiseF = allocNoise > 0 ? (task.Noise == null || task.Noise.Length != area) ? new Float3[area] : task.NoiseF : null;
 		}
 		void CalculateCache(FractalTask task) {
 			// This is very simplistic estimator of L2, could use something more direct and precise, like:
@@ -2341,6 +2338,10 @@ internal partial class FractalGenerator {
 				for (var t = 0; t < allocMaxTasks; ++t) {
 					var tempBuffT = buffer[t];
 					for (var a = task.ApplyWidth * task.ApplyHeight; 0 <= --a; tempBuffT[a] = Vector3.Zero) { }
+					/*for (var y = 0; y < task.ApplyHeight; ++y) {
+						var tempBuffY = tempBuffT[y];
+						for (var x = 0; x < task.ApplyWidth; tempBuffY[x++] = Vector3.Zero) {}
+					}*/
 				}
 			}
 
@@ -2419,21 +2420,21 @@ internal partial class FractalGenerator {
 				double sX, sY;
 				var zoomAngle = refAngle;
 				var zoomSize = refSize; // Incorporating reference size
-					// First three iterations into child 0
-					for (var i = 0; i < 3; i++) {
-						zoomAngle += ChildAngle[0];  // Accumulate rotation
-						zoomSize /= f.ChildSize;     // Shrink for next step
-					}
+										// First three iterations into child 0
+				for (var i = 0; i < 3; i++) {
+					zoomAngle += ChildAngle[0];  // Accumulate rotation
+					zoomSize /= f.ChildSize;     // Shrink for next step
+				}
 				// Compute infinite sum for zoomChild
 				var infiniteSum = new Complex(f.ChildX[selectedZoomChild], -f.ChildY[selectedZoomChild])
 					/ (new Complex(1.0, 0.0) - new Complex(Math.Cos(ChildAngle[selectedZoomChild]), Math.Sin(ChildAngle[selectedZoomChild])) / f.ChildSize);
 				// Transform infinite sum into the new coordinate system
 				var cosFinal = Math.Cos(-zoomAngle);
-					var sinFinal = Math.Sin(-zoomAngle);
+				var sinFinal = Math.Sin(-zoomAngle);
 				// Calculate the location we are zooming into relative to the center, to shift it to the center
 				sX = zoomSize * (cosFinal * infiniteSum.Real - sinFinal * infiniteSum.Imaginary);
 				sY = zoomSize * (sinFinal * infiniteSum.Real + cosFinal * infiniteSum.Imaginary);
-				
+
 				if (allocCacheOpt) {
 					// new cache optimizing algorithm:
 
@@ -2443,7 +2444,7 @@ internal partial class FractalGenerator {
 						task.StripeHeight = allocStripeHeight;
 						task.StripeCount = allocStripeCount;
 					} else CalculateCache(task);
-					
+
 					/// <summary>
 					/// Computes the area of a convex hull of a set of 2D points. Interior points are removed.
 					/// </summary>
@@ -2466,8 +2467,8 @@ internal partial class FractalGenerator {
 						}
 
 
-							// Sort by X, then Y
-							pts.Sort((p1, p2) => {
+						// Sort by X, then Y
+						pts.Sort((p1, p2) => {
 							int cx = p1.X.CompareTo(p2.X);
 							return cx != 0 ? cx : p1.Y.CompareTo(p2.Y);
 						});
@@ -2504,7 +2505,7 @@ internal partial class FractalGenerator {
 						}
 						return sum / 2;
 					}
-					
+
 					// Total number of dots divided by fractal convex hull area (or bitmap size if the area is smaller, but it shouldn't)
 					float DotDensityPerPixel = (float)Math.Pow(_AverageChildCount, PreSimulatedDepth) / Math.Max(GetConvexHull(), task.ApplyWidth * task.ApplyHeight);
 					// BinBytes = BinSize * (sizeof(float) * 2 + sizeof(long) + sizeof(byte)))
@@ -2516,7 +2517,7 @@ internal partial class FractalGenerator {
 						task.PredictedBinsPerStripe = (ushort)Math.Ceiling(task.PredictedBinsPerStripe / Math.Sqrt(allocMaxTasks));
 						task.NewBin(task);
 						tuples[0] = (dotsTaskIndex, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startSeed, 0);
-						
+
 						GenerateBufferOfDepth(bitmapIndex);
 						foreach (var t in tasks)
 							t.ClearBin();
@@ -2619,7 +2620,7 @@ internal partial class FractalGenerator {
 				(double, double) dotsXy, (double, double) dotsAngle, byte dotsColor, long dotsFlags, byte dotsDepth
 				) {
 				dotsTask.UseBuffer = dotsTask.Buffer;
-				GenerateDotsSingleTask(dotsTask, dotsTask, dotsXy, dotsAngle,dotsColor,dotsFlags,dotsDepth, addDot);
+				GenerateDotsSingleTask(dotsTask, dotsTask, dotsXy, dotsAngle, dotsColor, dotsFlags, dotsDepth, addDot);
 				dotsTask.DrawStripesOfAnimation();
 			}
 			void GenerateDotsSingleTask<TApplier>(FractalTask mainTask, FractalTask binTask,
@@ -2739,8 +2740,8 @@ internal partial class FractalGenerator {
 							continue;
 						tuples[insertTo++] =
 							(tupleIndex, newXy,
-							i == 0 
-							? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2) 
+							i == 0
+							? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2)
 							: (tupleAngle.Item1 + ChildAngle[i], SelectedSpin == 3 ? -tupleAngle.Item2 : tupleAngle.Item2),
 							allocPreviewMode && tupleDepth > 1 ? tupleColor : (byte)((tupleColor + ChildColor[i]) % allocPalette2), newFlags, tupleDepth);
 						insertTo %= max; // we have added the new parent into the queue
@@ -2768,7 +2769,7 @@ internal partial class FractalGenerator {
 							bufferTask.UseBuffer = MultiDepth ? buffer[taskIndex] : task.Buffer;
 							GenerateDotsSingleTask(bufferTask, bufferTask, tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth, applyDot);
 						}
-						
+
 						tasks[taskIndex].State = TaskState.Done;
 					});
 					index %= max;
@@ -2780,16 +2781,9 @@ internal partial class FractalGenerator {
 		}
 		void GenerateImage(FractalTask task) {
 			ReadWriteBuffer<int> v = null;
-			//ReadWriteBuffer<int> b = null;
-			//ReadWriteBuffer<int> v = null;
-			void DisposeImage() {
-				if (!allocBuffers) {
-					// if we get cancelled we should dispose this buffer if we are still keeping it for GpuDraw
-					//b?.Dispose();
-					//b = null;
-					v?.Dispose();
-					v = null;
-				}
+			void DisposeDraw() {
+				// if we get cancelled we should dispose this buffer if we are still keeping it for GpuDraw
+				v?.Dispose();
 				task.State = TaskState.Done;
 			}
 #if CustomDebug
@@ -2808,9 +2802,6 @@ internal partial class FractalGenerator {
 			Vector3 buffI;
 			float max;
 			bool IsAmbient = false;
-
-			var area = task.ApplyWidth * task.ApplyHeight;
-
 			// find the highest seed value
 			float GetMax(int i) {
 				buffI = buffT[i];
@@ -2818,10 +2809,6 @@ internal partial class FractalGenerator {
 				task.LightNormalizer = Math.Max(task.LightNormalizer, max);
 				return max;
 			}
-
-
-			var d = GraphicsDevice.GetDefault();
-
 			// Void Depth:
 			if (allocGpuVoidType > GpuVoidType.CPU) {
 				var voidTN = task.Void;
@@ -2844,7 +2831,6 @@ internal partial class FractalGenerator {
 				for (int x = i + task.ApplyWidth; i < x; voidTN[i] = voidT[i++] = 0)
 					GetMax(i); // bottom edge
 				if (seeds < task.ApplyWidth * task.ApplyHeight) {
-					var context = d.CreateComputeContext();
 					IsAmbient = true;
 					// if there was at least 1 pixel of void, do the BFS:
 					task.VoidDepthMax = maxSize;
@@ -2852,9 +2838,9 @@ internal partial class FractalGenerator {
 					int innerHeight = task.ApplyHeight - 2;
 					var outB = new int[1] { 1 };
 					// Wrap into GPU buffers
-					v = d.AllocateReadWriteBuffer(voidT);
-					var bufferVoidN = d.AllocateReadWriteBuffer(voidTN);
-					var outMaxBuffer = d.AllocateReadWriteBuffer(outB);
+					v = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(voidT);
+					var bufferVoidN = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(voidTN);
+					var outMaxBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(outB);
 					static void Swap<T>(ref T a, ref T b) => (b, a) = (a, b);
 					void BFS() {
 						outB[0] = 1;
@@ -2904,7 +2890,6 @@ internal partial class FractalGenerator {
 							BFS();
 						}
 					}
-					context.Dispose();
 					if (allocGpuDrawType == GpuDrawType.CPU) {
 						// Copy and dispose if drawing will need to acess regular voidT, otherwise it will jsut reuse the buffer directly
 						v.CopyTo(voidT);
@@ -2967,7 +2952,7 @@ internal partial class FractalGenerator {
 			}
 			task.LightNormalizer = SelectedBrightness * 2.55f / task.LightNormalizer;
 			if (token.IsCancellationRequested) {
-				DisposeImage();
+				DisposeDraw();
 				return;
 			}
 #if CustomDebug
@@ -2980,10 +2965,10 @@ internal partial class FractalGenerator {
 			bitmap[task.BitmapIndex]?.Dispose();
 			var bmp = bitmap[task.BitmapIndex] = new(task.ApplyWidth, task.ApplyHeight);
 			bitmapState[task.BitmapIndex] = BitmapState.Drawing;
-			nint bytes = LockBits(task.BitmapIndex, 
-				(allocParallelType == ParallelType.OfDepth ? task.BitmapIndex : task.BitmapIndex + 1) < previewFrames 
+			nint bytes = LockBits(task.BitmapIndex,
+				(allocParallelType == ParallelType.OfDepth ? task.BitmapIndex : task.BitmapIndex + 1) < previewFrames
 				? new Rectangle(0, 0, task.ApplyWidth, task.ApplyHeight) : rect
-			,allocGpuDrawType == GpuDrawType.CPU ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb).Scan0;
+			, allocGpuDrawType == GpuDrawType.CPU ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb).Scan0;
 			//var vw = task.ApplyHeight / allocVoid + 2;
 			int DrawType = allocNoise > 0 && allocGenerationType != GenerationType.HashSeeds && IsAmbient ? 0 : (IsAmbient ? 4 : 8);
 			if (allocGpuDrawType == GpuDrawType.CPU) {
@@ -3010,7 +2995,6 @@ internal partial class FractalGenerator {
 					}
 				}
 			} else {
-				var context = d.CreateComputeContext();
 				// Draw the generated pixels to bitmap data with GPU
 				ReadOnlyBuffer<Float3> n = null;
 				if (DrawType < 4) {
@@ -3018,15 +3002,15 @@ internal partial class FractalGenerator {
 						for (var a = 0; a < noiseWidth * noiseHeight; ++a)
 							task.NoiseF[a] = new Float3(random.Next(allocNoise), random.Next(allocNoise), random.Next(allocNoise));
 					}
-					n = d.AllocateReadOnlyBuffer<Float3>(task.NoiseF);
+					n = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(task.NoiseF);
 				}
 				// Output texture (same size as your bitmap)
-				var o = d.AllocateReadWriteBuffer<int>(bmp.Width * bmp.Height);
+				var o = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<int>(bmp.Width * bmp.Height);
 				// Reinterpret task.Buffer as Float3[]
-				var b = d.AllocateReadWriteBuffer<Float3>(MemoryMarshal.Cast<Vector3, Float3>(task.Buffer.AsSpan()));
-				
+				var b = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<Float3>(MemoryMarshal.Cast<Vector3, Float3>(task.Buffer.AsSpan()));
+
 				if (allocGpuVoidType == GpuVoidType.CPU && IsAmbient)
-					v = d.AllocateReadWriteBuffer(task.Void);
+					v = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(task.Void);
 				Int2 np = new Int2(noiseWidth, allocVoid);
 				if (allocGpuDrawType == GpuDrawType.Functions) {
 					// GPU Type: Switch functions
@@ -3089,8 +3073,6 @@ internal partial class FractalGenerator {
 						GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeBytesDither(b, o, task.ApplyWidth));
 					else GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeBytes(b, o, task.ApplyWidth));
 				}
-				context.Dispose();
-
 				// Marshal the data into bitmap
 				var ints = MemoryMarshal.Cast<int, byte>(o.ToArray().AsSpan());
 				Marshal.Copy(ints.ToArray(), 0, bytes, ints.Length);
@@ -3209,16 +3191,16 @@ internal partial class FractalGenerator {
 
 			gifEncoder = new();
 			gifEncoder.SetDelay(allocDelay);// Framerate
-			gifEncoder.SetRepeat(0);		// Loop
-			gifEncoder.SetQuality(1);		// Highest quality
+			gifEncoder.SetRepeat(0);        // Loop
+			gifEncoder.SetQuality(1);       // Highest quality
 			gifEncoder.SetTransparent(SelectedAmbient < 0 ? Color.Black : Color.Empty);
 
 			MakeTemp();
 
 			while (gifIndex < 255) {
-				GifTempPath = "temp/"+ filePrefix + "gif" + gifIndex + ".tmp";
+				GifTempPath = "temp/" + filePrefix + "gif" + gifIndex + ".tmp";
 				if (gifEncoder.Start(SelectedWidth, SelectedHeight, GifTempPath,
-					    SelectedGifType == GifType.Global ? ColorTable.GlobalSingle : ColorTable.Local)
+						SelectedGifType == GifType.Global ? ColorTable.GlobalSingle : ColorTable.Local)
 				   ) break;
 				++gifIndex;
 			}
@@ -3323,8 +3305,8 @@ internal partial class FractalGenerator {
 				validZoomChildren.Add(i);
 		MaxZoomChild = (ushort)(validZoomChildren.Count - 1);
 
-		return; 
-		
+		return;
+
 		bool PreGenerateChildren(Fractal.CutFunction preCf, int preIndex, long preFlags, byte preDepth, byte max = 3) {
 			long newFlags;
 			return ++preDepth >= max || (newFlags = CalculateFlags(preCf, preIndex, preFlags)) >= 0 && PreGenerateChildren(preCf, preIndex, newFlags, preDepth, max);
@@ -3409,7 +3391,7 @@ internal partial class FractalGenerator {
 	private int SavePngs() {
 		allocPngType = PngType.Yes; // ensures FinishTasks will want to start threads exporting PNGs
 		pngFailed = 0; // reset failure attempt counter, every png write fail will increment it, and if it reaches 1000 it will cancel the FinishTasks
-		//tryPng = previewFrames;
+					   //tryPng = previewFrames;
 
 		for (int enc = previewFrames; !token.IsCancellationRequested && enc < bitmap.Length; Thread.Sleep(100))
 			while (enc < bitmap.Length && encodedPng[enc] >= 2)
@@ -3421,7 +3403,7 @@ internal partial class FractalGenerator {
 	internal string SavePngs(string pngPath) {
 		exportType = ExportType.Pngs;
 		FinishTasks(true, true, _ => false); // Make sure there are no bitmap generation tasks still running
-		if (SavePngs() == 2) 
+		if (SavePngs() == 2)
 			return Fail("PNG saving failed"); // failed to save
 		if (token.IsCancellationRequested)
 			return ""; // just cancelled, return with no error
@@ -3496,7 +3478,7 @@ internal partial class FractalGenerator {
 		} catch (Exception ex) {
 			return Fail("Delete existing Mp4: " + ex);
 		}
-			var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 		if (!File.Exists(ffmpegPath))
 			return Fail("Ffmpeg not found");
 
@@ -3557,7 +3539,7 @@ internal partial class FractalGenerator {
 				UseShellExecute = false,
 				RedirectStandardInput = true,
 				RedirectStandardError = true, // will get progress from this
-				//RedirectStandardOutput = true, // not needed so far
+											  //RedirectStandardOutput = true, // not needed so far
 				CreateNoWindow = true
 			}
 		};
@@ -3566,7 +3548,7 @@ internal partial class FractalGenerator {
 			// start pipe:
 			//var pipeServer = new NamedPipeServerStream("mypipe", PipeDirection.Out);
 			//pipeServer.WaitForConnection();
-			
+
 			// start ffmpeg
 			if (!ffmpegProcess.Start())
 				return Fail("Ffmpeg failed to start");
@@ -3606,7 +3588,7 @@ internal partial class FractalGenerator {
 					ffmpegProcess.StandardInput.Flush();     // Ensure the command is sent
 					Thread.Sleep(500);  // Give FFmpeg some time to exit gracefully
 				}
-				if (!ffmpegProcess.HasExited) 
+				if (!ffmpegProcess.HasExited)
 					ffmpegProcess.Kill();  // Force terminate if graceful shutdown isn't possible
 			}
 			// Wait for the process to exit
@@ -3620,9 +3602,9 @@ internal partial class FractalGenerator {
 	}
 	private static string Fail(string log) {
 		Console.WriteLine(log);
-/*#if CustomDebug
-    Log(ref logString, log);
-#endif*/
+		/*#if CustomDebug
+			Log(ref logString, log);
+		#endif*/
 		return log;
 	}
 
@@ -3677,17 +3659,17 @@ internal partial class FractalGenerator {
 		}
 
 		// PNGs States:
-		if (DebugPng) 
+		if (DebugPng)
 			GetStates("PNG", encodedPng);
 
 		// GIF States:
-		if (DebugGif) 
+		if (DebugGif)
 			GetStates("GIF", encodedGif);
 
 		DebugString = tempDebugString;
 
 		return;
-		
+
 		void GetStates(string header, byte[] states) {
 			byte iState, lastIState = 255;
 			i = previewFrames;
@@ -3704,7 +3686,7 @@ internal partial class FractalGenerator {
 			tempMemoryString += (li == i - 1 ? li + ": " : li + "-" + (i - 1) + ": ") + GetEncodeState(lastIState);
 			for (var c = 0; c < counterE.Length; ++c)
 				tempDebugString += "\n" + counterE[c] + "x: " + GetEncodeState(c);
-			tempDebugString += "\n\n" + header + " STATES (0-" + (previewFrames-1) + "=preview):" + tempMemoryString;
+			tempDebugString += "\n\n" + header + " STATES (0-" + (previewFrames - 1) + "=preview):" + tempMemoryString;
 			tempDebugString = i < bitmap.Length ? tempDebugString + "\n" + i + "+: " + "QUEUED" : tempDebugString;
 		}
 
@@ -3754,7 +3736,7 @@ internal partial class FractalGenerator {
 		SelectedCut = SelectedChildAngle = SelectedChildColor = SelectedPaletteType = 0;
 		SetupCutFunction();
 	}
-#endregion
+	#endregion
 
 	#region Interface_Settings
 	internal bool SelectFractal(short selectFractal) {
@@ -3775,7 +3757,7 @@ internal partial class FractalGenerator {
 		maxIterations = (short)(8 + Math.Ceiling(Math.Log(Math.Max(SelectedWidth, SelectedHeight) * f.MaxSize / (SelectedDetail + SelectedBloom + 1)) / logBase));
 		//maxIterations = (short)(/*2*/ 8 + Math.Ceiling(Math.Log(Math.Max(SelectedWidth, SelectedHeight) * f.MaxSize / SelectedDetail) / logBase));
 	}
-	internal void SetupCutFunction() 
+	internal void SetupCutFunction()
 		=> selectedCutFunction = f.ChildCutFunction == null || f.ChildCutFunction.Count <= 0 ? null : Fractal.CutFunctions[f.ChildCutFunction[SelectedCut].Item1].Item2;
 	internal bool SelectZoomChild(short z) {
 		if (validZoomChildren == null || validZoomChildren.Count < 1 || validZoomChildren[z] == selectedZoomChild)
@@ -3796,8 +3778,7 @@ internal partial class FractalGenerator {
 		if (cores <= 8) return 512 * 1024;
 		return 1024 * 1024; // 1 MB per core for modern CPUs
 	}
-	internal int GetMaxCutSeed()
-	{
+	internal int GetMaxCutSeed() {
 		if (SelectedCut < 0 || GetFractal().ChildCutFunction == null)
 			return CutSeed_Max;
 		var c = GetFractal().ChildCutFunction[SelectedCut].Item2;
@@ -3808,11 +3789,11 @@ internal partial class FractalGenerator {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal Fractal GetFractal() => fractals[SelectedFractal];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal Bitmap GetBitmap(int index) 
-		=> bitmap == null || bitmap.Length <= index || bitmapState[index] < BitmapState.Unlocked || encodedPng[index] == 1 
+	internal Bitmap GetBitmap(int index)
+		=> bitmap == null || bitmap.Length <= index || bitmapState[index] < BitmapState.Unlocked || encodedPng[index] == 1
 		? null : bitmap[index + previewFrames];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal Bitmap GetPreviewBitmap() => bitmapsFinished < 1 ? null : bitmap[bitmapsFinished-1];
+	internal Bitmap GetPreviewBitmap() => bitmapsFinished < 1 ? null : bitmap[bitmapsFinished - 1];
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal int GetFrames() => bitmap == null ? 0 : SelectedGenerationType == GenerationType.OnlyImage ? 1 : bitmap.Length - previewFrames;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3822,15 +3803,15 @@ internal partial class FractalGenerator {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal int GetBitmapsFinished() => (int)bitmapsFinished - previewFrames;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	internal int GetMp4Encoded() => encodedMp4; 
+	internal int GetMp4Encoded() => encodedMp4;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal int IsGifReady() => gifSuccess;
 	//[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	//internal bool IsMp4Ready() => mp4Success;
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	//GetTempGif();
-	internal Fractal.CutFunction GetCutFunction() 
-		=> GetFractal().ChildCutFunction == null? null : Fractal.CutFunctions[GetFractal().ChildCutFunction[SelectedCut].Item1].Item2;
+	internal Fractal.CutFunction GetCutFunction()
+		=> GetFractal().ChildCutFunction == null ? null : Fractal.CutFunctions[GetFractal().ChildCutFunction[SelectedCut].Item1].Item2;
 	internal bool IsCancelRequested() => token.IsCancellationRequested;
 
 	internal int GetCompleted() {
@@ -3852,7 +3833,7 @@ internal partial class FractalGenerator {
 			b /= 1000;
 			p = "K";
 		}
-		if(b >= 1000) {
+		if (b >= 1000) {
 			d = b % 1000;
 			b /= 1000;
 			p = "M";
@@ -3866,6 +3847,6 @@ internal partial class FractalGenerator {
 	}
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal string GetStripeHeight() => allocStripeHeight.ToString();
-	
+
 	#endregion
 }
