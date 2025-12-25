@@ -1,4 +1,5 @@
 RECENT:
+Make angles and colors bitmasks
 make FinishTasks exit if new settings than change buffer allocations 
 fix new buffer management & conversions crashing the app
 maybe even more crashes, i even got a crash in ApplyDon from Bin...

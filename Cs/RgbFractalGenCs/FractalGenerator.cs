@@ -21,6 +21,8 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ComputeSharp;
 using System.Runtime.InteropServices;
+using ComputeSharp.Resources;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RgbFractalGenCs;
 
@@ -1993,6 +1995,7 @@ internal partial class FractalGenerator {
 				allocVoid = (ushort)(SelectedVoid + 1); // already reallocated the noise buffer
 				noiseWidth = (ushort)(SelectedWidth / allocVoid + 2);
 				noiseHeight = (ushort)(SelectedHeight / allocVoid + 2);
+				allocGpuDrawType = SelectedGpuDrawType;
 				// Regular NeBuffer
 				for (var t = allocMaxTasks; 0 <= --t;) {
 					var task = tasks[t] = new FractalTask();
@@ -2007,6 +2010,7 @@ internal partial class FractalGenerator {
 				allocVoid = (ushort)(SelectedVoid + 1); // already reallocated the noise buffer
 				noiseWidth = (ushort)(SelectedWidth / allocVoid + 2);
 				noiseHeight = (ushort)(SelectedHeight / allocVoid + 2);
+				allocGpuDrawType = SelectedGpuDrawType;
 				for (short t = 0; t < allocMaxTasks; NewBuffer(tasks[t++])) { }
 				rect = new(0, 0, allocWidth = (short)SelectedWidth, allocHeight = (short)SelectedHeight);
 				NewCache();
@@ -2137,7 +2141,10 @@ internal partial class FractalGenerator {
 			task.Void = new int[area];
 			task.VoidQueue = new int[area];
 			task.Buffer = new Vector3[area];
-			InitNoise(task, noiseWidth * noiseHeight);
+			if (SelectedGpuDrawType == GpuDrawType.CPU)
+				InitNoise(task, noiseWidth * noiseHeight);
+			else
+				InitNoiseF(task, noiseWidth * noiseHeight);
 			//task.isDrawBuffer = task.isBloomBuffer = task.isNoiseBuffer = task.isUploadBuffer = task.isVoidBuffer = false;
 			//AllocateBuffer(task);
 
@@ -2166,17 +2173,19 @@ internal partial class FractalGenerator {
 			else for (short t = 0; t < allocMaxTasks; t++)
 					InitNoiseF(tasks[t], area);
 		}
-		void InitNoise(FractalTask task, int area) //{
-			=>task.Noise = allocNoise > 0 && (task.Noise == null || task.Noise.Length != area) ? new Vector3[area] : null;
+		void InitNoise(FractalTask task, int area) {
+			task.Noise = allocNoise > 0 ? (task.Noise == null || task.Noise.Length != area) ? new Vector3[area] : task.Noise : null;
+			task.NoiseF = null;
 			/*if (!task.isNoiseBuffer && (task.isNoiseBuffer = SelectedAmbient > 0 && SelectedNoise > 0)) {
 				task.NoiseB?.Dispose();
 				task.NoiseB = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(noiseWidth * noiseHeight, AllocationMode.Default);
 			}*/
-		//}
-		void InitNoiseF(FractalTask task, int area) //{
+		}
+		void InitNoiseF(FractalTask task, int area) {
+			task.Noise = null;
 			//task.Noise = allocNoise > 0 && (task.Noise == null || task.Noise.Length != area) ? new Vector3[area] : null;
-			=> task.NoiseF = allocNoise > 0 && (task.NoiseF == null || task.NoiseF.Length != area) ? new Float3[area] : null;
-		//}
+			task.NoiseF = allocNoise > 0 ? (task.Noise == null || task.Noise.Length != area) ? new Float3[area] : task.NoiseF : null;
+		}
 		void CalculateCache(FractalTask task) {
 			// This is very simplistic estimator of L2, could use something more direct and precise, like:
 			/*using System.Management;
@@ -2332,10 +2341,6 @@ internal partial class FractalGenerator {
 				for (var t = 0; t < allocMaxTasks; ++t) {
 					var tempBuffT = buffer[t];
 					for (var a = task.ApplyWidth * task.ApplyHeight; 0 <= --a; tempBuffT[a] = Vector3.Zero) { }
-					/*for (var y = 0; y < task.ApplyHeight; ++y) {
-						var tempBuffY = tempBuffT[y];
-						for (var x = 0; x < task.ApplyWidth; tempBuffY[x++] = Vector3.Zero) {}
-					}*/
 				}
 			}
 
@@ -2775,9 +2780,16 @@ internal partial class FractalGenerator {
 		}
 		void GenerateImage(FractalTask task) {
 			ReadWriteBuffer<int> v = null;
-			void DisposeDraw() {
-				// if we get cancelled we should dispose this buffer if we are still keeping it for GpuDraw
-				v?.Dispose();
+			//ReadWriteBuffer<int> b = null;
+			//ReadWriteBuffer<int> v = null;
+			void DisposeImage() {
+				if (!allocBuffers) {
+					// if we get cancelled we should dispose this buffer if we are still keeping it for GpuDraw
+					//b?.Dispose();
+					//b = null;
+					v?.Dispose();
+					v = null;
+				}
 				task.State = TaskState.Done;
 			}
 #if CustomDebug
@@ -2796,6 +2808,9 @@ internal partial class FractalGenerator {
 			Vector3 buffI;
 			float max;
 			bool IsAmbient = false;
+
+			var area = task.ApplyWidth * task.ApplyHeight;
+
 			// find the highest seed value
 			float GetMax(int i) {
 				buffI = buffT[i];
@@ -2803,6 +2818,10 @@ internal partial class FractalGenerator {
 				task.LightNormalizer = Math.Max(task.LightNormalizer, max);
 				return max;
 			}
+
+
+			var d = GraphicsDevice.GetDefault();
+
 			// Void Depth:
 			if (allocGpuVoidType > GpuVoidType.CPU) {
 				var voidTN = task.Void;
@@ -2825,6 +2844,7 @@ internal partial class FractalGenerator {
 				for (int x = i + task.ApplyWidth; i < x; voidTN[i] = voidT[i++] = 0)
 					GetMax(i); // bottom edge
 				if (seeds < task.ApplyWidth * task.ApplyHeight) {
+					var context = d.CreateComputeContext();
 					IsAmbient = true;
 					// if there was at least 1 pixel of void, do the BFS:
 					task.VoidDepthMax = maxSize;
@@ -2832,9 +2852,9 @@ internal partial class FractalGenerator {
 					int innerHeight = task.ApplyHeight - 2;
 					var outB = new int[1] { 1 };
 					// Wrap into GPU buffers
-					v = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(voidT);
-					var bufferVoidN = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(voidTN);
-					var outMaxBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(outB);
+					v = d.AllocateReadWriteBuffer(voidT);
+					var bufferVoidN = d.AllocateReadWriteBuffer(voidTN);
+					var outMaxBuffer = d.AllocateReadWriteBuffer(outB);
 					static void Swap<T>(ref T a, ref T b) => (b, a) = (a, b);
 					void BFS() {
 						outB[0] = 1;
@@ -2884,6 +2904,7 @@ internal partial class FractalGenerator {
 							BFS();
 						}
 					}
+					context.Dispose();
 					if (allocGpuDrawType == GpuDrawType.CPU) {
 						// Copy and dispose if drawing will need to acess regular voidT, otherwise it will jsut reuse the buffer directly
 						v.CopyTo(voidT);
@@ -2946,7 +2967,7 @@ internal partial class FractalGenerator {
 			}
 			task.LightNormalizer = SelectedBrightness * 2.55f / task.LightNormalizer;
 			if (token.IsCancellationRequested) {
-				DisposeDraw();
+				DisposeImage();
 				return;
 			}
 #if CustomDebug
@@ -2989,6 +3010,7 @@ internal partial class FractalGenerator {
 					}
 				}
 			} else {
+				var context = d.CreateComputeContext();
 				// Draw the generated pixels to bitmap data with GPU
 				ReadOnlyBuffer<Float3> n = null;
 				if (DrawType < 4) {
@@ -2996,15 +3018,15 @@ internal partial class FractalGenerator {
 						for (var a = 0; a < noiseWidth * noiseHeight; ++a)
 							task.NoiseF[a] = new Float3(random.Next(allocNoise), random.Next(allocNoise), random.Next(allocNoise));
 					}
-					n = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(task.NoiseF);
+					n = d.AllocateReadOnlyBuffer<Float3>(task.NoiseF);
 				}
 				// Output texture (same size as your bitmap)
-				var o = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<int>(bmp.Width * bmp.Height);
+				var o = d.AllocateReadWriteBuffer<int>(bmp.Width * bmp.Height);
 				// Reinterpret task.Buffer as Float3[]
-				var b = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<Float3>(MemoryMarshal.Cast<Vector3, Float3>(task.Buffer.AsSpan()));
+				var b = d.AllocateReadWriteBuffer<Float3>(MemoryMarshal.Cast<Vector3, Float3>(task.Buffer.AsSpan()));
 				
 				if (allocGpuVoidType == GpuVoidType.CPU && IsAmbient)
-					v = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(task.Void);
+					v = d.AllocateReadWriteBuffer(task.Void);
 				Int2 np = new Int2(noiseWidth, allocVoid);
 				if (allocGpuDrawType == GpuDrawType.Functions) {
 					// GPU Type: Switch functions
@@ -3054,21 +3076,21 @@ internal partial class FractalGenerator {
 					}
 				} else {
 					// GPU Type: Multi-pass pipeline
-					var p = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<Float3>(task.NoiseF);
-					if(SelectedSaturate <= 0.0f)
-						GraphicsDevice.GetDefault().For(bmp.Width * bmp.Height, new PipeNormalize(p, task.ApplyWidth, task.LightNormalizer));
-					else GraphicsDevice.GetDefault().For(bmp.Width * bmp.Height, new PipeNormalizeSaturate(p, task.ApplyWidth, task.LightNormalizer, SelectedSaturate));
+					if (SelectedSaturate <= 0.0f)
+						GraphicsDevice.GetDefault().For(bmp.Width * bmp.Height, new PipeNormalize(b, task.ApplyWidth, task.LightNormalizer));
+					else GraphicsDevice.GetDefault().For(bmp.Width * bmp.Height, new PipeNormalizeSaturate(b, task.ApplyWidth, task.LightNormalizer, SelectedSaturate));
 					if (v != null) {
 						if (DrawType < 4)
-							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeNoise(p, task.ApplyWidth, v, SelectedAmbient, task.VoidDepthMax, n, np));
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeNoise(b, task.ApplyWidth, v, SelectedAmbient, task.VoidDepthMax, n, np));
 						else
-							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeAmbient(p, task.ApplyWidth, v, SelectedAmbient, task.VoidDepthMax));
+							GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeAmbient(b, task.ApplyWidth, v, SelectedAmbient, task.VoidDepthMax));
 					}
-					if(allocDithering)
-						GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeBytesDither(p, o, task.ApplyWidth));
-					else GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeBytes(p, o, task.ApplyWidth));
-					p.Dispose();
+					if (allocDithering)
+						GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeBytesDither(b, o, task.ApplyWidth));
+					else GraphicsDevice.GetDefault().For(task.ApplyWidth, task.ApplyHeight, new PipeBytes(b, o, task.ApplyWidth));
 				}
+				context.Dispose();
+
 				// Marshal the data into bitmap
 				var ints = MemoryMarshal.Cast<int, byte>(o.ToArray().AsSpan());
 				Marshal.Copy(ints.ToArray(), 0, bytes, ints.Length);
