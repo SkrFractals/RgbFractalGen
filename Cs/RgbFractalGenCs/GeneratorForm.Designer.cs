@@ -91,6 +91,8 @@ namespace RgbFractalGenCs {
 			exportSelect = new ComboBox();
 			fileSelect = new ComboBox();
 			panel1 = new Panel();
+			l2Label = new Label();
+			l2Box = new TextBox();
 			gpuDLabel = new Label();
 			gpuVLabel = new Label();
 			stripeLabel = new Label();
@@ -162,8 +164,6 @@ namespace RgbFractalGenCs {
 			debugPngBox = new CheckBox();
 			debugGifBox = new CheckBox();
 			loadExport = new OpenFileDialog();
-			l2Box = new TextBox();
-			l2Label = new Label();
 			helpPanel.SuspendLayout();
 			generatorPanel.SuspendLayout();
 			panel1.SuspendLayout();
@@ -883,6 +883,27 @@ namespace RgbFractalGenCs {
 			panel1.Size = new System.Drawing.Size(256, 300);
 			panel1.TabIndex = 60;
 			// 
+			// l2Label
+			// 
+			l2Label.AutoSize = true;
+			l2Label.Font = new System.Drawing.Font("Segoe UI", 9F);
+			l2Label.ForeColor = System.Drawing.Color.White;
+			l2Label.Location = new System.Drawing.Point(4, 608);
+			l2Label.Margin = new Padding(4, 0, 4, 0);
+			l2Label.Name = "l2Label";
+			l2Label.Size = new System.Drawing.Size(81, 15);
+			l2Label.TabIndex = 96;
+			l2Label.Text = "L2 Cache Size:";
+			// 
+			// l2Box
+			// 
+			l2Box.Location = new System.Drawing.Point(164, 605);
+			l2Box.Name = "l2Box";
+			l2Box.Size = new System.Drawing.Size(59, 23);
+			l2Box.TabIndex = 95;
+			l2Box.Text = "0";
+			l2Box.TextChanged += L2Box_TextChanged;
+			// 
 			// gpuDLabel
 			// 
 			gpuDLabel.AutoSize = true;
@@ -915,7 +936,7 @@ namespace RgbFractalGenCs {
 			stripeLabel.Location = new System.Drawing.Point(4, 550);
 			stripeLabel.Margin = new Padding(4, 0, 4, 0);
 			stripeLabel.Name = "stripeLabel";
-			stripeLabel.Size = new System.Drawing.Size(112, 15);
+			stripeLabel.Size = new System.Drawing.Size(76, 15);
 			stripeLabel.TabIndex = 92;
 			stripeLabel.Text = "Stripe Height";
 			// 
@@ -927,7 +948,7 @@ namespace RgbFractalGenCs {
 			binLabel.Location = new System.Drawing.Point(4, 579);
 			binLabel.Margin = new Padding(4, 0, 4, 0);
 			binLabel.Name = "binLabel";
-			binLabel.Size = new System.Drawing.Size(108, 15);
+			binLabel.Size = new System.Drawing.Size(50, 15);
 			binLabel.TabIndex = 91;
 			binLabel.Text = "Bin Size:";
 			// 
@@ -946,8 +967,6 @@ namespace RgbFractalGenCs {
 			// cacheBox
 			// 
 			cacheBox.AutoSize = true;
-			cacheBox.Checked = true;
-			cacheBox.CheckState = CheckState.Checked;
 			cacheBox.ForeColor = System.Drawing.SystemColors.Control;
 			cacheBox.Location = new System.Drawing.Point(155, 523);
 			cacheBox.Name = "cacheBox";
@@ -1630,27 +1649,6 @@ namespace RgbFractalGenCs {
 			loadExport.Filter = "All files (*.*)|*.*";
 			loadExport.RestoreDirectory = true;
 			loadExport.FileOk += LoadExport_FileOk;
-			// 
-			// l2Box
-			// 
-			l2Box.Location = new System.Drawing.Point(164, 605);
-			l2Box.Name = "l2Box";
-			l2Box.Size = new System.Drawing.Size(59, 23);
-			l2Box.TabIndex = 95;
-			l2Box.Text = "0";
-			l2Box.TextChanged += L2Box_TextChanged;
-			// 
-			// l2Label
-			// 
-			l2Label.AutoSize = true;
-			l2Label.Font = new System.Drawing.Font("Segoe UI", 9F);
-			l2Label.ForeColor = System.Drawing.Color.White;
-			l2Label.Location = new System.Drawing.Point(4, 608);
-			l2Label.Margin = new Padding(4, 0, 4, 0);
-			l2Label.Name = "l2Label";
-			l2Label.Size = new System.Drawing.Size(81, 15);
-			l2Label.TabIndex = 96;
-			l2Label.Text = "L2 Cache Size:";
 			// 
 			// GeneratorForm
 			// 

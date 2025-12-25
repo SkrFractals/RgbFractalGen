@@ -12,7 +12,6 @@ public readonly struct NoiseCoordData {
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public static class ShaderMath {
-
 	// Void:
 	public static Float3 Noise(float voidAmb, float selectedAmbient, Float4 b, Float3 n0, Float3 n1, Float3 n2, Float3 n3) {
 		var voidAmbS = selectedAmbient * voidAmb;
@@ -64,30 +63,125 @@ public static class ShaderMath {
 }
 #endregion
 
+#region Blur
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
+[ThreadGroupSize(16, 16, 1)]
+[GeneratedComputeShaderDescriptor]
+public readonly partial struct HorizontalBlur(
+	ReadWriteBuffer<Float3> input, ReadWriteBuffer<Float3> output, ReadOnlyBuffer<float> kernel, int width, int radius, int kernelWidth
+) : IComputeShader {
+	public void Execute() {
+		/*var xy = ThreadIds.XY;
+		var i = xy.Y * width + xy.X;
+		output[i] = input[i];*/
+
+		// kernelWidth = kernel.Length = must be 1 + 2*radius!
+		// sum of kernel values must be 1!
+		var xy = ThreadIds.XY;
+		Float3 sum = 0f;
+		// Start of this row
+		int yw = xy.Y * width,
+		// After the end of this row (will decrement back)
+		fromRowEnd = yw + width,
+		// how many pixels of the left radius overflow over left border?
+		leftOver = Hlsl.Max(radius - xy.X, 0),
+		// how many pixels of the right radius overflow over right border?
+		rightOver = Hlsl.Max(xy.X + 1 + radius - width, 0),
+		// how many pixels fit int the central kernel run (clamped from both overflow sides, the claped parts will attempt to get reflected)
+		fit = kernelWidth - leftOver - rightOver,
+		// how much would the reflected left overflow still overflow again over the right border? (this will really get clamped)
+		leftStop = Hlsl.Max(0, leftOver - fit),
+		// how much would the reflected right overflow still overflow again over the left border?
+		rightStop = Hlsl.Max(0, rightOver - fit),
+		// what input index will the central run start from?
+		startCentral = yw + xy.X + leftOver - radius, // *1 right
+		// kernel index, starts on clamp size of the left overflow.
+		kerneli = leftStop;
+		// reflected left overflow run, clamped by stopLeft if overflown again:
+		// from the end of left mirrored kernel decrementing to left border
+		for (int i = leftOver - leftStop; i > 0; sum += kernel[kerneli++] * input[--i + yw]) ;
+		// central run:
+		// from startcentral incrementing right to the right end of the central run
+		for (int i = 0; i < fit; sum += kernel[kerneli++] * input[startCentral + i++]) ;
+		// reflected right overflow run, clamped by stopRight if overflown again:
+		// from the right border, decrement left to the end of right mirrored kernel
+		for (int totalRightReflect = rightOver - rightStop, i = 0; i < totalRightReflect; sum += kernel[kerneli++] * input[fromRowEnd - ++i]);
+		// put the sum of the kerneled runs into output:
+		output[yw + xy.X] = sum;
+	} 
+}
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
+[ThreadGroupSize(16, 16, 1)]
+[GeneratedComputeShaderDescriptor]
+public readonly partial struct VerticalBlur(
+	ReadWriteBuffer<Float3> input, ReadWriteBuffer<Float3> output, ReadOnlyBuffer<float> kernel, int width, int height, int radius, int kernelWidth
+) : IComputeShader {
+	public void Execute() {
+		/*var xy = ThreadIds.XY;
+		var i = xy.Y * width + xy.X;
+		output[i] = input[i];*/
+		
+		// kernelWidth = kernel.Length = must be 1 + 2*radius!
+		// sum of kernel values must be 1!
+		var xy = ThreadIds.XY;
+		Float3 sum = 0f;
+		// Start of this row
+		int yw = xy.Y * width,
+		// Below the end of this collumn (will row-decrement back)
+		fromColEnd = width * height + xy.X,
+		// how many pixels of the up radius overflow over up border?
+		upOver = Hlsl.Max(radius - xy.Y, 0),
+		// how many pixels of the down radius overflow over down border?
+		downOver = Hlsl.Max(xy.Y + 1 + radius - height, 0),
+		// how many pixels fit int the central kernel run (clamped from both overflow sides, the claped parts will attempt to get reflected)
+		fit = kernelWidth - upOver - downOver,
+		// how much would the reflected up overflow still overflow again over the down border? (this will really get clamped)
+		upStop = Hlsl.Max(0, upOver - fit),
+		// how much would the reflected down overflow still overflow again over the up border?
+		downStop = Hlsl.Max(0, downOver - fit),
+		// what input index will the central run start from?
+		startCentral = yw + xy.X + (upOver - radius) * width, // *width down
+		// kernel index, starts on clamp size of the up overflow.
+		kerneli = upStop;
+		// reflected up overflow run, clamped by stopLeft if overflown again:
+		// from the end of upper mirrored kernel row-decrementing to up border
+		for (int i = upOver - upStop; i > 0; sum += kernel[kerneli++] * input[xy.X + width * --i]) ; 
+		// central run:
+		// from startcentral row-incrementing down to the bottom end of the central run
+		for (int i = 0; i < fit; sum += kernel[kerneli++] * input[startCentral + width * i++]) ;
+		// reflected down overflow run, clamped by stopRight if overflown again:
+		// from the bottom border, row-decrement up to the end of bottom mirrored kernel
+		for (int totalBottomReflect = downOver - downStop, i = 0; i < totalBottomReflect; sum += kernel[kerneli++] * input[fromColEnd - width * ++i]) ; 
+		// put the sum of the kerneled runs into output:
+		output[yw + xy.X] = sum;
+	}
+}
+#endregion
+
 #region Draw_Pipeline
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct PipeNormalizeSaturate(
-	ReadWriteBuffer<Float3> ping, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	float saturateAmount
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
-		ping[i] = ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount);
+		buffer[i] = ShaderMath.ApplySaturate(ShaderMath.Normalize(buffer[i], lightNormalizer), saturateAmount);
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct PipeNormalize(
-	ReadWriteBuffer<Float3> ping, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer
+	ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
 		var i = xy.Y * width + xy.X;
-		ping[i] = ShaderMath.Normalize(buffer[i], lightNormalizer);
+		buffer[i] = ShaderMath.Normalize(buffer[i], lightNormalizer);
 	}
 }
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
@@ -149,7 +243,7 @@ public readonly partial struct PipeBytes(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawNoiseSaturateDither(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	ReadOnlyBuffer<Float3> noise, Int2 noiseP,
 	float saturateAmount
@@ -168,7 +262,7 @@ public readonly partial struct DrawNoiseSaturateDither(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawNoiseSaturate(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	ReadOnlyBuffer<Float3> noise, Int2 noiseP,
 	float saturateAmount
@@ -187,7 +281,7 @@ public readonly partial struct DrawNoiseSaturate(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawNoiseDither(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	ReadOnlyBuffer<Float3> noise, Int2 noiseP
 ) : IComputeShader {
@@ -205,7 +299,7 @@ public readonly partial struct DrawNoiseDither(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawNoise(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	ReadOnlyBuffer<Float3> noise, Int2 noiseP
 ) : IComputeShader {
@@ -226,7 +320,7 @@ public readonly partial struct DrawNoise(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawAmbientSaturateDither(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	float saturateAmount
 ) : IComputeShader {
@@ -242,7 +336,7 @@ public readonly partial struct DrawAmbientSaturateDither(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawAmbientSaturate(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax,
 	float saturateAmount
 ) : IComputeShader {
@@ -258,7 +352,7 @@ public readonly partial struct DrawAmbientSaturate(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawAmbientDither(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax
 ) : IComputeShader {
 	public void Execute() {
@@ -273,7 +367,7 @@ public readonly partial struct DrawAmbientDither(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawAmbient(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	ReadWriteBuffer<int> voidT, int selectedAmbient, float voidDepthMax
 ) : IComputeShader {
 	public void Execute() {
@@ -291,7 +385,7 @@ public readonly partial struct DrawAmbient(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawSaturateDither(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	float saturateAmount
 ) : IComputeShader {
 	public void Execute() {
@@ -305,7 +399,7 @@ public readonly partial struct DrawSaturateDither(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawSaturate(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer,
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer,
 	float saturateAmount
 ) : IComputeShader {
 	public void Execute() {
@@ -319,7 +413,7 @@ public readonly partial struct DrawSaturate(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct DrawDither(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
@@ -332,7 +426,7 @@ public readonly partial struct DrawDither(
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct Draw(
-	ReadWriteBuffer<int> output, ReadOnlyBuffer<Float3> buffer, int width, float lightNormalizer
+	ReadWriteBuffer<int> output, ReadWriteBuffer<Float3> buffer, int width, float lightNormalizer
 ) : IComputeShader {
 	public void Execute() {
 		var xy = ThreadIds.XY;
@@ -368,6 +462,7 @@ public readonly partial struct VoidBfs(
 		Hlsl.InterlockedMax(ref outMax[0], best);
 	}
 }
+
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 [ThreadGroupSize(16, 16, 1)]
 [GeneratedComputeShaderDescriptor]

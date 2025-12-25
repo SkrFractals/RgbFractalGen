@@ -2,7 +2,6 @@
 //#define CustomDebugTest
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -642,6 +641,7 @@ public partial class GeneratorForm : Form {
 					case "detailMax": detailMax = n; break;
 					case "saturateMax": saturateMax = n; break;
 					case "brightnessMax": brightnessMax = n; break;
+					case "bloomMax": bloomMax = n; break;
 					case "binMax": binMax = n; break;
 					case "L2Max": l2Max = n; break;
 					case "blurMax": blurMax = n; break;
@@ -1118,11 +1118,11 @@ public partial class GeneratorForm : Form {
 		if (!modifySettings) {
 			modifySettings = true;
 			Parallel_Changed(null, null);
-			DetailBox_TextChanged(null, null);
+			DetailBox_TextChanged(null, null); // Applies min size
 			modifySettings = false;
 		} else {
 			Parallel_Changed(null, null);
-			DetailBox_TextChanged(null, null);
+			DetailBox_TextChanged(null, null); // Applies min size
 		}
 		generator.SetupCutFunction();
 	}
@@ -1408,21 +1408,23 @@ public partial class GeneratorForm : Form {
 	private void VoidBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(voidBox, ref generator.SelectedVoid, (ushort)0, voidScaleMax);
 	private void DetailBox_TextChanged(object sender, EventArgs e) {
-		if (!ParseClampReTextMulDiffApply(detailBox, ref generator.SelectedDetail, 0.0, detailMax, detailMul * generator.GetFractal().MinSize))
+		if (!ParseClampReTextMulDiffApply(detailBox, ref generator.SelectedDetail, 1.0, detailMax, detailMul * generator.GetFractal().MinSize))
 			generator.SetMaxIterations();
 	}
 	private void SaturateBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextMulDiffApply(saturateBox, ref generator.SelectedSaturate, 0, saturateMax, 1.0f / saturateMax);
 	private void BrightnessBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(brightnessBox, ref generator.SelectedBrightness, (ushort)0, brightnessMax);
-	private void BloomBox_TextChanged(object sender, EventArgs e) {
-		AdjustBloomMax();
-		if (ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, bloomMax, bloomMul))
-			return;
+	private void BloomBox_TextChanged(object sender, EventArgs e) //{
+		//AdjustBloomMax();
+		//if (
+			=> ParseClampReTextMulDiffApply(bloomBox, ref generator.SelectedBloom, 0, bloomMax, bloomMul);
+		//)
+		//	return;
 		// Number of threads can change the maximum of these:
-		StripeBox_TextChanged(null, null);
-	}
-	private void AdjustBloomMax() {
+		//StripeBox_TextChanged(null, null);
+	//}
+	/*private void AdjustBloomMax() {
 		if (width + height <= 0)
 			return;
 		byte OnePixelBytes = 12;
@@ -1439,7 +1441,7 @@ public partial class GeneratorForm : Form {
 			maxCache // the cache size should fit a strip wide as Width, and Tall as BloomDiameter+StripHeight
 		) / bloomMul);
 		bloomLabel.Text = "Bloom (0-" + bloomMax + "):";
-	}
+	}*/
 	private void BlurBox_TextChanged(object sender, EventArgs e)
 		=> ParseClampReTextDiffApply(blurBox, ref generator.SelectedBlur, (ushort)0, blurMax);
 	private void ZoomChildBox_TextChanged(object sender, EventArgs e) {
@@ -1503,7 +1505,7 @@ public partial class GeneratorForm : Form {
 	private void Parallel_Changed(object sender, EventArgs e) {
 		SetupParallel(ParseClampReText(threadsBox, (short)FractalGenerator.MinTasks, (short)Math.Max(1, threadsMul * maxTasks)));
 		// Number of threads can change the maximum of these:
-		BloomBox_TextChanged(null, null);
+		//BloomBox_TextChanged(null, null);
 		StripeBox_TextChanged(null, null);
 	}
 	private void CacheBox_CheckedChanged(object sender, EventArgs e) {
@@ -1514,12 +1516,12 @@ public partial class GeneratorForm : Form {
 	private void StripeBox_TextChanged(object sender, EventArgs e) {
 		AdjustStripeMax();
 		ParseClampReTextDiffApply(stripeBox, ref generator.SelectedStripeHeight, (ushort)0, stripeMax);
-		BloomBox_TextChanged(null, null);
+		//BloomBox_TextChanged(null, null);
 	}
 	private void AdjustStripeMax() {
 		byte OnePixelBytes = 12;
 		var L2_eff = (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes) *.85f;
-		var minCachableStripe = (ushort)Math.Max(1, L2_eff / (OnePixelBytes * width) - 2 * generator.SelectedBloom - 2);
+		var minCachableStripe = (ushort)Math.Max(1, L2_eff / (OnePixelBytes * width) - 2 /* - 2 * generator.SelectedBloom*/ );
 
 		if (maxTasks <= 0) {
 			stripeMax = minCachableStripe;
@@ -2784,8 +2786,8 @@ public partial class GeneratorForm : Form {
 			generator.SelectedPngType = FractalGenerator.PngType.No;
 			generator.SelectedGifType = FractalGenerator.GifType.No;
 			generator.SelectedGenerationType = FractalGenerator.GenerationType.Animation;
-			generator.SelectedBlur = 0;
-			generator.SelectedBloom = generator.SelectedHue = 0;// generator.selectDefaultHue = 0;
+			generator.SelectedBloom = generator.SelectedBlur = 0;
+			generator.SelectedHue = 0;// generator.selectDefaultHue = 0;
 			generator.SelectedPreviewMode = previewMode;
 		}
 		generator.SelectedEditorMode = editorPanel.Visible = !(generatorPanel.Visible = editorPanel.Visible);
