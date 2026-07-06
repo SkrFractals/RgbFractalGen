@@ -2139,7 +2139,7 @@ internal partial class FractalGenerator {
 			task.Void = new int[area];
 			task.VoidQueue = new int[area];
 			task.Buffer = new Vector3[area];
-			if(allocGpuDrawType == GpuDrawType.CPU)
+			if (allocGpuDrawType == GpuDrawType.CPU)
 				InitNoise(task, noiseWidth * noiseHeight);
 			else
 				InitNoiseF(task, noiseWidth * noiseHeight);
@@ -2174,10 +2174,10 @@ internal partial class FractalGenerator {
 		void InitNoise(FractalTask task, int area) {
 			task.Noise = allocNoise > 0 ? (task.Noise == null || task.Noise.Length != area) ? new Vector3[area] : task.Noise : null;
 			task.NoiseF = null;
-		/*if (!task.isNoiseBuffer && (task.isNoiseBuffer = SelectedAmbient > 0 && SelectedNoise > 0)) {
-			task.NoiseB?.Dispose();
-			task.NoiseB = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(noiseWidth * noiseHeight, AllocationMode.Default);
-		}*/
+			/*if (!task.isNoiseBuffer && (task.isNoiseBuffer = SelectedAmbient > 0 && SelectedNoise > 0)) {
+				task.NoiseB?.Dispose();
+				task.NoiseB = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer<Float3>(noiseWidth * noiseHeight, AllocationMode.Default);
+			}*/
 		}
 		void InitNoiseF(FractalTask task, int area) {
 			task.NoiseF = allocNoise > 0 ? (task.NoiseF == null || task.NoiseF.Length != area) ? new Float3[area] : task.NoiseF : null;
