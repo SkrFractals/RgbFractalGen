@@ -746,7 +746,7 @@ public partial class GeneratorForm : Form {
 
 					// Did we not fail at any parsing?
 					if (ci == si.Length) {
-						// Reject it ijf it's already in the list:
+						// Reject it if it's already in the list:
 						var same = false;
 						foreach (var pal in generator.Colors) {
 							if (pal.Item2.Length != c.Length)
@@ -2634,12 +2634,13 @@ public partial class GeneratorForm : Form {
 		s += p[..^1];
 		// Cuts
 		p = "|";
-		foreach (var (an, ai) in f.ChildCutFunction) {
-			a = an + ":";
-			foreach (var i in ai)
-				a += i + ":";
-			p += (a != "" ? a[..^1] : "") + ";";
-		}
+		if (f.ChildCutFunction != null)
+			foreach (var (an, ai) in f.ChildCutFunction) {
+				a = an + ":";
+				foreach (var i in ai)
+					a += i + ":";
+				p += (a != "" ? a[..^1] : "") + ";";
+			}
 		s += p == "|" ? "|" : p[..^1];
 		File.WriteAllText(f.Path, s);
 		f.Edit = false;
@@ -2667,7 +2668,7 @@ public partial class GeneratorForm : Form {
 		// Name
 		if (arr[0] == "")
 			return Error("No fractal name", "Cannot load");
-		if (fractalSelect.Items.Contains(fractalSelect.Text))
+		if (fractalSelect.Items.Contains(arr[0]))
 			return Error("Fractal with the same name already loaded in the list.", "Cannot load");
 		// Constants
 		if (!int.TryParse(arr[1], out var count) || count < 1)
@@ -2698,13 +2699,26 @@ public partial class GeneratorForm : Form {
 		for (var i = count; --i >= 0; childY[i] = x)
 			if (!double.TryParse(s[i], out x))
 				return Error("Invalid child Y: " + s[i], "Cannot load");
+		// if there were any ":" in the name, merge those split entries 
+		string[] MergeName(string[] set) {
+			int diff = set.Length - count - 1;
+			if (diff > 0) {
+				var newSet = new string[set.Length - diff];
+				newSet[0] = set[0];
+				for (int i = 0; i < diff; newSet[0] += ":" + set[++i]) { }
+				for (int i = 1; i < newSet.Length; ++i)
+					newSet[i] = set[i + diff];
+				return newSet;
+			}
+			return set;
+		}
 		// ChildAngles
 		s = arr[8].Split(';');
 		if (s.Length < 1)
 			return Error("No set of child angles", "Cannot load");
 		List<(string, double[])> childAngle = [];
 		foreach (var c in s) {
-			var angleSet = c.Split(':');
+			var angleSet = MergeName(c.Split(':'));
 			if (angleSet[0] == "")
 				return Error("Empty angle set name", "Cannot load");
 			if (angleSet.Length < count + 1)
@@ -2722,7 +2736,7 @@ public partial class GeneratorForm : Form {
 		List<(string, byte[])> childColor = [];
 		foreach (var c in s) {
 			byte ss;
-			var colorSet = c.Split(':');
+			var colorSet = MergeName(c.Split(':'));
 			if (colorSet[0] == "")
 				return Error("Empty color set name", "Cannot load");
 			if (colorSet.Length < count + 1)
@@ -2734,10 +2748,11 @@ public partial class GeneratorForm : Form {
 			childColor.Add((colorSet[0], color));
 		}
 		// Cuts
-
 		s = arr[10].Split(';');
 		List<(int, int[])> cutFunction = [];
 		foreach (var c in s) {
+			if (c == "")
+				continue;
 			int intParse;
 			var cutInt = c.Split(':');
 			if (!int.TryParse(cutInt[0], out var cutIndex))
@@ -2748,6 +2763,8 @@ public partial class GeneratorForm : Form {
 					return Error("Invalid cutFunction seed: " + cutInt[i + 1], "Cannot load");
 			cutFunction.Add((cutIndex, cutHash));
 		}
+		if (cutFunction.Count == 0)
+			cutFunction = null;
 		var f = new Fractal(arr[0], count, size, maxsize, minSize, cutSize, childX, childY, childAngle, childColor, cutFunction) {
 			Path = file
 		};
