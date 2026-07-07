@@ -946,10 +946,12 @@ internal partial class FractalGenerator {
 				[0, 0, 0],
 				[0, 1, -1],
 			[
-				("BASE",	[SYMMETRIC + pi, pi/2, -pi/2])
+				("BASE",	[SYMMETRIC + pi, pi2, -pi2]),
+				("180",		[-SYMMETRIC, 0, pi])
 			], [
 				("BASE",	[0, 0, 0]),
-				("Center",	[2, 0, 0])
+				("Center",	[2, 0, 0]),
+				("One",		[0, 4, 0])
 			], null
 			),
 
@@ -957,7 +959,7 @@ internal partial class FractalGenerator {
 				[0, 1, -1],
 				[0, 1, 1],
 			[
-				("Claws",	[SYMMETRIC + pi, pi/2, -pi/2]),
+				("Claws",	[pi, pi2, -pi2]),
 				("Diamonds",[0, -pi, -pi])
 			], [
 				("BASE",	[0, 0, 0]),
@@ -965,25 +967,14 @@ internal partial class FractalGenerator {
 			], null
 			),
 
-			/*ew("Diamonds", 3, 2, 1.1, .1, 1.3,
-				[0, -1, 1],
-				[0, 1, 1],
-			[
-				("BASE",	[SYMMETRIC + pi, pi/2, -pi/2])
-			], [
-				("BASE",	[0, 0, 0]),
-				("Center",	[2, 0, 0])
-			], null
-			),*/
-
 			new("Vicsek", 5, 3, 1.1, .1, 1.0,
 				[0, 1, -1, 0, 0],
 				[0, 0, 0, 1, -1],
 			[
-				("BASE",	[SYMMETRIC + pi/2, 0, 0, 0, 0]),
-				("180",		[pi/2, 0, 0, 0, 0]),
-				("Rotate",  [0, pi/2, pi / 2, 0, 0]),
-				("Rotate2", [0, 0, 0, pi/2, pi/2])
+				("BASE",	[SYMMETRIC + pi2, 0, 0, 0, 0]),
+				("180",		[pi2, 0, 0, 0, 0]),
+				("Rotate",  [0, pi2, pi2, 0, 0]),
+				("Rotate2", [0, 0, 0, pi2, pi2])
 			], [
 				("BASE",	[0, 0, 0, 0, 0]),
 				("Center",	[2, 0, 0, 0, 0]),
