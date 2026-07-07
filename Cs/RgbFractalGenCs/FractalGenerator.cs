@@ -981,8 +981,8 @@ internal partial class FractalGenerator {
 			[
 				("BASE",	[SYMMETRIC + pi/2, 0, 0, 0, 0]),
 				("180",		[pi/2, 0, 0, 0, 0]),
-				("Rotate",  [SYMMETRIC + pi, pi/2, pi / 2, 0, 0]),
-				("Rotate2", [SYMMETRIC + pi, 0, 0, pi/2, pi/2])
+				("Rotate",  [0, pi/2, pi / 2, 0, 0]),
+				("Rotate2", [0, 0, 0, pi/2, pi/2])
 			], [
 				("BASE",	[0, 0, 0, 0, 0]),
 				("Center",	[2, 0, 0, 0, 0]),
