@@ -17,6 +17,7 @@ using System.Windows.Forms;
 using ComputeSharp;
 
 namespace RgbFractalGenCs;
+
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public partial class GeneratorForm : Form {
 
@@ -121,6 +122,10 @@ public partial class GeneratorForm : Form {
 	private static bool Error(string text, string caption) {
 		_ = MessageBox.Show(text, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		return false;
+	}
+	private void StartGenerate() {
+		generator.StartGenerate();
+		SwitchChildColor();
 	}
 	private void UpdateBitmap(Bitmap bitmap) {
 		if (currentBitmap == bitmap || bitmap == null)
@@ -262,6 +267,9 @@ public partial class GeneratorForm : Form {
 			SetupControl(loadBatchButton, "");
 			SetupControl(addBatchButton, "");
 			SetupControl(saveBatchButton, "");
+			SetupControl(batchBox, "");
+			SetupControl(updateBatchButton, "");
+			SetupControl(runBatchButton, "");
 			SetupControl(prevButton, "Stop the animation and move to the previous frame.\nUseful for selecting the exact frame you want to export to PNG file.");
 			SetupControl(animateButton, "Toggle preview animation.\nWill seamlessly loop when the fractal is finished generating.\nClicking on the image does the same thing.");
 			SetupControl(nextButton, "Stop the animation and move to the next frame.\nUseful for selecting the exact frame you want to export to PNG file.");
@@ -269,8 +277,11 @@ public partial class GeneratorForm : Form {
 			SetupControl(helpButton, "Show README.txt.");
 			SetupControl(exportButton, "");
 			SetupControl(exportSelect, "Select what you want to save with the button on the left.\nHover over that button after the selection to get more info about the selection.");
-			SetupControl(fileSelect, "Toggle what selected propeerties should be used for a default export file name.");
+			SetupControl(fileSelect, "Toggle what selected properties should be used for a default export file name.");
 			SetupControl(debugBox, "shows a log of task and image states, to see what the generator is doing.");
+			SetupControl(debugAnimBox, "animation debug logs");
+			SetupControl(debugPngBox, "png encoding debug logs");
+			SetupControl(debugGifBox, "gif encoding debug logs");
 
 			// Read the README.txt for the help button
 			if (File.Exists("README.txt"))
@@ -347,7 +358,7 @@ public partial class GeneratorForm : Form {
 			ResizeAll();
 
 			aTask = xTask = null;
-			generator.StartGenerate();
+			StartGenerate();
 
 			// Load all extra fractal files
 			var appDirectory = AppDomain.CurrentDomain.BaseDirectory; // Get the app's directory
@@ -414,7 +425,7 @@ public partial class GeneratorForm : Form {
 				return;
 			// Resets the generator
 			// (Abort should be called before this or else it will crash)
-			// generator.StartGenerate(); should be called after
+			// StartGenerate(); should be called after
 			//gifButton.Enabled = false;
 			isGifReady = 0;
 			currentBitmapIndex = 0;
@@ -479,7 +490,7 @@ public partial class GeneratorForm : Form {
 				//restartButton.Enabled = true;
 				//ResetRestart();
 				//generator.RestartGif = false;
-				generator.StartGenerate();
+				StartGenerate();
 				// Wait until finished
 				while (generator.GetBitmapsFinished() < generator.GetFrames()) { }
 				// collect the hashes
@@ -506,7 +517,7 @@ public partial class GeneratorForm : Form {
 			} else {
 				SetupFractal();
 				ResizeAll();
-				generator.StartGenerate();
+				StartGenerate();
 			}
 		}
 		if (restartTimer > 0 && (restartTimer -= (short)timer.Interval) <= 0)
@@ -1340,6 +1351,7 @@ public partial class GeneratorForm : Form {
 		if (DiffApply((short)Math.Max(-1, paletteSelect.SelectedIndex - 1), ref generator.SelectedPaletteType))
 			return;
 		defaultHue.Text = "0";
+		SwitchChildColor();
 	}
 	private void RemovePalette_Click(object sender, EventArgs e) {
 		if (generator.Colors.Count <= 1)
@@ -1349,6 +1361,7 @@ public partial class GeneratorForm : Form {
 		FillPalette();
 		paletteSelect.SelectedIndex = i;
 		QueueReset();
+		SwitchChildColor();
 	}
 	private void AddPalette_Click(object sender, EventArgs e) {
 		List<Vector3> newPalette = [];
@@ -1365,9 +1378,13 @@ public partial class GeneratorForm : Form {
 		// TODO name the palette
 		generator.Colors.Add(("Custom palette", p));
 		paletteSelect.SelectedIndex = FillPalette();
+		SwitchChildColor();
 	}
-	private void DefaultHue_TextChanged(object sender, EventArgs e)
-		=> DiffApply(ParseValue<float>(defaultHue), ref generator.SelectedDefaultHue);
+	private void DefaultHue_TextChanged(object sender, EventArgs e) {
+		if (DiffApply(ParseValue<float>(defaultHue), ref generator.SelectedDefaultHue))
+			return;
+		SwitchChildColor();
+	}
 	#endregion
 
 	#region Input_Settings
@@ -1435,7 +1452,7 @@ public partial class GeneratorForm : Form {
 			return;
 		}
 		bloomMax = (ushort)(Math.Min(
-			Math.Max(1,height / (2 * maxTasks) - 1), // Should be enough run all the threads of each in parallel
+			Math.Max(1, height / (2 * maxTasks) - 1), // Should be enough run all the threads of each in parallel
 			maxCache // the cache size should fit a strip wide as Width, and Tall as BloomDiameter+StripHeight
 		) / bloomMul);
 		bloomLabel.Text = "Bloom (0-" + bloomMax + "):";
@@ -1518,7 +1535,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void AdjustStripeMax() {
 		byte OnePixelBytes = 12;
-		var L2_eff = (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes) *.85f;
+		var L2_eff = (generator.SelectedL2Kilobytes == 0 ? FractalGenerator.GetEstimatedL2CachePerCore() : generator.SelectedL2Kilobytes) * .85f;
 		var minCachableStripe = (ushort)Math.Max(1, L2_eff / (OnePixelBytes * width) - 2 * generator.SelectedBloom - 2);
 
 		if (maxTasks <= 0) {
@@ -2398,12 +2415,25 @@ public partial class GeneratorForm : Form {
 	private void SwitchChildColor() {
 		var f = generator.GetFractal();
 		var e = f.Edit;
-		for (var i = 0; i < f.ChildCount; ++i)
-			editorPoint[i].Item4.BackColor = f.ChildColor[generator.SelectedChildColor].Item2[i] switch {
-				0 => Color.Red,
-				1 => Color.Green,
-				_ => Color.Blue
-			};
+		var set = generator.GetAllocPalette();
+		if (set != null)
+			for (var i = 0; i < f.ChildCount; ++i) {
+				var item = editorPoint[i].Item4;
+				var color = FractalGenerator.SampleColor(set, generator.SelectedDefaultHue + .5 *
+					f.ChildColor[generator.SelectedChildColor].Item2[i] /*% generator.GetAllocPalette2()*/);
+				item.BackColor = Color.FromArgb((byte)color.X, (byte)color.Y, (byte)color.Z);
+
+				/*item.BackColor = (f.ChildColor[generator.SelectedChildColor].Item2[i] % 6) switch {
+					0 => Color.Red,
+					1 => Color.Yellow,
+					2 => Color.Green,
+					3 => Color.Cyan,
+					4 => Color.Blue,
+					_ => Color.Magenta
+				};*/
+				item.Text = f.ChildColor[generator.SelectedChildColor].Item2[i].ToString();
+			}
+
 		f.Edit = e;
 	}
 	private void AddEditorPoint(double[] cx, double[] cy, double[] ca, byte[] cc, bool single = true) {
@@ -2597,7 +2627,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void SaveFractal_FileOk(object sender, CancelEventArgs e) {
 		var f = toSave;
-		var fractalName = f.Path = ((SaveFileDialog)sender).FileName;
+		var fractalName = Path.GetFileNameWithoutExtension(f.Path = ((SaveFileDialog)sender).FileName);
 		int index;
 		while ((index = fractalName.IndexOf('/')) >= 0)
 			fractalName = fractalName[(index + 1)..];
@@ -2836,16 +2866,15 @@ public partial class GeneratorForm : Form {
 		f.ChildX = nx;
 		f.ChildY = ny;
 		for (var l = 0; l < f.ChildAngle.Count; ++l) {
-			var nal = na[l] = new double[ni];
+			var nal = na[l] = new double[ni + 1]; // make new incrementally bigger ChildAngle sets
 			var (can, ca) = f.ChildAngle[l];
 			for (var ci = 0; ci < ni; ++ci)
-				nal[ci] = ca[ci];
-			nal[ni] = 0;
+				nal[ci] = ca[ci]; // copy the previous angles to each set
+			nal[ni] = 0; // put 0 as the childAngle of the new child to each new set
 			f.ChildAngle[l] = (can, nal);
 		}
-		// RemoveAt from Color
 		for (var l = 0; l < f.ChildColor.Count; ++l) {
-			var ncl = nc[l] = new byte[ni];
+			var ncl = nc[l] = new byte[ni+1];
 			var (ccn, cc) = f.ChildColor[l];
 			for (var ci = 0; ci < ni; ++ci)
 				ncl[ci] = cc[ci];
@@ -2857,11 +2886,13 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 	}
 	private void SizeBox_TextChanged(object sender, EventArgs e) {
-		if (ParseDiffApply(sizeBox, ref generator.GetFractal().ChildSize)) return;
+		if (ParseClampReTextDiffApply(sizeBox, ref generator.GetFractal().ChildSize, 2, 128))
+			return;
 		generator.GetFractal().Edit = true;
 	}
 	private void MaxBox_TextChanged(object sender, EventArgs e) {
-		if (ParseDiffApply(maxBox, ref generator.GetFractal().MaxSize)) return;
+		if (ParseClampReTextDiffApply(maxBox, ref generator.GetFractal().MaxSize, 1.1, 128))
+			return;
 		generator.GetFractal().Edit = true;
 	}
 	private void MinBox_TextChanged(object sender, EventArgs e) {
@@ -2869,7 +2900,7 @@ public partial class GeneratorForm : Form {
 		generator.GetFractal().Edit = true;
 	}
 	private void CutBox_TextChanged(object sender, EventArgs e) {
-		if (ParseDiffApply(cutBox, ref generator.GetFractal().CutSize)) return;
+		if (ParseClampReTextDiffApply(cutBox, ref generator.GetFractal().CutSize, 0.1, 128)) return;
 		generator.GetFractal().Edit = true;
 	}
 	private void AddAngleButton_Click(object sender, EventArgs e) {
@@ -2965,6 +2996,26 @@ public partial class GeneratorForm : Form {
 		performHash = true;
 		QueueReset();
 	}
+	private void RemoveCutButton_Click(object sender, EventArgs e) {
+		if (generator.GetFractal().ChildCutFunction == null) {
+			_ = Error(
+		"There are no CutFunctions left in the fractal.",
+		"Cannot remove");
+			return;
+		}
+
+		if (generator.GetFractal().ChildCutFunction.Count <= 1) {
+			generator.GetFractal().ChildCutFunction = null;
+			generator.SelectedCut = 0;
+		} else {
+			generator.GetFractal().ChildCutFunction.RemoveAt(generator.SelectedCut);
+			generator.SelectedCut = Math.Min((short)(generator.GetFractal().ChildCutFunction.Count - 1), generator.SelectedCut);
+		}
+		generator.SelectedCutSeed = 0;
+		SetupSelects();
+		generator.GetFractal().Edit = true;
+		QueueReset();
+	}
 	private void LoadButton_Click(object sender, EventArgs e) {
 		_ = loadFractal.ShowDialog();
 	}
@@ -2977,5 +3028,4 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 	}
 	#endregion
-
 }

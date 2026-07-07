@@ -38,7 +38,7 @@ internal class Fractal {
 		ChildAngle;             // Angle shifts of children inside
 	internal readonly List<(string, byte[])>
 		ChildColor;             // Color shifts of children inside
-	internal readonly List<(int, int[])>
+	internal List<(int, int[])>
 		ChildCutFunction;            // Function that takes a bitarray transforms it and decides to cut some specific patterns of children
 	//internal double Hyperbolic;
 	internal string Path = "";  // where was it loaded from?

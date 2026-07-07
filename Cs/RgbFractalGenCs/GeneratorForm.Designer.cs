@@ -91,6 +91,8 @@ namespace RgbFractalGenCs {
 			exportSelect = new ComboBox();
 			fileSelect = new ComboBox();
 			panel1 = new Panel();
+			l2Label = new Label();
+			l2Box = new TextBox();
 			gpuDLabel = new Label();
 			gpuVLabel = new Label();
 			stripeLabel = new Label();
@@ -129,6 +131,7 @@ namespace RgbFractalGenCs {
 			voidBox = new TextBox();
 			modeButton = new Button();
 			editorPanel = new Panel();
+			removeCutButton = new Button();
 			preButton = new Button();
 			pointLabel = new Label();
 			sizeLabel = new Label();
@@ -162,8 +165,6 @@ namespace RgbFractalGenCs {
 			debugPngBox = new CheckBox();
 			debugGifBox = new CheckBox();
 			loadExport = new OpenFileDialog();
-			l2Box = new TextBox();
-			l2Label = new Label();
 			helpPanel.SuspendLayout();
 			generatorPanel.SuspendLayout();
 			panel1.SuspendLayout();
@@ -883,6 +884,27 @@ namespace RgbFractalGenCs {
 			panel1.Size = new System.Drawing.Size(256, 300);
 			panel1.TabIndex = 60;
 			// 
+			// l2Label
+			// 
+			l2Label.AutoSize = true;
+			l2Label.Font = new System.Drawing.Font("Segoe UI", 9F);
+			l2Label.ForeColor = System.Drawing.Color.White;
+			l2Label.Location = new System.Drawing.Point(4, 608);
+			l2Label.Margin = new Padding(4, 0, 4, 0);
+			l2Label.Name = "l2Label";
+			l2Label.Size = new System.Drawing.Size(81, 15);
+			l2Label.TabIndex = 96;
+			l2Label.Text = "L2 Cache Size:";
+			// 
+			// l2Box
+			// 
+			l2Box.Location = new System.Drawing.Point(164, 605);
+			l2Box.Name = "l2Box";
+			l2Box.Size = new System.Drawing.Size(59, 23);
+			l2Box.TabIndex = 95;
+			l2Box.Text = "0";
+			l2Box.TextChanged += L2Box_TextChanged;
+			// 
 			// gpuDLabel
 			// 
 			gpuDLabel.AutoSize = true;
@@ -915,7 +937,7 @@ namespace RgbFractalGenCs {
 			stripeLabel.Location = new System.Drawing.Point(4, 550);
 			stripeLabel.Margin = new Padding(4, 0, 4, 0);
 			stripeLabel.Name = "stripeLabel";
-			stripeLabel.Size = new System.Drawing.Size(112, 15);
+			stripeLabel.Size = new System.Drawing.Size(76, 15);
 			stripeLabel.TabIndex = 92;
 			stripeLabel.Text = "Stripe Height";
 			// 
@@ -927,7 +949,7 @@ namespace RgbFractalGenCs {
 			binLabel.Location = new System.Drawing.Point(4, 579);
 			binLabel.Margin = new Padding(4, 0, 4, 0);
 			binLabel.Name = "binLabel";
-			binLabel.Size = new System.Drawing.Size(108, 15);
+			binLabel.Size = new System.Drawing.Size(50, 15);
 			binLabel.TabIndex = 91;
 			binLabel.Text = "Bin Size:";
 			// 
@@ -946,14 +968,12 @@ namespace RgbFractalGenCs {
 			// cacheBox
 			// 
 			cacheBox.AutoSize = true;
-			cacheBox.Checked = true;
-			cacheBox.CheckState = CheckState.Checked;
 			cacheBox.ForeColor = System.Drawing.SystemColors.Control;
 			cacheBox.Location = new System.Drawing.Point(155, 523);
 			cacheBox.Name = "cacheBox";
-			cacheBox.Size = new System.Drawing.Size(68, 19);
+			cacheBox.Size = new System.Drawing.Size(71, 19);
 			cacheBox.TabIndex = 89;
-			cacheBox.Text = "Enabled";
+			cacheBox.Text = "Disabled";
 			cacheBox.UseVisualStyleBackColor = true;
 			cacheBox.CheckedChanged += CacheBox_CheckedChanged;
 			// 
@@ -1300,6 +1320,7 @@ namespace RgbFractalGenCs {
 			// 
 			// editorPanel
 			// 
+			editorPanel.Controls.Add(removeCutButton);
 			editorPanel.Controls.Add(preButton);
 			editorPanel.Controls.Add(pointLabel);
 			editorPanel.Controls.Add(sizeLabel);
@@ -1322,6 +1343,16 @@ namespace RgbFractalGenCs {
 			editorPanel.Name = "editorPanel";
 			editorPanel.Size = new System.Drawing.Size(286, 440);
 			editorPanel.TabIndex = 56;
+			// 
+			// removeCutButton
+			// 
+			removeCutButton.Location = new System.Drawing.Point(249, 374);
+			removeCutButton.Name = "removeCutButton";
+			removeCutButton.Size = new System.Drawing.Size(21, 23);
+			removeCutButton.TabIndex = 69;
+			removeCutButton.Text = "X";
+			removeCutButton.UseVisualStyleBackColor = true;
+			removeCutButton.Click += RemoveCutButton_Click;
 			// 
 			// preButton
 			// 
@@ -1396,7 +1427,7 @@ namespace RgbFractalGenCs {
 			addCut.Location = new System.Drawing.Point(121, 374);
 			addCut.Margin = new Padding(4, 3, 4, 3);
 			addCut.Name = "addCut";
-			addCut.Size = new System.Drawing.Size(149, 23);
+			addCut.Size = new System.Drawing.Size(122, 23);
 			addCut.TabIndex = 67;
 			addCut.Text = "Select CutFunction";
 			addCut.SelectedIndexChanged += AddCut_SelectedIndexChanged;
@@ -1631,27 +1662,6 @@ namespace RgbFractalGenCs {
 			loadExport.RestoreDirectory = true;
 			loadExport.FileOk += LoadExport_FileOk;
 			// 
-			// l2Box
-			// 
-			l2Box.Location = new System.Drawing.Point(164, 605);
-			l2Box.Name = "l2Box";
-			l2Box.Size = new System.Drawing.Size(59, 23);
-			l2Box.TabIndex = 95;
-			l2Box.Text = "0";
-			l2Box.TextChanged += L2Box_TextChanged;
-			// 
-			// l2Label
-			// 
-			l2Label.AutoSize = true;
-			l2Label.Font = new System.Drawing.Font("Segoe UI", 9F);
-			l2Label.ForeColor = System.Drawing.Color.White;
-			l2Label.Location = new System.Drawing.Point(4, 608);
-			l2Label.Margin = new Padding(4, 0, 4, 0);
-			l2Label.Name = "l2Label";
-			l2Label.Size = new System.Drawing.Size(81, 15);
-			l2Label.TabIndex = 96;
-			l2Label.Text = "L2 Cache Size:";
-			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -1688,7 +1698,7 @@ namespace RgbFractalGenCs {
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.13.1";
+			Text = "RGB Fractal Zoom Generator C# v1.13.2";
 			FormClosing += GeneratorForm_FormClosing;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();
@@ -1840,6 +1850,7 @@ namespace RgbFractalGenCs {
 		private Label cacheLabel;
 		private Label l2Label;
 		private TextBox l2Box;
+		private Button removeCutButton;
 	}
 }
 

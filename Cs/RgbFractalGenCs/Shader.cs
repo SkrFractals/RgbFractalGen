@@ -59,7 +59,7 @@ public static class ShaderMath {
 		return n * max > 254.0f ?  Hlsl.Mul(254.0f / max, rgb) : Hlsl.Mul(n, rgb);
 	}
 	public static int ToBytes(Float3 p) {
-		return (255 << 24) | ((int)p.Z << 16) | ((int)p.Y << 8) | (int)p.X;
+		return (255 << 24) | ((int)p.X << 16) | ((int)p.Y << 8) | (int)p.Z;
 	}
 }
 #endregion
