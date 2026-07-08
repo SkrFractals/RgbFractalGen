@@ -402,8 +402,8 @@ internal partial class FractalGenerator {
 	public readonly List<(string, Vector3[])> Colors = [
 		("RGB", [new Vector3(255, 0, 0), new Vector3(0, 255, 0), new Vector3(0, 0, 255)]),
 		("BGR", [new Vector3(0, 0, 255), new Vector3(0, 255, 0), new Vector3(255, 0, 0)]),
-		("->", [new Vector3(255, 0, 0), new Vector3(255, 255, 0), new Vector3(0, 255, 0), new Vector3(0, 255, 255), new Vector3(0, 0, 255), new Vector3(255, 0, 255)]),
-		("<-", [new Vector3(255, 0, 255), new Vector3(0, 0, 255), new Vector3(0, 255, 255), new Vector3(0, 255, 0), new Vector3(255, 255, 0), new Vector3(255, 0, 0)]),
+		("RYGCBM", [new Vector3(255, 0, 0), new Vector3(255, 255, 0), new Vector3(0, 255, 0), new Vector3(0, 255, 255), new Vector3(0, 0, 255), new Vector3(255, 0, 255)]),
+		("MBCGYR", [new Vector3(255, 0, 255), new Vector3(0, 0, 255), new Vector3(0, 255, 255), new Vector3(0, 255, 0), new Vector3(255, 255, 0), new Vector3(255, 0, 0)]),
 		("Colorblind ", [new Vector3(255, 0, 0), new Vector3(0, 0, 255), new Vector3(0, 255, 0), new Vector3(0, 0, 255)]),
 		("ColorblindLike", [new Vector3(255, 255, 0), new Vector3(0, 0, 255)]),
 		("WhiteTransp", [new Vector3(255, 255, 255), new Vector3(0, 0, 0)]),
@@ -955,7 +955,7 @@ internal partial class FractalGenerator {
 			], null
 			),
 
-			new("V", 3, 2, 1.1, .1, 1.0,
+			new("V", 3, 2, 1.1, .1, 1.4,
 				[0, 1, -1],
 				[0, 1, 1],
 			[
