@@ -1,8 +1,17 @@
+Known issues:
+-Rare crashes
+-ZoomChild is be buggy for some indices (not centering properly, jumping, and CutSize cutting off parts of the fractal too soon)
+
+1.13.3
+-Fixed a couple angle sets of the new fractals
+-Allowed to edit the first central child (assuming it could work with ZoomChild, but that feature is still a bit buggy)
+-Fixed GIF export when GPU drawing is selected (that uses RGBA format, so I had to pad the GIF encoder with Alpha bytes)
+
 1.13.2
 -*.fractal was included in the fractal name
 -Added 4 new fractals
 -GPU Draws had inverted RGB-BGR, now they match the colors of CPU Draw
--fixed GPU Draw Type: Pipeline
+-Fixed GPU Draw Type: Pipeline
 -EDITOR: ChildColor fields are now always correctly update their background colors, and those colors are now matching the preview
 -EDITOR: Added Remove Cut Function Button
 -EDITOR: fixed crash when clicking AddChild

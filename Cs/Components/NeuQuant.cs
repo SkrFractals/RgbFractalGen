@@ -144,7 +144,7 @@ public class NeuQuant {
 	private int sampleFac; /* sampling factor 1..30 */
 
 	private int factor;
-	private readonly int w3;
+	private readonly int w_bytes, b; // width * pixBytes, pixBytes
 
 	//   typedef int pixel[4];                /* BGRc */
 	private readonly int[][] network; /* the network itself - [netSize][4] */
@@ -161,9 +161,9 @@ public class NeuQuant {
 
 	/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 	   ----------------------------------------------------------------------- */
-	public NeuQuant(EncoderTaskData encodeTask, int frameBytes, int sample, int width3) {
+	public NeuQuant(EncoderTaskData encodeTask, int frameBytes, int sample, int width, int bytes) {
 		encode = encodeTask;
-		w3 = width3;
+		w_bytes = width * (b = bytes);
 		lengthCount = frameBytes;
 		sampleFac = sample;
 		network = new int[NetSize][];
@@ -173,11 +173,11 @@ public class NeuQuant {
 
 	/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 	   ----------------------------------------------------------------------- */
-	public NeuQuant(byte[] thePicture, int frameBytes, int sample, int width3) {
+	public NeuQuant(byte[] thePicture, int frameBytes, int sample, int width, int bytes) {
 		thePictureArr = thePicture;
 		lengthCount = frameBytes;
 		sampleFac = sample;
-		w3 = width3;
+		w_bytes = width * (b = bytes);
 		network = new int[NetSize][];
 		for (var i = 0; i < NetSize; ++i)
 			InitNetwork(i);
@@ -185,11 +185,11 @@ public class NeuQuant {
 
 	/* Initialise network in range (0,0,0) to (255,255,255) and set parameters - cancellable
 	   ----------------------------------------------------------------------- */
-	public NeuQuant(byte[] thePicture, int frameBytes, int sample, int width3, CancellationToken token) {
+	public NeuQuant(byte[] thePicture, int frameBytes, int sample, int width, int bytes, CancellationToken token) {
 		thePictureArr = thePicture;
 		lengthCount = frameBytes;
 		sampleFac = sample;
-		w3 = width3;
+		w_bytes = width * (b = bytes);
 		network = new int[NetSize][];
 		for (var i = 0; i < NetSize; ++i) {
 			if (token.IsCancellationRequested)
@@ -202,11 +202,11 @@ public class NeuQuant {
 
 	/* Initialise network in range (0,0,0) to (255,255,255) and set parameters
 	   ----------------------------------------------------------------------- */
-	public unsafe NeuQuant(byte* picture, int stride, int frameBytes, int sample, int width3) {
+	public unsafe NeuQuant(byte* picture, int stride, int frameBytes, int sample, int width, int bytes) {
 		thePicturePtr = picture;
 		lengthCount = frameBytes;
 		sampleFac = sample;
-		w3 = width3;
+		w_bytes = width * (b = bytes);
 		theStride = stride;
 		network = new int[NetSize][];
 		for (var i = 0; i < NetSize; ++i)
@@ -215,19 +215,18 @@ public class NeuQuant {
 
 	/* Initialise network in range (0,0,0) to (255,255,255) and set parameters - cancellable
 	   ----------------------------------------------------------------------- */
-	public unsafe NeuQuant(byte* picture, int stride, int len, int sample, int width3, CancellationToken token) {
+	public unsafe NeuQuant(byte* picture, int stride, int len, int sample, int width, int bytes, CancellationToken token) {
 		thePicturePtr = picture;
 		lengthCount = len;
 		sampleFac = sample;
 		theStride = stride;
-		w3 = width3;
+		w_bytes = width*(b = bytes);
 		network = new int[NetSize][];
 		for (var i = 0; i < NetSize; ++i) {
 			if (token.IsCancellationRequested)
 				return;
 			InitNetwork(i);
 		}
-
 		FactorizeLength(lengthCount, token);
 	}
 
@@ -239,7 +238,7 @@ public class NeuQuant {
 	}
 
 	private void FactorizeLength(int len, CancellationToken token) {
-		var samplePixels = len / (3 * sampleFac);
+		var samplePixels = len / (b * sampleFac);
 		factor = 1;
 		for (int t = 2, xt = factor * t, st = samplePixels / t;
 			 xt - st < samplePixels - factor;
@@ -251,7 +250,6 @@ public class NeuQuant {
 				samplePixels = st;
 				continue;
 			}
-
 			++t;
 		}
 	}
@@ -384,7 +382,7 @@ public class NeuQuant {
 			sampleFac = 1;
 		alphaDec = 30 + (sampleFac - 1) / 3;
 		var lim = len;
-		var samplePixels = len / (3 * sampleFac);
+		var samplePixels = len / (b * sampleFac);
 		var delta = samplePixels / NumCycles;
 		if (delta <= 0)
 			delta = 1;
@@ -399,10 +397,10 @@ public class NeuQuant {
 			radPower[i] = alpha * ((rad2 - i * i) * RadBias / rad2);
 
 		var step = len < MinPictureBytes
-			? 3 : len % Prime1 != 0
-				? 3 * Prime1 : len % Prime2 != 0
-					? 3 * Prime2 : len % Prime3 != 0
-						? 3 * Prime3 : 3 * Prime4;
+			? b : len % Prime1 != 0
+				? b * Prime1 : len % Prime2 != 0
+					? b * Prime2 : len % Prime3 != 0
+						? b * Prime3 : b * Prime4;
 		var pix = i = 0;
 		for (var x = 0; x < samplePixels; ++x) {
 			var f = ani[pix / lengthCount];
@@ -412,8 +410,8 @@ public class NeuQuant {
 			if (f.Ptr != null) {
 				// Calculate the byte offset from the beginning of the row
 				// modPix is the pixel index (modPix / w3 is the row), w3 = 3 * width (bytes per row)
-				var scanMod = modPix % w3;
-				var scanPtr = modPix / w3 * f.Stride; // Find the row in memory (stride accounts for padding)
+				var scanMod = modPix % w_bytes;
+				var scanPtr = modPix / w_bytes * f.Stride; // Find the row in memory (stride accounts for padding)
 													  // Access the color channels in the correct order (BGR) using the scanMod for the column
 				b = f.Ptr[scanPtr + scanMod] << NetBiasShift; // Blue channel (first byte)
 				g = f.Ptr[scanPtr + scanMod + 1] << NetBiasShift; // Green channel (second byte)
@@ -458,12 +456,12 @@ public class NeuQuant {
 				e = e.NextTask;
 			}
 
-			delta = (samplePixels = len / (3 * sampleFac)) / NumCycles;
+			delta = (samplePixels = len / (b * sampleFac)) / NumCycles;
 			FactorizeLength(len, token);
 		} else {
 			len = lengthCount;
 			ani.Add(new PixelsFrame(thePicturePtr, thePictureArr, theStride));
-			delta = (samplePixels = len / (3 * sampleFac)) / NumCycles;
+			delta = (samplePixels = len / (b * sampleFac)) / NumCycles;
 		}
 		if (len < MinPictureBytes)
 			sampleFac = 1;
@@ -482,10 +480,10 @@ public class NeuQuant {
 		for (i = 0; i < rad; ++i)
 			radPower[i] = alpha * ((rad2 - i * i) * RadBias / rad2);
 		var step = len < MinPictureBytes
-			? 3 : len % Prime1 != 0
-				? 3 * Prime1 : len % Prime2 != 0
-					? 3 * Prime2 : len % Prime3 != 0
-						? 3 * Prime3 : 3 * Prime4;
+			? b : len % Prime1 != 0
+				? b * Prime1 : len % Prime2 != 0
+					? b * Prime2 : len % Prime3 != 0
+						? b * Prime3 : b * Prime4;
 		var pix = i = 0;
 		samplePixels /= factor;
 
@@ -503,8 +501,8 @@ public class NeuQuant {
 					if (f.Ptr != null) {
 						// Calculate the byte offset from the beginning of the row
 						// modPix is the pixel index (modPix / w3 is the row), w3 = 3 * width (bytes per row)
-						scanMod = modPix % w3;
-						scanPtr = modPix / w3 * f.Stride; // Find the row in memory (stride accounts for padding)
+						scanMod = modPix % w_bytes;
+						scanPtr = modPix / w_bytes * f.Stride; // Find the row in memory (stride accounts for padding)
 														  // Access the color channels in the correct order (BGR) using the scanMod for the column
 						b = f.Ptr[scanPtr + scanMod] << NetBiasShift; // Blue channel (first byte)
 						g = f.Ptr[scanPtr + scanMod + 1] << NetBiasShift; // Green channel (second byte)

@@ -2457,7 +2457,7 @@ public partial class GeneratorForm : Form {
 		const int buttonSize = 23;
 		if (single)
 			pointPanel.SuspendLayout();
-		if (i > 1) {
+		if (i > 0) {
 			editorSwitch.Add(new());
 			var s = editorSwitch[^1];
 			s.Text = "⇕";
@@ -2522,24 +2522,22 @@ public partial class GeneratorForm : Form {
 		x.Name = "x" + i;
 		x.Font = new Font("Segoe UI", 7F, FontStyle.Regular, GraphicsUnit.Point, 238);
 		x.Size = new Size(textSize, buttonSize);
-		x.Enabled = i > 0;
-		if (x.Enabled)
-			x.TextChanged += (sender, _) => {
-				if (ParseDiffApply((TextBox)sender, ref generator.GetFractal().ChildX[i])) return;
-				generator.GetFractal().Edit = true;
-			};
+		//if (x.Enabled = i > 0)
+		x.TextChanged += (sender, _) => {
+			if (ParseDiffApply((TextBox)sender, ref generator.GetFractal().ChildX[i])) return;
+			generator.GetFractal().Edit = true;
+		};
 
 		y.Location = new Point(10 + textSize, 10 + i * buttonSize);
 		y.Margin = new Padding(4, 3, 4, 3);
 		y.Name = "y" + y;
 		y.Font = new Font("Segoe UI", 7F, FontStyle.Regular, GraphicsUnit.Point, 238);
 		y.Size = new Size(textSize, buttonSize);
-		y.Enabled = i > 0;
-		if (y.Enabled)
-			y.TextChanged += (sender, _) => {
-				if (ParseDiffApply((TextBox)sender, ref generator.GetFractal().ChildY[i])) return;
-				generator.GetFractal().Edit = true;
-			};
+		//if (y.Enabled = i > 0)
+		y.TextChanged += (sender, _) => {
+			if (ParseDiffApply((TextBox)sender, ref generator.GetFractal().ChildY[i])) return;
+			generator.GetFractal().Edit = true;
+		};
 
 		a.Location = new Point(10 + 2 * textSize, 10 + i * buttonSize);
 		a.Margin = new Padding(4, 3, 4, 3);
@@ -2565,64 +2563,67 @@ public partial class GeneratorForm : Form {
 		d.Name = "d" + i;
 		d.Font = new Font("Segoe UI", 7F, FontStyle.Regular, GraphicsUnit.Point, 238);
 		d.Size = new Size(23, 23);
-		d.Enabled = i > 0;
-		if (d.Enabled)
-			d.Click += (_, _) => {
-				var f = generator.GetFractal();
-				var ni = --f.ChildCount;
-				var nx = new double[ni];
-				var ny = new double[ni];
-				var na = new double[f.ChildAngle.Count][];
-				var nc = new byte[f.ChildColor.Count][];
-				var cx = f.ChildX;
-				var cy = f.ChildY;
-				pointPanel.SuspendLayout();
-				UnFillEditor();
-				pointPanel.ResumeLayout(false);
-				int xp;
-				// RemoveAt from XY
-				for (var ci = 0; ci < i; ++ci) {
-					nx[ci] = cx[ci];
-					ny[ci] = cy[ci];
-				}
+		//if (d.Enabled = i > 0)
+		d.Click += (_, _) => {
+			var f = generator.GetFractal();
+			if (f.ChildCount <= 1) {
+				Error("Cannot remove the last one", "Cannot Remove");
+				return;
+			}
+			var ni = --f.ChildCount;
+			var nx = new double[ni];
+			var ny = new double[ni];
+			var na = new double[f.ChildAngle.Count][];
+			var nc = new byte[f.ChildColor.Count][];
+			var cx = f.ChildX;
+			var cy = f.ChildY;
+			pointPanel.SuspendLayout();
+			UnFillEditor();
+			pointPanel.ResumeLayout(false);
+			int xp;
+			// RemoveAt from XY
+			for (var ci = 0; ci < i; ++ci) {
+				nx[ci] = cx[ci];
+				ny[ci] = cy[ci];
+			}
+			for (var ci = i; ci < ni; ci = xp) {
+				xp = ci + 1;
+				nx[ci] = cx[xp];
+				ny[ci] = cy[xp];
+			}
+			f.ChildX = nx;
+			f.ChildY = ny;
+			// RemoveAt from Angle
+			for (var l = 0; l < f.ChildAngle.Count; ++l) {
+				var nal = na[l] = new double[ni];
+				var (can, ca) = f.ChildAngle[l];
+				for (var ci = 0; ci < i; ++ci)
+					nal[ci] = ca[ci];
 				for (var ci = i; ci < ni; ci = xp) {
 					xp = ci + 1;
-					nx[ci] = cx[xp];
-					ny[ci] = cy[xp];
+					nal[ci] = ca[xp];
 				}
-				f.ChildX = nx;
-				f.ChildY = ny;
-				// RemoveAt from Angle
-				for (var l = 0; l < f.ChildAngle.Count; ++l) {
-					var nal = na[l] = new double[ni];
-					var (can, ca) = f.ChildAngle[l];
-					for (var ci = 0; ci < i; ++ci)
-						nal[ci] = ca[ci];
-					for (var ci = i; ci < ni; ci = xp) {
-						xp = ci + 1;
-						nal[ci] = ca[xp];
-					}
-					f.ChildAngle[l] = (can, nal);
+				f.ChildAngle[l] = (can, nal);
+			}
+			// RemoveAt from Color
+			for (var l = 0; l < f.ChildColor.Count; ++l) {
+				var ncl = nc[l] = new byte[ni];
+				var (ccn, cc) = f.ChildColor[l];
+				for (var ci = 0; ci < i; ++ci)
+					ncl[ci] = cc[ci];
+				for (var ci = i; ci < ni; ci = xp) {
+					xp = ci + 1;
+					ncl[ci] = cc[xp];
 				}
-				// RemoveAt from Color
-				for (var l = 0; l < f.ChildColor.Count; ++l) {
-					var ncl = nc[l] = new byte[ni];
-					var (ccn, cc) = f.ChildColor[l];
-					for (var ci = 0; ci < i; ++ci)
-						ncl[ci] = cc[ci];
-					for (var ci = i; ci < ni; ci = xp) {
-						xp = ci + 1;
-						ncl[ci] = cc[xp];
-					}
-					f.ChildColor[l] = (ccn, ncl);
-				}
-				// RemoveAt from editor points
-				for (var ci = 0; ci < ni; ++ci)
-					AddEditorPoint(nx, ny, na[generator.SelectedChildAngle], nc[generator.SelectedChildAngle], false);
-				// Finish edit
-				f.Edit = true;
-				QueueReset();
-			};
+				f.ChildColor[l] = (ccn, ncl);
+			}
+			// RemoveAt from editor points
+			for (var ci = 0; ci < ni; ++ci)
+				AddEditorPoint(nx, ny, na[generator.SelectedChildAngle], nc[generator.SelectedChildAngle], false);
+			// Finish edit
+			f.Edit = true;
+			QueueReset();
+		};
 		addPoint.Location = new(10, 10 + (i + 1) * buttonSize);
 	}
 	private void SaveFractal_FileOk(object sender, CancelEventArgs e) {
@@ -2886,7 +2887,7 @@ public partial class GeneratorForm : Form {
 		QueueReset();
 	}
 	private void SizeBox_TextChanged(object sender, EventArgs e) {
-		if (ParseClampReTextDiffApply(sizeBox, ref generator.GetFractal().ChildSize, 2, 128))
+		if (ParseClampReTextDiffApply(sizeBox, ref generator.GetFractal().ChildSize, Math.Sqrt(2), 128))
 			return;
 		generator.GetFractal().Edit = true;
 	}

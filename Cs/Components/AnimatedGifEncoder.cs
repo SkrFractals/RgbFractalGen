@@ -35,6 +35,7 @@ using System.Threading.Tasks;
  *  3. Added support for a Cancellation token (useful if running in a thread or using the parallelism, and you want to quickly cancel), use the overloaded functions with Cancellation token argument for this feature
  *  4. Added support for unsafe byte* pointer arrays as image input, you can have these if you generate your own bitmaps pixel by pixel through bitmap.LockBits. Keep it locked until the AddFrame task is finished!
  *  5. Added support for out of order AddFrame calls (DO NOT MIX this feature with the classic automatic ordered calls!), old ordered calls are used if you leave the frameIndex argument -1 or give other negative number 
+ *  6. Added support for different PixelFormats (RGB/RGBA etc)
  */
 #endregion
 
@@ -64,13 +65,13 @@ public enum ColorTable : byte {
  *    unsafe {
  *     // Image:
  *     var bmp1 = new Bitmap(width, height);
- *	   var locked1 = bitmaps[bitmapsGenerated].LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat.Format24bppRgb);
+ *	   var locked1 = bitmaps[bitmapsGenerated].LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, format);
  *	   byte* p1, imageBytes1 = p = (byte*)(void*)locked.Scan0;
  *	   for (var y = 0 y < height; ++y) for (var x = 0; x < width; ++x) {
  *	    p[0] = (byte)BLUE;    //  BLUE subPixel at x,y
  *		p[1] = (byte)GREEN;   // GREEN subPixel at x,y
  *		p[2] = (byte)RED;     //   RED subPixel at x,y
- *		p += 3;
+ *		p += bytes; // 3 or 4 if rgb or argb
  *	   }
  *     e.AddFrame(imageBytes1); // modification takes only directly byte* that you already have from LockBits, instead of Image+byte[]
  *     bmp1.UnlockBits(locked1);
@@ -109,6 +110,8 @@ public class AnimatedGifEncoder {
 	private const int PalSize = 7; // color table size (bits-1)
 	private int dispose = -1; // disposal code (-1 = use default)
 	private int sample = 10; // default sample interval for quantizer
+	private PixelFormat format = PixelFormat.Format24bppRgb;
+	private int bytes = 3;
 
 	// SkrFractals' additions:
 	private EncoderTaskData encodeTaskData; // The next task struct to add encoding task to
@@ -143,9 +146,7 @@ public class AnimatedGifEncoder {
 	 *
 	 * @param ms int delay time in hundredths
 	 */
-	public void SetDelay(int hundredths) {
-		delay = hundredths;
-	}
+	public void SetDelay(int hundredths) => delay = hundredths;
 
 	/**
 	 * Sets the GIF frame disposal code for the last added frame and any subsequent frames.
@@ -193,9 +194,7 @@ public class AnimatedGifEncoder {
 	 * @param quality int greater than 0.
 	 * @return
 	 */
-	public void SetQuality(int quality) {
-		sample = Math.Max(1, quality);
-	}
+	public void SetQuality(int quality) => sample = Math.Max(1, quality);
 
 	/**
 	 * Sets the transparent color for the last added frame
@@ -208,10 +207,14 @@ public class AnimatedGifEncoder {
 	 *
 	 * @param c Color to be treated as transparent on display.
 	 */
-	public void SetTransparent(Color c) {
-		transparent = c;
-	}
+	public void SetTransparent(Color c) => transparent = c;
 
+	public void SetPixelFormat(PixelFormat newFormat) => bytes = (format = newFormat) switch {
+		PixelFormat.Format24bppRgb => 3,
+		PixelFormat.Format32bppArgb => 4,
+		PixelFormat.Format32bppRgb => 4,
+		_ => throw new("Unsupported PixelFormat. Only Format24bppRgb/Format32bppArgb/Format32bppRgb"),
+	};
 	#endregion
 
 	#region Commands
@@ -610,8 +613,8 @@ public class AnimatedGifEncoder {
 		// each instance of NeuQuant will write the data into its own EncoderTaskData,
 		// so it can be remembered for the later sequential write
 		encodeData.ThisNeuQuant = encodeData.PixelsPtr == null
-			? new NeuQuant(encodeData.PixelsArr, len, sample, width * 3)
-			: new NeuQuant(encodeData.PixelsPtr, encodeData.Stride, len, sample, width * 3);
+			? new NeuQuant(encodeData.PixelsArr, len, sample, width, bytes)
+			: new NeuQuant(encodeData.PixelsPtr, encodeData.Stride, len, sample, width, bytes);
 		encodeData.ColorTab = encodeData.ThisNeuQuant.Process(); // create reduced palette
 		return false;
 	}
@@ -624,7 +627,7 @@ public class AnimatedGifEncoder {
 		// initialize quantizer
 		// each instance of NeuQuant will write the data into its own EncoderTaskData,
 		// so it can be remembered for the later sequential write
-		encodeData.ThisNeuQuant = new NeuQuant(encodeData, len, sample, width * 3);
+		encodeData.ThisNeuQuant = new NeuQuant(encodeData, len, sample, width, bytes);
 		encodeData.ColorTab = encodeData.ThisNeuQuant.Process(); // create reduced palette
 		return false;
 	}
@@ -640,14 +643,14 @@ public class AnimatedGifEncoder {
 
 		if (p == null) {
 			var pa = encodeData.PixelsArr;
-			for (int x = width * height, i = 0, pi = 0; x > 0; --x)
+			for (int x = width * height, i = 0, pi = 0; x > 0; --x, pi += bytes)
 				//usedEntry[
-				encodeData.IndexedPixels[i++] = (byte)nq.Map(pa[pi++], pa[pi++], pa[pi++]);
+				encodeData.IndexedPixels[i++] = (byte)nq.Map(pa[pi], pa[pi+1], pa[pi+2]);
 			//] = true;
 		} else {
 			for (int y = 0, i = 0; y < height; ++y) {
 				var pi = p + encodeData.Stride * y;
-				for (var x = 0; x < width; ++x, pi += 3)
+				for (var x = 0; x < width; ++x, pi += bytes)
 					//usedEntry[
 					encodeData.IndexedPixels[i++] = (byte)nq.Map(pi[0], pi[1], pi[2]);
 				//] = true;
@@ -680,8 +683,8 @@ public class AnimatedGifEncoder {
 		// each instance of NeuQuant will then write the data into its own EncoderTaskData,
 		// so it can be remembered for the later sequential write
 		encodeData.ThisNeuQuant = encodeData.PixelsPtr == null
-			? new NeuQuant(encodeData.PixelsArr, len, sample, width * 3, token)
-			: new NeuQuant(encodeData.PixelsPtr, encodeData.Stride, len, sample, width * 3, token);
+			? new NeuQuant(encodeData.PixelsArr, len, sample, width, bytes, token)
+			: new NeuQuant(encodeData.PixelsPtr, encodeData.Stride, len, sample, width, bytes, token);
 		encodeData.ColorTab = encodeData.ThisNeuQuant.Process(token); // create reduced palette
 		return token.IsCancellationRequested;
 	}
@@ -693,7 +696,7 @@ public class AnimatedGifEncoder {
 		// initialize quantizer
 		// each instance of NeuQuant will write the data into its own EncoderTaskData,
 		// so it can be remembered for the later sequential write
-		encodeData.ThisNeuQuant = new NeuQuant(encodeData, len, sample, width * 3);
+		encodeData.ThisNeuQuant = new NeuQuant(encodeData, len, sample, width, bytes);
 		encodeData.ColorTab = encodeData.ThisNeuQuant.Process(token); // create reduced palette
 		return token.IsCancellationRequested;
 	}
@@ -711,9 +714,9 @@ public class AnimatedGifEncoder {
 			for (int y = 0, i = 0, pi = 0; y < height; ++y) {
 				if (token.IsCancellationRequested)
 					return true;
-				for (var x = 0; x < width; ++x)
+				for (var x = 0; x < width; ++x, pi += bytes)
 					//usedEntry[
-					encodeData.IndexedPixels[i++] = (byte)nq.Map(pa[pi++], pa[pi++], pa[pi++]);
+					encodeData.IndexedPixels[i++] = (byte)nq.Map(pa[pi], pa[pi+1], pa[pi+2]);
 				//] = true;
 			}
 		} else {
@@ -721,7 +724,7 @@ public class AnimatedGifEncoder {
 				if (token.IsCancellationRequested)
 					return true;
 				var pi = p + encodeData.Stride * y;
-				for (var x = 0; x < width; ++x, pi += 3)
+				for (var x = 0; x < width; ++x, pi += bytes)
 					//usedEntry[
 					encodeData.IndexedPixels[i++] = (byte)nq.Map(pi[0], pi[1], pi[2]);
 				//] = true;
@@ -863,9 +866,9 @@ public class AnimatedGifEncoder {
 	};
 
 	/** Add bitmap to the task */
-	private static void SetEncodeBitmap(EncoderTaskData encodeTask, Image im) {
+	private void SetEncodeBitmap(EncoderTaskData encodeTask, Image im) {
 		encodeTask.BitmapData = (encodeTask.Bitmap = (Bitmap)im).LockBits(new Rectangle(0, 0, im.Width, im.Height),
-			ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+			ImageLockMode.ReadOnly, format);
 	}
 
 	/**Initiates writing of a GIF file with the specified name.

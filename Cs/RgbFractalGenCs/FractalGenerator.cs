@@ -1866,7 +1866,7 @@ internal partial class FractalGenerator {
 				var d = bitmapData[task.BitmapIndex];
 				var ptr = (byte*)(void*)d.Scan0;
 				// Start encoding this image as GIF
-				gifEncoder.AddFrameParallel(ptr, d.Stride, gifToken, task.BitmapIndex - previewFrames);
+				gifEncoder.AddFrameParallel(ptr, d.Stride, gifToken, task.BitmapIndex - previewFrames/*, allocGpuDrawType == GpuDrawType.CPU*/);
 				encodedGif[task.BitmapIndex] = 2;
 			}
 		} else {
@@ -3512,7 +3512,7 @@ internal partial class FractalGenerator {
 			nint bytes = LockBits(task.BitmapIndex, 
 				(allocParallelType == ParallelType.OfDepth ? task.BitmapIndex : task.BitmapIndex + 1) < previewFrames 
 				? new Rectangle(0, 0, task.ApplyWidth, task.ApplyHeight) : rect
-			,allocGpuDrawType == GpuDrawType.CPU ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb).Scan0;
+			, allocGpuDrawType == GpuDrawType.CPU ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb).Scan0;
 			//var vw = task.ApplyHeight / allocVoid + 2;
 			int DrawType = allocNoise > 0 && allocGenerationType != GenerationType.HashSeeds && IsAmbient ? 0 : (IsAmbient ? 4 : 8);
 			if (allocGpuDrawType == GpuDrawType.CPU) {
@@ -3740,7 +3740,7 @@ internal partial class FractalGenerator {
 			gifEncoder.SetRepeat(0);		// Loop
 			gifEncoder.SetQuality(1);		// Highest quality
 			gifEncoder.SetTransparent(SelectedAmbient < 0 ? Color.Black : Color.Empty);
-
+			gifEncoder.SetPixelFormat(allocGpuDrawType == GpuDrawType.CPU ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb);
 			MakeTemp();
 
 			while (gifIndex < 255) {
