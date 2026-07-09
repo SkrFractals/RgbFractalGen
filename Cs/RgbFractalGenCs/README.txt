@@ -34,15 +34,13 @@ TODO:
 Known bugs, issues, and plans for new fearutes to be added/fixed later:
 BUGS: Rarelly the program crashes for various reasons, it's probably more bugs in one, and I'll try to keep fixing these as I figure out what's causing these. It's not that bad though.
 BUG: When PNG encoding is selected, the preview screen sometimes goes blank until it's refresh with a new frame. Possibly trying to display a bitmap that is activelly written to a file, but I thought I accounted for that.
+-maybe fixed already?
 BUG: Some zoom child choices might be broken and not zoom/loop correctly (this is new and complex feature, so it still has some work to do on it)
 FEATURE: turning on a gif encoder or changing gif encoder type or delay shouldn't need to restart the whole animation generation from scratch, but if I do that it will crash, so it's restarting for now.
 FEATURE: Draw direction arrows for children angles in editor preview more
-LANGUAGE: update the C++ implementation - the current one is very obsolete, but I could never really make it perform better than C# so I'm seriously considering to just abandon it.
-
-Known bugs, issues and features I'm actively trying to fix and implement ASAP:
-BUG: Toggling PNG encoding on will not catch up with encoding the PNGs for the current animation
-BUG: Low resolution preview doesn't have the same zoom/spin as the final full resolution first frame in some cases
 FEATURE: Finish implementing the batching feature
+LANGUAGE: update the C++ implementation - the current one is very obsolete, but I could never really make it perform better than C# so I'm seriously considering to just abandon it.
+LANGUAGE: port the Cs version into Avalonia, that should let it become multi-platform. But it would bloat the size to about 150MB or so.
 
 ----------------------------------------------------------------------------------------------------------
 
@@ -312,6 +310,7 @@ Export Select:
 - GIF->MP4: Convert the temporary or exported GIF into an MP4. You need to have GIF encoding selected for this to be available. You can use it before of after saving the GIF.
 - MP4: Will Export the animation as PNG series and covert those into high quality MP4. Unintuitively, it's a bit faster overall with PNG encoding turned OFF.
 - Load Export: This will instead let you open any exported file, and try to read all of it's properties, as long as they are encoded in the file name descibed below:
+- Import Code: This will let copy-paste an imnport code directly from clipboard, instead of having to locate a file with such a filename.
 
 File:
 - This will let you choose the default filename that will be offered to you when you export. (you can always rename to whatever you want though)

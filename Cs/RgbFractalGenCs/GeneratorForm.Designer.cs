@@ -790,7 +790,7 @@ namespace RgbFractalGenCs {
 			// 
 			exportSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			exportSelect.FormattingEnabled = true;
-			exportSelect.Items.AddRange(new object[] { "Current PNG", "PNGs", "MP4", "Selected GIF", "GIF->MP4", "Load Export" });
+			exportSelect.Items.AddRange(new object[] { "Current PNG", "PNGs", "MP4", "Selected GIF", "GIF->MP4", "Load Export", "Import Code" });
 			exportSelect.Location = new System.Drawing.Point(162, 381);
 			exportSelect.Name = "exportSelect";
 			exportSelect.Size = new System.Drawing.Size(108, 23);
@@ -1698,7 +1698,7 @@ namespace RgbFractalGenCs {
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new Padding(4, 3, 4, 3);
 			Name = "GeneratorForm";
-			Text = "RGB Fractal Zoom Generator C# v1.13.3";
+			Text = "RGB Fractal Zoom Generator C# v1.13.4";
 			FormClosing += GeneratorForm_FormClosing;
 			helpPanel.ResumeLayout(false);
 			helpPanel.PerformLayout();

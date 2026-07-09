@@ -728,11 +728,12 @@ internal partial class FractalGenerator {
 	#endregion
 
 	#region Unsorted
-	BitmapData LockBits(int index, Rectangle rect, PixelFormat format = PixelFormat.Format24bppRgb) {
+	BitmapData LockBits(int index, Rectangle rect) {
 		if (lockedBmp[index])
 			return bitmapData[index];
 		lockedBmp[index] = true;
-		return bitmapData[index] = bitmap[index].LockBits(rect, ImageLockMode.ReadWrite, format);
+		return bitmapData[index] = bitmap[index].LockBits(rect, ImageLockMode.ReadWrite, 
+			allocGpuDrawType == GpuDrawType.CPU ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb);
 	}
 	void UnlockBits(uint index) {
 		if (!lockedBmp[index])
@@ -3511,8 +3512,7 @@ internal partial class FractalGenerator {
 			bitmapState[task.BitmapIndex] = BitmapState.Drawing;
 			nint bytes = LockBits(task.BitmapIndex, 
 				(allocParallelType == ParallelType.OfDepth ? task.BitmapIndex : task.BitmapIndex + 1) < previewFrames 
-				? new Rectangle(0, 0, task.ApplyWidth, task.ApplyHeight) : rect
-			, allocGpuDrawType == GpuDrawType.CPU ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb).Scan0;
+				? new Rectangle(0, 0, task.ApplyWidth, task.ApplyHeight) : rect).Scan0;
 			//var vw = task.ApplyHeight / allocVoid + 2;
 			int DrawType = allocNoise > 0 && allocGenerationType != GenerationType.HashSeeds && IsAmbient ? 0 : (IsAmbient ? 4 : 8);
 			if (allocGpuDrawType == GpuDrawType.CPU) {

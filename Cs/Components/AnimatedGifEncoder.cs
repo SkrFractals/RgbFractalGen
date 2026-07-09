@@ -726,7 +726,7 @@ public class AnimatedGifEncoder {
 				var pi = p + encodeData.Stride * y;
 				for (var x = 0; x < width; ++x, pi += bytes)
 					//usedEntry[
-					encodeData.IndexedPixels[i++] = (byte)nq.Map(pi[0], pi[1], pi[2]);
+					encodeData.IndexedPixels[i++] = (byte)nq.Map(pi[0], pi[1], pi[2]); // TODO CRASH sometimes: "Attempted to read/write protected memory"
 				//] = true;
 			}
 		}

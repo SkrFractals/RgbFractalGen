@@ -26,10 +26,10 @@ internal class Fractal {
 	// Properties
 	internal string Name;       // Fractal name (only for selection list)
 	internal int ChildCount;    // ChildCount of children Inside (must equal the length of all the following arrays)
-	internal double ChildSize;   // Scale Of children Inside (how much to scale the image when switching parent-child)
-	internal double MaxSize;     // The root scale (if too small, the fractal might not fill the whole screen, if too large, it might hurt the performance)
-	internal double MinSize;     // How tiny the iterations must have to get before rendering dots (if too large, it might crash, it too low it might look gray and have bad performance)
-	internal double CutSize;     // A scaling multiplier to test cutting off iterations that are completely outside the view (if you see pieces disappearing too early when zooming in, increase it, if not you can decrease to boost performance)
+	internal double ChildSize;  // Scale Of children Inside (how much to scale the image when switching parent-child)
+	internal double MaxSize;    // The root scale (if too small, the fractal might not fill the whole screen, if too large, it might hurt the performance)
+	internal double MinSize;    // How tiny the iterations must have to get before rendering dots (if too large, it might crash, it too low it might look gray and have bad performance)
+	internal double CutSize;    // A scaling multiplier to test cutting off iterations that are completely outside the view (if you see pieces disappearing too early when zooming in, increase it, if not you can decrease to boost performance)
 	internal double[]
 		ChildX;                 // X coordinate shifts of children inside
 	internal double[]

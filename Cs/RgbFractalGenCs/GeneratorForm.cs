@@ -65,6 +65,7 @@ public partial class GeneratorForm : Form {
 	private short queueReset;       // Counting time until generator Restart
 	private int isGifReady;
 	private bool isPngsSaved = false;
+	private InputCode input;
 
 	// Settings
 	private bool animated = true;   // Animating preview or paused? (default animating)
@@ -587,6 +588,7 @@ public partial class GeneratorForm : Form {
 				3 => "Save GIF",
 				4 => "Save MP4",
 				5 => "Load File",
+				6 => "Import Code",
 				_ => "Undefined",
 			};
 
@@ -1944,10 +1946,16 @@ public partial class GeneratorForm : Form {
 				saveGif.Filter = "MP4 video (*.mp4)|*.mp4";
 				_ = saveGif.ShowDialog();
 				break;
-			case 5: // IMPORT
+			case 5: // IMPORT FILE
 				loadExport.DefaultExt = "";
 				loadExport.Filter = "All files (*.*)|*.*";
 				_ = loadExport.ShowDialog();
+				break;
+			case 6: // IMPORT CODE
+				input ??= new InputCode();
+				input.SetUp(this, GetFileName());
+				input.Show();
+				input.Location = Location;
 				break;
 		}
 	}
@@ -1963,7 +1971,8 @@ public partial class GeneratorForm : Form {
 			2 => "Export the full animation into MP4 video",
 			3 => "Export the full animation into a GIF file.\nMust have GIF encoding enabled.",
 			4 => "Convert a GIF file into Mp4.\nMust have GIF encoding enabled.",
-			5 => "This will import a fractaal instead.\nIf you select any exported fractal it will attempt to load everything it can to replicate it.",
+			5 => "This will import a fractal instead.\nIf you select any exported fractal it will attempt to load everything it can to replicate it.\nThe export must have the original suggested export filename.",
+			6 => "This will import a fractal instead.\nIf you have an Import Code, you can paste it and it will preselected all the fractal definitions and settings.",
 			_ => ""
 		});
 	}
@@ -2066,23 +2075,22 @@ public partial class GeneratorForm : Form {
 		mp4Path = ((SaveFileDialog)sender).FileName;
 		xTask = Task.Run(ExportMp4, (xCancel = new()).Token);
 	}
-	private void LoadExport_FileOk(object sender, CancelEventArgs e) {
-		LoadExportFile();
-	}
-	private bool LoadExportFile() {
-		var s = Path.GetFileNameWithoutExtension(loadExport.FileName).Split(['_', '(', ')']);
+	private void LoadExport_FileOk(object sender, CancelEventArgs e) 
+		=> LoadCodeName(Path.GetFileNameWithoutExtension(loadExport.FileName));
+	public bool LoadCodeName(string codeName) {
+		var s = codeName.Split(['_', '(', ')']);
 		var f = generator.GetFractals();
 
 		// load fractal type:
 		short fi = 0;
-		while (fi < f.Count()) {
+		while (fi < f.Count) {
 			if (f[fi].Name == s[0]) {
 				fractalSelect.SelectedIndex = fi;
 				break;
 			}
 			++fi;
 		}
-		if (fi == f.Count())
+		if (fi == f.Count)
 			return false; // not valid file name, nothing can be loaded
 		fi = 1;
 		short _s;
@@ -2330,8 +2338,7 @@ public partial class GeneratorForm : Form {
 		}
 		_ = Error(result, "Failed MP4 export");
 	}
-	void SetFileName(SaveFileDialog dialog, string extension) {
-		//var prev = dialog.FileName;
+	string GetFileName() {
 		string f = "";
 		f += generator.GetFractal().Name;
 		if ((fileMask & 1) > 0)
@@ -2356,7 +2363,12 @@ public partial class GeneratorForm : Form {
 			f += "_I(" + saturateBox.Text + "_" + brightnessBox.Text + "_" + bloomBox.Text + "_" + blurBox.Text + ")";
 		if ((fileMask & 1024) > 0)
 			f += "_D(" + (ditherBox.Checked ? "1" : "0") + "_" + detailBox.Text + ")";
-		dialog.FileName = f + "." + extension;
+		return f;
+	}
+	void SetFileName(SaveFileDialog dialog, string extension) {
+		//var prev = dialog.FileName;
+
+		dialog.FileName = GetFileName() + "." + extension;
 	}
 	#endregion
 
