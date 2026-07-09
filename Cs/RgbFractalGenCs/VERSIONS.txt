@@ -2,6 +2,10 @@ Known issues:
 -Rare crashes
 -ZoomChild is be buggy for some indices (not centering properly, jumping, and CutSize cutting off parts of the fractal too soon)
 
+1.13.4
+-Fixed an occasional crash in GifEncoder, when GPU Draw was enabled
+-Added Impode Code feature (like Load Export, but from a clipboard)
+
 1.13.3
 -Fixed a couple angle sets of the new fractals
 -Allowed to edit the first central child (assuming it could work with ZoomChild, but that feature is still a bit buggy)
