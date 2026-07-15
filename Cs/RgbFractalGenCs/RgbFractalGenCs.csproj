@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
     <OutputType>WinExe</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <UseWindowsForms>true</UseWindowsForms>
@@ -21,7 +21,7 @@
     <PackageReference Include="ComputeSharp" Version="3.2.0" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Update="DoubleBufferedPanel.cs">
+    <Compile Update="Content\Basic\DoubleBufferedPanel.cs">
       <SubType>Component</SubType>
     </Compile>
   </ItemGroup>
@@ -592,7 +592,13 @@
     <None Update="ffmpeg.exe">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="README.txt">
+    <None Update="Locales\en-us.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="en-us.README.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="resolutions.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="VERSIONS.txt">

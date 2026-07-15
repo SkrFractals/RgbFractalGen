@@ -1,11 +1,12 @@
-﻿using System.Diagnostics;
+﻿#nullable enable
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System;
 
 public unsafe class Mp4Encoder {
-	private Process ffmpeg;
-	private Stream inputStream;
+	private Process? ffmpeg;
+	private Stream? inputStream;
 	//private int width;
 	private int height;
 	//private string outputPath;
@@ -42,8 +43,10 @@ public unsafe class Mp4Encoder {
 		Marshal.Copy((IntPtr)data, buffer, 0, length);
 
 		try {
-			inputStream.Write(buffer, 0, length);
-			inputStream.Flush();
+			if (inputStream != null) {
+				inputStream.Write(buffer, 0, length);
+				inputStream.Flush();
+			}
 			return true;
 		} catch (IOException ex) {
 			Console.WriteLine("IOException: " + ex.Message);
@@ -52,10 +55,14 @@ public unsafe class Mp4Encoder {
 	}
 	public bool Finish() {
 		try {
-			inputStream.Flush();
-			inputStream.Close();
-			ffmpeg.WaitForExit();
-			ffmpeg.Dispose();
+			if (inputStream != null) {
+				inputStream.Flush();
+				inputStream.Close();
+			}
+			if (ffmpeg != null) {
+				ffmpeg.WaitForExit();
+				ffmpeg.Dispose();
+			}
 			return true;
 		} catch (IOException ex) {
 			Console.WriteLine("IOException: " + ex.Message);

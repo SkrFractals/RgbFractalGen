@@ -2,13 +2,28 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup />
   <ItemGroup>
-    <Compile Update="CueTextBox.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="GeneratorForm.cs">
+    <Compile Update="Content\AvailableQuestion.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="InputCode.cs">
+    <Compile Update="Content\GeneratorForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Content\GeneratorsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Content\HelpForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Content\ImportForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Content\InputDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Content\MainForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Content\SettingsForm.cs">
       <SubType>Form</SubType>
     </Compile>
   </ItemGroup>

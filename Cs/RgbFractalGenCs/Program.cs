@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Windows.Forms;
 
 namespace RgbFractalGenCs; 
@@ -11,6 +12,6 @@ static class Program {
 	static void Main() {
 		Application.EnableVisualStyles();
 		Application.SetCompatibleTextRenderingDefault(false);
-		Application.Run(new GeneratorForm());
+		Application.Run(new MainForm());
 	}
 }

@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
+﻿#nullable enable
+using System.Collections.Generic;
 
-namespace RgbFractalGenCs;
+namespace RgbFractalGenCs.Core;
 /// <summary>
 /// Fractal Definitions
 /// </summary>
@@ -25,7 +26,7 @@ internal class Fractal {
 	internal delegate long CutFunction(int index, long flags, Fractal f);
 	// Properties
 	internal string Name;       // Fractal name (only for selection list)
-	internal int ChildCount;    // ChildCount of children Inside (must equal the length of all the following arrays)
+	internal short ChildCount;    // ChildCount of children Inside (must equal the length of all the following arrays)
 	internal double ChildSize;  // Scale Of children Inside (how much to scale the image when switching parent-child)
 	internal double MaxSize;    // The root scale (if too small, the fractal might not fill the whole screen, if too large, it might hurt the performance)
 	internal double MinSize;    // How tiny the iterations must have to get before rendering dots (if too large, it might crash, it too low it might look gray and have bad performance)
@@ -63,7 +64,7 @@ internal class Fractal {
 	/// <param name="childCutFunction">Function that takes a bitarray transforms it and decides to cut some specific patterns of children</param>
 	public Fractal(
 		string name,
-		int childCount,
+		short childCount,
 		double childSize,
 		double maxSize,
 		double minSize,
@@ -101,9 +102,9 @@ internal class Fractal {
 	private Fractal(
 		Fractal copy,
 		string name,
-		int childCount,
-		List<(string, double[])> childAngle,
-		List<(string, byte[])> childColor,
+		short childCount,
+		List<(string, double[])>? childAngle,
+		List<(string, byte[])>? childColor,
 		List<(int, int[])> cutFunction
 	) {
 		ChildSize = copy.ChildSize;
@@ -146,7 +147,7 @@ internal class Fractal {
 	/// <returns>Copy fractal</returns>
 	public Fractal Copy(
 		string name,
-		int childCount,
+		short childCount,
 		List<(string, double[])> childAngle,
 		List<(string, byte[])> childColor,
 		List<(int, int[])> cutFunction
