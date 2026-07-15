@@ -153,7 +153,7 @@ public partial class SettingsForm : Form {
 				p += i.X + ":" + i.Y + ":" + i.Z + ";";
 			file += p[..^1] + "|";
 		}
-		File.WriteAllText(Path.Combine(GetRootSaveDir(), "palette.txt"), file);
+		File.WriteAllText(Path.Combine(GetRootSaveDir(), "palettes.txt"), file);
 
 		// Save Resolutions
 		List<string> fileRes = ["// Resolutions:"];
@@ -171,16 +171,16 @@ public partial class SettingsForm : Form {
 		var rootDir = GetRootSaveDir();
 		var oldSettingsFile = File.Exists(settings);
 
-		bool Is(string name, out string file, bool copy = true) {
+		bool Is(string name, out string file) {
 			file = Path.Combine(rootDir, name);
-			if (copy && !File.Exists(file) && oldSettingsFile)
+			if (!File.Exists(file) && oldSettingsFile)
 				File.Copy(settings, file); // restore from old format settings
 			return File.Exists(file);
 		}
 		if(Is("palettes.txt", out var pFile))
 			LoadPalettes(File.ReadAllText(pFile).Split('|'));
 		//if(Is("fractals.txt", out var file)) LoadFractals(File.ReadAllText(file).Split('|'));
-		if (Is("settings.txt", out var sFile, false))
+		if (Is("settings.txt", out var sFile))
 			LoadParams(File.ReadAllText(sFile).Split('|'));
 		if (localeBox.SelectedIndex < 0)
 			localeBox.SelectedIndex = 0;
@@ -190,7 +190,7 @@ public partial class SettingsForm : Form {
 			var v = s[i + 1];
 			var p = int.TryParse(v, out var n);
 			switch (s[i]) {
-				case "locale": localeBox.SelectedItem = v; break;
+				case "locale": localeBox.SelectedIndex = LocaleKeys.IndexOf(v); break;
 				case "threads": threadsBox.Text = v; break;
 				case "cache": if (p) cacheBox.Checked = n == 1; break;
 				case "": --i; break;

@@ -605,6 +605,9 @@
     <None Update="resolutions.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="settings.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="VERSIONS.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

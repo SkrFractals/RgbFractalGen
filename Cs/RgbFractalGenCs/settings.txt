@@ -1,0 +1,1 @@
+locale|en-US|threads|5|cache|0
