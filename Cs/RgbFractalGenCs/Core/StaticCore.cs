@@ -16,6 +16,7 @@ internal static class StaticCore {
 	internal static short Tasks;
 	internal static ushort MaxChildren = 1;
 	internal static bool CacheChecked = false;
+	internal static int ReduceThreads = 3;
 
 	// Config
 	internal static int MaxTasks;
@@ -848,7 +849,7 @@ internal static class StaticCore {
 			if (i.ChildCount > MaxChildren)
 				MaxChildren = (ushort)i.ChildCount;
 		}
-		MaxTasks = Math.Max(FractalGenerator.MinTasks, Environment.ProcessorCount - 2);
+		MaxTasks = Math.Max(FractalGenerator.MinTasks, Environment.ProcessorCount - ReduceThreads);
 	}
 
 	internal static void LoadPalettes(string[] s) {

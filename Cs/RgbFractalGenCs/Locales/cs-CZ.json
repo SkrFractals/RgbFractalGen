@@ -368,6 +368,7 @@
 
   "-ErrorsAndDialogs-": "--------------------------------------------------------------------",
 
+  "saturatedThreads": "VAROVÁNÍ: Povolutete velké množství pracovních vláken.\nPokud přesytí plánování CPU vláken, aplikace se může začít sekat.\nPokud se to stane, přijďte sem zpět a trošku to snižte.",
   "exportStillSaving": "Export se stále ukládá!\nOpravdu chcete zavřít aplikaci a riskovat ztrátu exportu?",
   "confirmExit": "Potvrdit ukončení",
   "confirmSave": "Potvrdit uložení",
@@ -423,7 +424,7 @@
   "bloomLarge2": "Bloom je příliš velký, takže se při vykreslování do pruhů překrývají jádra úloh.",
   "noStripeRange": "Není k dispozici žádný rozsah pruhů",
   "notFoundAnything": "Nic nebylo nalezeno",
-   "resetSchedule": "Stále jsou naplánovány některé nedokončené úlohy po dokončení generování.\nZrušit tuto akci a počkat na dokončení naplánovaných úloh?",
+  "resetSchedule": "Stále jsou naplánovány některé nedokončené úlohy po dokončení generování.\nZrušit tuto akci a počkat na dokončení naplánovaných úloh?",
   "confirmResetSchedule": "Počkat na naplánované úlohy?",
   "moveClose": "Přesunout úlohu Zavřít?",
   "moveCloseTask": "Tato úloha Zavřít byla vyvolána plánovačem a zrušena.\nChcete po dokončení všeho naplánovat novou úlohu Zavřít?",

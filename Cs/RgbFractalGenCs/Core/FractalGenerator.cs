@@ -6,6 +6,8 @@
 
 //#define SmoothnessDebugDetail // Will make the detail parameter huge to separate the deep dots to see how they are splitting themselves 
 
+#define ENABLE_INVOKE
+
 using ComputeSharp;
 using Gif.Components;
 using System;
@@ -656,6 +658,7 @@ internal partial class FractalGenerator {
 ?
 #endif
 		UpdatePreview = null,
+		UpdatePreviewSimple = null,
 		UpdateCache = null;
 
 	private readonly object
@@ -1000,8 +1003,13 @@ internal partial class FractalGenerator {
 					MakeSeedHashFile();
 				UnlockBits(bitmapsFinished);
 				// Let the form know it's ready
+#if ENABLE_INVOKE
 				if (bitmapsFinished++ <= previewFrames && !IsCancelRequested())
 					UpdatePreview?.Invoke();
+#elif SIMPLE_INVOKE
+				if (bitmapsFinished++ <= previewFrames && !IsCancelRequested())
+					UpdatePreviewSimple?.Invoke();
+#endif
 			}
 			// Only called with bitmapIndex -2 is a unique task that needs to mark itself done, otherwise it's a previewImage called within another task
 			var task = tasks[taskIndex];
@@ -1104,9 +1112,12 @@ internal partial class FractalGenerator {
 		}
 		FinishTask(task, stop, "Gif:" + task.BitmapIndex);
 	}
-	#endregion
+#endregion
 
 	private void GenerateAnimation() {
+
+		// makes the GUI thread higher priority by comparion, reducing user lag when saturating CPU with too many worker threads.
+		Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
 
 		#region GeneralAnimation_Implementation
 #if CustomDebug
@@ -1396,9 +1407,10 @@ internal partial class FractalGenerator {
 		foreach (var t in tasks)
 			t.ClearBin();
 		// task has finished:
+		Thread.CurrentThread.Priority = ThreadPriority.Normal;
 		mainTask = null;
 		return;
-		#endregion
+#endregion
 
 		#region InitData
 		void NewBuffer(FractalTask task) {

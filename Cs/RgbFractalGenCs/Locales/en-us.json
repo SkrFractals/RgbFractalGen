@@ -364,6 +364,7 @@
 
   "-ErrorsAndDialogs-": "--------------------------------------------------------------------",
   
+  "saturatedThreads": "WARNING: You are allowing a a lot of worker threads.\nIf they overwhelm the CPU scheduling, your used experience could become laggy.\nIf that happens, come back here and lower this a little.",
   "exportStillSaving": "Your export is still saving!\nAre you sure you want to close the application and potentially lose it?",
   "confirmExit": "Confirm Exit",
   "confirmSave": "Confirm Save",

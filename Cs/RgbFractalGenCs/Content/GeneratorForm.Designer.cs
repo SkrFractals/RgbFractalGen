@@ -1650,7 +1650,7 @@ namespace RgbFractalGenCs {
 			// frameLabel
 			// 
 			frameLabel.AutoSize = true;
-			frameLabel.BackColor = System.Drawing.Color.White;
+			frameLabel.ForeColor = System.Drawing.Color.White;
 			frameLabel.Location = new System.Drawing.Point(216, 9);
 			frameLabel.Name = "frameLabel";
 			frameLabel.Size = new System.Drawing.Size(46, 15);

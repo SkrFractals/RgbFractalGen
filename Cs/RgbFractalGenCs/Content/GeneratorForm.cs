@@ -48,6 +48,7 @@ public partial class GeneratorForm : Form {
 			Size = new Size(80, 80),
 			TabIndex = 0,
 			TabStop = false
+			//Anchor = AnchorStyles.Left | AnchorStyles.Bottom
 		};
 		screenPanel.Paint += ScreenPanel_Paint;
 		screenPanel.Click += AnimateButton_Click;
@@ -74,6 +75,13 @@ public partial class GeneratorForm : Form {
 
 	internal bool SetWorking(bool working) => generator.Working = Working = working;
 	internal void OpenTasks() { scheduler.Show(); scheduler.Location = Location; }
+
+
+
+	/*private (int, int)[] BWH = new (int, int)[3];
+	private int BW = 0;
+	private int BH = 0;
+	private int BI = 0;*/
 
 	#region Variables
 	// Threading
@@ -183,6 +191,9 @@ public partial class GeneratorForm : Form {
 ?
 #endif
 		bitmap) {
+
+		//return; // TODO remove this
+
 		if (currentBitmap == bitmap || bitmap == null)
 			return;
 		// Update the display with the bitmap when it's not loaded
@@ -191,9 +202,17 @@ public partial class GeneratorForm : Form {
 			return;
 		screenPanel?.Invalidate();
 	}
+	private void UpdatePreviewSimple() {
+		var bitmapsFinished = generator.GetBitmapsFinished();
+		currentBitmapIndex = (animated ? currentBitmapIndex + 1 : currentBitmapIndex) % bitmapsFinished;
+	}
 	private void UpdatePreview() {
 		if (!Visible)
 			return;
+
+		//return; // TODO remove this
+
+		// TODO test thoroughly if this monitor wa really needed
 		Monitor.Enter(this);
 		try {
 			var bitmapsFinished = generator.GetBitmapsFinished();
@@ -269,6 +288,7 @@ public partial class GeneratorForm : Form {
 			generator.SelectedFractal = -1;
 			//generator.RestartGif = false;
 			generator.UpdatePreview += UpdatePreview;
+			generator.UpdatePreviewSimple += UpdatePreviewSimple;
 			generator.UpdateCache += UpdateCache;
 
 			myControls.Clear();
@@ -454,6 +474,10 @@ public partial class GeneratorForm : Form {
 		#endregion
 
 		#region Size
+		/*BWH[BI = (BI + 1) % 3] = (Width - ClientRectangle.Width, Height - ClientRectangle.Height);
+		BW = Math.Max(Math.Min(BWH[0].Item1, BWH[1].Item1), Math.Min(Math.Max(BWH[0].Item1, BWH[1].Item1), BWH[2].Item1));
+		BH = Math.Max(Math.Min(BWH[0].Item2, BWH[1].Item2), Math.Min(Math.Max(BWH[0].Item2, BWH[1].Item2), BWH[2].Item2));*/
+
 		/*void SetMinimumSize() {
 			// bw = Width - ClientWidth = 16
 			// bh = Height - ClientHeight = 39
@@ -465,7 +489,7 @@ public partial class GeneratorForm : Form {
 			//const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
 			int bw = Width - ClientRectangle.Width, bh = Height - ClientRectangle.Height;
 			var screenHeight = Math.Max(height, Math.Min(Height - bh, (Width - bw) * height / width));
-			screenPanel.SetBounds(/*305,4*/0, 0, screenHeight * width / height, screenHeight);
+			screenPanel.Size = new(screenHeight * width / height, screenHeight);
 			//helpPanel.SetBounds(305, 4, Width - bw - 314, Height - bh - 8);
 			screenPanel?.Invalidate();
 		}
@@ -489,7 +513,7 @@ public partial class GeneratorForm : Form {
 			generator.SetMaxIterations();
 			// Update the size of the window and display
 			//SetMinimumSize();
-			SetClientSizeCore(width + 314, Math.Max(height + 8, 300));
+			SetClientSizeCore(width/* + 314*/, height/*Math.Max(height + 8, 300)*/);
 			ResizeScreen();
 			WindowSizeRefresh();
 #if CustomDebugTest
@@ -3007,36 +3031,43 @@ public partial class GeneratorForm : Form {
 			: (toolGenPanel, generatorPanel, genControlPanel, fractalSettingsPanel);
 		//const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
 		int bw = Width - client.Width, bh = Height - client.Height;
-		int windowWidth = Width - bw, windowHeight = Height - bh;
+		//int windowWidth = Width - bw, windowHeight = Height - bh;
 		// desired X location of the popup (windowWidth - popupWidth)
 		//popupPanel.Visible = true;
-		var hysteresisOff = windowWidth - popupPanel.Width;
+		var hysteresisOff = client.Width - popupPanel.Width;
 		// does toolbar want to be shown? If so, set its target Y
 		bool showTool = shown && inside;
 		var toolH = tool.MinimumSize.Height;
+		// if screen has some empty space below it, move it down to let the tool be revealed without covering it
+		var screenDesiredY = shown ? Math.Min(toolH, client.Height - screenPanel.Height) : 0;
+		if (screenPanel.Location.Y != screenDesiredY)
+			screenPanel.Location = new(0, screenDesiredY);//Math.Clamp(screenDesiredY, screenPanel.Location.Y - 2, screenPanel.Location.Y + 2));
 		// location in the middle of the animation
-		var popupMiddle = windowWidth - popupPanel.Width / 2;
-		// Location of the hidden popup
-		var hiddenPopup = Math.Clamp(Lerp(windowWidth, popupMiddle, (float)p.X/popupMiddle), popupMiddle, windowWidth);
+		var popupMiddle = client.Width - popupPanel.Width / 2;
 		// does popup want to be shown? (if popup visible and cursor hysteringly on the right side)
 		showPopup = showTool && p.X > (showPopup ? hysteresisOff : popupMiddle);
 		// animate toolbar's Y (along the shown/hidden axis)
 		toolA = showTool ? Math.Min(1, toolA + deltaTime) : Math.Max(0, toolA - deltaTime);//toolA = Math.Clamp(showTool ? 1 : 0, toolA - deltaTime, toolA + deltaTime);
-		toolTransientY = (MathF.Cos(toolA * MathF.PI)*.5f + .5f) * -toolH;
+		var cosA = MathF.Cos(toolA * MathF.PI) * .5f + .5f;
+		toolTransientY = cosA * (screenPanel.Location.Y - toolH);
 		tool.Location = new(0, (int)toolTransientY);
 		// animate popup's X (along the shown/hidden axis, shown=hysteresisOff or hidden=hiddenPopup)
 		popupA = showPopup ? Math.Min(1, popupA + deltaTime) : Math.Max(0, popupA - deltaTime);//Math.Clamp(showPopup ? 1 : 0, popupA - deltaTime, popupA + deltaTime);
 		var cA = MathF.Cos(popupA * MathF.PI) * .5f + .5f;
+		// Location of the hidden popup
+		var hiddenPopup = Math.Min(
+			Lerp( Math.Max(screenPanel.Location.X + screenPanel.Width, hysteresisOff), client.Width, cosA), // if there's empty space on the right, then it will be allowed for the popup to occupy even when hidden
+			Math.Clamp(Lerp(client.Width, popupMiddle, p.X * (1- cosA) / popupMiddle), popupMiddle, client.Width));
 		// set popup's target X 
 		popupTransientX = Lerp(hysteresisOff, hiddenPopup, cA);
 		// if the toolbar's width does not fit the windowWidth-popupWidth, then it will stretch over the whole windowWidth, and the popup.Y will be under it
 		(int w, int y) = hysteresisOff < tool.MinimumSize.Width
-			? (windowWidth, (int)toolTransientY + toolH)  // vertical (popup under tool)
+			? (client.Width, (int)toolTransientY + toolH)  // vertical (popup under tool)
 			: ((int)popupTransientX, 0); // horizontal (tool stretched to popup)
 		tool.Size = new(w, toolH);
 		// move and resize the whole popup Panel
 		popupPanel.Location = new((int)popupTransientX, y);
-		popupPanel.Size = new(popupPanel.MinimumSize.Width, windowHeight - y);
+		popupPanel.Size = new(popupPanel.MinimumSize.Width, client.Height - y);
 		// Rescale the whole switchable parts of the popups (generator/editor)
 		switchable.Size = new(switchable.Size.Width, Math.Min(
 			popupPanel.Size.Height - switchable.Location.Y - 2, // maximum stretch from the bottom of the top controls, to the bottom of the window
@@ -3050,15 +3081,10 @@ public partial class GeneratorForm : Form {
 		debugPanel.Location = new(debugPanel.Location.X, switchable.Location.Y + switchable.Size.Height + 2);
 		debugPanel.Size = new(debugPanel.Size.Width, popupPanel.Size.Height - debugPanel.Location.Y - 2);
 
-		Size newMin = new(
+		MinimumSize = new(
 			Math.Max(Math.Max(popupPanel.MinimumSize.Width, tool.MinimumSize.Width), width) + bw,
 			Math.Max(popupPanel.MinimumSize.Height + tool.MinimumSize.Height, height) + bh
-		//Math.Max(Math.Max(640, debugLabel.Bounds.Bottom + bh), bh + Math.Max(460, height + 8))
 		);
-		//bool changedSize = Size.Width < newMin.Width || Size.Height < newMin.Height;
-		MinimumSize = newMin;
-		//if (changedSize)
-		//	ResizeScreen();
 	}
 
 }

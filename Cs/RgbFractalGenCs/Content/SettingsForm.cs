@@ -15,6 +15,7 @@ public partial class SettingsForm : Form {
 
 	private readonly MainForm root;
 	private readonly Dictionary<Control, string> myControls = [];
+	private bool allowWarning = true;
 
 	public SettingsForm(MainForm source) { root = source; InitializeComponent(); }
 
@@ -22,8 +23,8 @@ public partial class SettingsForm : Form {
 		SetupControl(localeBox, "localeBox");
 		SetupControl(threadsBox, "threadsBox");
 		SetupControl(cacheBox, "cacheBox");
-
-		threadsBox.Text = MaxTasks.ToString();
+		allowWarning = false;
+		threadsBox.Text = Math.Max(1, MaxTasks - 2).ToString();
 		LoadConfig();
 		LoadLocale();
 		localeBox.Items.AddRange([.. LocaleNames]);
@@ -44,6 +45,7 @@ public partial class SettingsForm : Form {
 		ThreadsBox();
 		CacheBox();
 		LocaleBox();
+		allowWarning = true;
 	}
 	internal static object
 #if NULLABLE
@@ -52,22 +54,6 @@ public partial class SettingsForm : Form {
 	 GetFirst(IEnumerable<object> e) {
 		var enumerator = e.GetEnumerator();
 		return enumerator.MoveNext() ? enumerator.Current : null;
-	}
-	private void ThreadsBox_TextChanged(object s, EventArgs e) => ThreadsBox();
-	private void ThreadsBox() {
-		Tasks = ParseClampReText(threadsBox, (short)FractalGenerator.MinTasks, (short)Math.Max(1, threadsMul * MaxTasks));
-		foreach (var g in root.Gens.Gen) {
-			g.Value.SetupParallel();
-			// Number of threads can change the maximum of these:
-			g.Value.BloomBox();
-			g.Value.StripeBox();
-		}
-	}
-	private void CacheBox_CheckedChanged(object s, EventArgs e) => CacheBox();
-	private void CacheBox() {
-		cacheBox.Text = (CacheChecked = cacheBox.Checked) ? "Enabled" : "Disabled";
-		foreach (var g in root.Gens.Gen) 
-			g.Value.SetCache(CacheChecked);
 	}
 	private static void LoadConfig() {
 		if (!File.Exists("config.txt"))
@@ -209,6 +195,24 @@ public partial class SettingsForm : Form {
 		//Thread.CurrentThread.CurrentUICulture = new CultureInfo(SelectedLocale);
 		//Thread.CurrentThread.CurrentCulture = new CultureInfo(SelectedLocale);
 		root.UpdateLocale();
+	}
+	private void ThreadsBox_TextChanged(object s, EventArgs e) => ThreadsBox();
+	private void ThreadsBox() {
+		Tasks = ParseClampReText(threadsBox, (short)FractalGenerator.MinTasks, (short)Math.Max(Math.Max(FractalGenerator.MinTasks, 1), threadsMul * MaxTasks));
+		if (allowWarning && Tasks > 1 && Tasks > Math.Max(Environment.ProcessorCount / 2, Environment.ProcessorCount - ReduceThreads - 2))
+			_ = Error("saturatedThreads", "warning", MessageBoxIcon.Warning);
+		foreach (var g in root.Gens.Gen) {
+			g.Value.SetupParallel();
+			// Number of threads can change the maximum of these:
+			g.Value.BloomBox();
+			g.Value.StripeBox();
+		}
+	}
+	private void CacheBox_CheckedChanged(object s, EventArgs e) => CacheBox();
+	private void CacheBox() {
+		cacheBox.Text = (CacheChecked = cacheBox.Checked) ? "Enabled" : "Disabled";
+		foreach (var g in root.Gens.Gen)
+			g.Value.SetCache(CacheChecked);
 	}
 	internal void UpdateLocale() {
 		Text = L("appName") + " - " + L("settings");
