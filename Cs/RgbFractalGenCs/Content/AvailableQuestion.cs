@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System;
+﻿using System;
 using System.Windows.Forms;
 using static RgbFractalGenCs.Core.StaticCore;
 
@@ -29,8 +28,8 @@ public partial class AvailableQuestion : Form {
 		//myControls.Add(control);
 	}
 
-	private void YesButton_Click(object sender, EventArgs e) => Finish(DialogResult.Yes);
-	private void NoButton_Click(object sender, EventArgs e) => Finish(DialogResult.No);
-	private void AbortButton_Click(object sender, EventArgs e) => Finish(DialogResult.Abort);
-	private void CancelButton_Click_1(object sender, EventArgs e) => Finish(DialogResult.Cancel);
+	private void YesButton_Click(object s, EventArgs e) => Finish(DialogResult.Yes);
+	private void NoButton_Click(object s, EventArgs e) => Finish(DialogResult.No);
+	private void AbortButton_Click(object s, EventArgs e) => Finish(DialogResult.Abort);
+	private void CancelButton_Click_1(object s, EventArgs e) => Finish(DialogResult.Cancel);
 }

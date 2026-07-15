@@ -23,6 +23,9 @@
     <Compile Update="Content\MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Content\SchedulerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Content\SettingsForm.cs">
       <SubType>Form</SubType>
     </Compile>

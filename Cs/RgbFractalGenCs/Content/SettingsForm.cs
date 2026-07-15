@@ -1,24 +1,28 @@
-﻿#nullable enable
-
-using RgbFractalGenCs.Core;
+﻿using RgbFractalGenCs.Core;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
-using static RgbFractalGenCs.Core.StaticCore;
 using static RgbFractalGenCs.Content.Static.StaticContent;
-using System.Collections.Generic;
+using static RgbFractalGenCs.Core.StaticCore;
+
 namespace RgbFractalGenCs.Content;
 
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public partial class SettingsForm : Form {
 
-	private static int controlTabIndex;
+	private static int controlTabIndex = 0;
 
 	private readonly MainForm root;
+	private readonly Dictionary<Control, string> myControls = [];
 
 	public SettingsForm(MainForm source) { root = source; InitializeComponent(); }
 
 	public void Init() {
+		SetupControl(localeBox, "localeBox");
+		SetupControl(threadsBox, "threadsBox");
+		SetupControl(cacheBox, "cacheBox");
+
 		threadsBox.Text = MaxTasks.ToString();
 		LoadConfig();
 		LoadLocale();
@@ -27,8 +31,12 @@ public partial class SettingsForm : Form {
 		// Load Locale:
 		if (LocaleData.Count == 0)
 			throw new("No Locales found!");
-		Locale = LocaleData.TryGetValue(SelectedLocale, out var found)
-			? found : LocaleData[SelectedLocale = (string?)GetFirst(LocaleData.Keys) ?? ""];
+		Locale = LocaleData.TryGetValue(SelectedLocale, out var found) ? found : LocaleData[SelectedLocale =
+#if NULLABLE
+			(string?)GetFirst(LocaleData.Keys) ?? ""];
+#else
+			(string)GetFirst(LocaleData.Keys)];
+#endif
 		//SubLocale = SubLocaleData.TryGetValue(profile.SelectedSubLocale, out var foundSub)
 		//	? foundSub : SubLocaleData[profile.SelectedLocale = (string?)GetFirst(SubLocaleData.Keys) ?? ""];
 		LoadResolutions();
@@ -37,11 +45,15 @@ public partial class SettingsForm : Form {
 		CacheBox();
 		LocaleBox();
 	}
-	internal static object? GetFirst(IEnumerable<object> e) {
+	internal static object
+#if NULLABLE
+?
+#endif
+	 GetFirst(IEnumerable<object> e) {
 		var enumerator = e.GetEnumerator();
 		return enumerator.MoveNext() ? enumerator.Current : null;
 	}
-	private void ThreadsBox_TextChanged(object sender, EventArgs e) => ThreadsBox();
+	private void ThreadsBox_TextChanged(object s, EventArgs e) => ThreadsBox();
 	private void ThreadsBox() {
 		Tasks = ParseClampReText(threadsBox, (short)FractalGenerator.MinTasks, (short)Math.Max(1, threadsMul * MaxTasks));
 		foreach (var g in root.Gens.Gen) {
@@ -51,7 +63,7 @@ public partial class SettingsForm : Form {
 			g.Value.StripeBox();
 		}
 	}
-	private void CacheBox_CheckedChanged(object sender, EventArgs e) => CacheBox();
+	private void CacheBox_CheckedChanged(object s, EventArgs e) => CacheBox();
 	private void CacheBox() {
 		cacheBox.Text = (CacheChecked = cacheBox.Checked) ? "Enabled" : "Disabled";
 		foreach (var g in root.Gens.Gen) 
@@ -103,6 +115,12 @@ public partial class SettingsForm : Form {
 		var file = Path.Combine(GetRootSaveDir(), "resolutions.txt");
 		if (!File.Exists(file) && root)
 			File.Copy(settings, file);
+
+		// initiate from builtin file if save doesn't exist yet
+		var fileR = "resolutions.txt";
+		if (!File.Exists(file) && File.Exists(fileR))
+			File.Copy(fileR, file);
+		
 		if (!File.Exists(file))
 			return;
 		var s = File.ReadAllLines("resolutions.txt");
@@ -110,16 +128,18 @@ public partial class SettingsForm : Form {
 			if (s[i][0] == '/' || !s[i].Contains('='))
 				continue;
 			var c = s[i].Split('=');
-			if (c[0] == "resolution") {
-				// skip and continue if the resolution is not a valid format <int>x<int>
-				if (!c[1].Contains('x'))
+			switch (c[0]) {
+				case "": --i; break;
+				case "resolution":
+					// skip and continue if the resolution is not a valid format <int>x<int>
+					if (!c[1].Contains('x'))
+						continue;
+					var r = c[1].Split('x');
+					if (r.Length != 2 || !(int.TryParse(r[0], out _) && int.TryParse(r[1], out _)))
+						continue;
+					if (!ResolutionSelection.Contains(c[1]))
+						ResolutionSelection.Add(c[1]);
 					continue;
-				var r = c[1].Split('x');
-				if (r.Length != 2 || !(int.TryParse(r[0], out _) && int.TryParse(r[1], out _)))
-					continue;
-				if (!ResolutionSelection.Contains(c[1]))
-					ResolutionSelection.Add(c[1]);
-				continue;
 			}
 		}
 	}
@@ -141,33 +161,27 @@ public partial class SettingsForm : Form {
 		File.WriteAllLines(Path.Combine(GetRootSaveDir(), "resolutions.txt"), fileRes);
 
 		// Save Settings
-		File.WriteAllText(Path.Combine(GetRootSaveDir(), "settings.txt"),
-			"|locale|" + LocaleKeys[localeBox.SelectedIndex]
+		File.WriteAllText(Path.Combine(GetRootSaveDir(), "settings.txt"), 
+			"locale|" + LocaleKeys[localeBox.SelectedIndex]
 			+ "|threads|" + threadsBox.Text
 			+ "|cache|" + (cacheBox.Checked ? 1 : 0));
 	}
 	internal void LoadSettings() {
 		var settings = "settings.txt";
-		var root = File.Exists(settings);
+		var rootDir = GetRootSaveDir();
+		var oldSettingsFile = File.Exists(settings);
 
-		var file = Path.Combine(GetRootSaveDir(), "palettes.txt");
-		if (!File.Exists(file) && root)
-			File.Copy(settings, file);
-		if (File.Exists(file))
-			LoadPalettes(File.ReadAllText(file).Split('|'));
-
-		/*file = Path.Combine(GetRootSaveDir(), "fractals.txt");
-		if (!File.Exists(file) && root)
-			File.Copy(settings, file);
-		if (File.Exists(file))
-			LoadFractals(File.ReadAllText(file).Split('|'));*/
-
-		file = Path.Combine(GetRootSaveDir(), settings);
-		if (!File.Exists(file) && root)
-			File.Copy(settings, file);
-		if (File.Exists(file))
-			LoadParams(File.ReadAllText(file).Split('|'));
-
+		bool Is(string name, out string file, bool copy = true) {
+			file = Path.Combine(rootDir, name);
+			if (copy && !File.Exists(file) && oldSettingsFile)
+				File.Copy(settings, file); // restore from old format settings
+			return File.Exists(file);
+		}
+		if(Is("palettes.txt", out var pFile))
+			LoadPalettes(File.ReadAllText(pFile).Split('|'));
+		//if(Is("fractals.txt", out var file)) LoadFractals(File.ReadAllText(file).Split('|'));
+		if (Is("settings.txt", out var sFile, false))
+			LoadParams(File.ReadAllText(sFile).Split('|'));
 		if (localeBox.SelectedIndex < 0)
 			localeBox.SelectedIndex = 0;
 	}
@@ -179,36 +193,36 @@ public partial class SettingsForm : Form {
 				case "locale": localeBox.SelectedItem = v; break;
 				case "threads": threadsBox.Text = v; break;
 				case "cache": if (p) cacheBox.Checked = n == 1; break;
+				case "": --i; break;
 			}
 		}
 	}
 
-	private void SettingsForm_FormClosing(object sender, FormClosingEventArgs e) {
+	private void SettingsForm_FormClosing(object s, FormClosingEventArgs e) {
 		e.Cancel = true;
 		Hide();
 	}
 
-	private void LocaleBox_SelectedIndexChanged(object sender, EventArgs e) => LocaleBox();
+	private void LocaleBox_SelectedIndexChanged(object s, EventArgs e) => LocaleBox();
 	private void LocaleBox() {
 		Locale = LocaleData[SelectedLocale = LocaleKeys[localeBox.SelectedIndex]];
+		//Thread.CurrentThread.CurrentUICulture = new CultureInfo(SelectedLocale);
+		//Thread.CurrentThread.CurrentCulture = new CultureInfo(SelectedLocale);
 		root.UpdateLocale();
 	}
 	internal void UpdateLocale() {
+		Text = L("appName") + " - " + L("settings");
+		foreach (var c in myControls)
+			toolTips.SetToolTip(c.Key, c.Value);
+
 		localeLabel.Text = L("localeLabel") + ": ";
 		threadsLabel.Text = L("threadsLabel") + ": ";
 		cacheLabel.Text = L("cacheLabel") + ": ";
-
-		controlTabIndex = 0;
-		SetupControl(localeBox, L("localeBox"));
-		SetupControl(threadsBox, L("threadsBox"));
-		SetupControl(cacheBox, L("cacheBox"));
-
-		Text = L("appName") + " - " + L("settings");
 	}
 
 	void SetupControl(Control control, string tip) {
 		// Add tooltip and set the next tabIndex
-		toolTips.SetToolTip(control, tip);
+		myControls.Add(control, tip);
 		control.TabIndex = ++controlTabIndex;
 		//myControls.Add(control);
 	}

@@ -1,9 +1,8 @@
-﻿#nullable enable
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using System.Text;
 using System.Text.Json;
 using static RgbFractalGenCs.Content.Static.StaticContent;
 
@@ -11,6 +10,8 @@ namespace RgbFractalGenCs.Core;
 
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal static class StaticCore {
+
+	internal static System.Drawing.Color Background = System.Drawing.Color.FromArgb(32, 32, 32);
 
 	internal static short Tasks;
 	internal static ushort MaxChildren = 1;
@@ -896,45 +897,46 @@ internal static class StaticCore {
 			}
 		}
 	}
-	internal static bool LoadFractal(GeneratorsForm gens, string file, GeneratorForm? select) {
+	internal static bool LoadFractal(GeneratorsForm gens, string file, GeneratorForm select) {
+		const string E = "cannotLoad";
 		if (!File.Exists(file))
-			return Error("No such file", "Cannot load");
+			return Error("noFile", E);
 		var content = File.ReadAllText(file);
 		var arr = content.Split('|');
 		// Name
 		if (arr[0] == "")
-			return Error("No fractal name", "Cannot load");
+			return Error("noFractalName", E);
 		if (FractalSelection.Contains(arr[0]))
-			return Error("Fractal with the same name already loaded in the list.", "Cannot load");
+			return Error("sameFractalName", E);
 		// Constants
 		if (!short.TryParse(arr[1], out short count) || count < 1)
-			return Error("Invalid children count: " + count, "Cannot load");
+			return Error(L("invalidChildCount") + ": " + count, E);
 		if (!double.TryParse(arr[2], out var size) || size <= 1)
-			return Error("Invalid children size: " + size, "Cannot load");
+			return Error(L("invalidChildSize") +": " + size, E);
 		if (!double.TryParse(arr[3], out var maxsize))
-			return Error("Invalid max size: " + maxsize, "Cannot load");
+			return Error(L("invalidMaxSize") + ": " + maxsize, E);
 		if (!double.TryParse(arr[4], out var minSize))
-			return Error("Invalid min size: " + minSize, "Cannot load");
+			return Error(L("invalidMinSize") + ": " + minSize, E);
 		if (!double.TryParse(arr[5], out var cutSize))
-			return Error("Invalid cut size: " + cutSize, "Cannot load");
+			return Error(L("invalidCutSize") + ": " + cutSize, E);
 
 		double x;
 		// ChildX
 		var s = arr[6].Split(';');
 		if (s.Length < count)
-			return Error("Insufficient children X count: " + s.Length + " / " + count, "Cannot load");
+			return Error(L("insufficientChildCount") + " X: " + s.Length + " / " + count, E);
 		var childX = new double[count];
 		for (var i = count; --i >= 0; childX[i] = x)
 			if (!double.TryParse(s[i], out x))
-				return Error("Invalid child X: " + s[i], "Cannot load");
+				return Error(L("invalidChild") + " X: " + s[i], E);
 		// ChildY
 		s = arr[7].Split(';');
 		if (s.Length < count)
-			return Error("Insufficient children Y count: " + s.Length + " / " + count, "Cannot load");
+			return Error(L("insufficientChildCount") + " Y: " + s.Length + " / " + count, E);
 		var childY = new double[count];
 		for (var i = count; --i >= 0; childY[i] = x)
 			if (!double.TryParse(s[i], out x))
-				return Error("Invalid child Y: " + s[i], "Cannot load");
+				return Error(L("invalidChild") + " Y: " + s[i], E);
 		// if there were any ":" in the name, merge those split entries 
 		string[] MergeName(string[] set) {
 			int diff = set.Length - count - 1;
@@ -951,36 +953,36 @@ internal static class StaticCore {
 		// ChildAngles
 		s = arr[8].Split(';');
 		if (s.Length < 1)
-			return Error("No set of child angles", "Cannot load");
+			return Error("noSetAngles", E);
 		List<(string, double[])> childAngle = [];
 		foreach (var c in s) {
 			var angleSet = MergeName(c.Split(':'));
 			if (angleSet[0] == "")
-				return Error("Empty angle set name", "Cannot load");
+				return Error("emptyAngle", E);
 			if (angleSet.Length < count + 1)
-				return Error("Insufficient child angle count of " + angleSet[0] + ": " + (angleSet.Length - 1) + " / " + count, "Cannot load");
+				return Error(L("insufficientChildAngle") + " " + angleSet[0] + ": " + (angleSet.Length - 1) + " / " + count, E);
 			var angle = new double[count];
 			for (var i = count; i > 0; angle[i] = x)
 				if (!double.TryParse(angleSet[i--], out x))
-					return Error("Invalid angle in set" + angleSet[0] + ": " + angleSet[i + 1], "Cannot load");
+					return Error(L("invalidAngle")+ " " + angleSet[0] + ": " + angleSet[i + 1], E);
 			childAngle.Add((angleSet[0], angle));
 		}
 		// ChildColors
 		s = arr[9].Split(';');
 		if (s.Length < 1)
-			return Error("No set of child colors", "Cannot load");
+			return Error("noSetColors", E);
 		List<(string, byte[])> childColor = [];
 		foreach (var c in s) {
 			byte ss;
 			var colorSet = MergeName(c.Split(':'));
 			if (colorSet[0] == "")
-				return Error("Empty color set name", "Cannot load");
+				return Error("emptyColor", E);
 			if (colorSet.Length < count + 1)
-				return Error("Insufficient child color count of " + colorSet[0] + ": " + (colorSet.Length - 1) + " / " + count, "Cannot load");
+				return Error(L("insufficientChildColor") + " " + colorSet[0] + ": " + (colorSet.Length - 1) + " / " + count, E);
 			var color = new byte[count];
 			for (var i = count; i > 0; color[i] = ss)
 				if (!byte.TryParse(colorSet[i--], out ss))
-					return Error("Invalid color in set " + colorSet[0] + ": " + colorSet[i + 1], "Cannot load");
+					return Error(L("invalidColor") + " " + colorSet[0] + ": " + colorSet[i + 1], E);
 			childColor.Add((colorSet[0], color));
 		}
 		// Cuts
@@ -992,11 +994,11 @@ internal static class StaticCore {
 			int intParse;
 			var cutInt = c.Split(':');
 			if (!int.TryParse(cutInt[0], out var cutIndex))
-				return Error("Invalid cutFunction index: " + cutInt[0], "Cannot load");
+				return Error(L("invalidCutIndex") + ": " + cutInt[0], E);
 			var cutHash = new int[cutInt.Length - 1];
 			for (var i = cutHash.Length; i > 0; cutHash[i] = intParse)
 				if (!int.TryParse(cutInt[i--], out intParse))
-					return Error("Invalid cutFunction seed: " + cutInt[i + 1], "Cannot load");
+					return Error(L("invalidCutSeed") + ": " + cutInt[i + 1], E);
 			cutFunction.Add((cutIndex, cutHash));
 		}
 		var f = new Fractal(arr[0], count, size, maxsize, minSize, cutSize, childX, childY, childAngle, childColor, cutFunction) {
@@ -1019,7 +1021,7 @@ internal static class StaticCore {
 		Directory.CreateDirectory(subPath);
 		foreach (var file in Directory.GetFiles(subPath, "*.json")) {
 			var code = Path.GetFileNameWithoutExtension(file);
-			if (JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(file)) is Dictionary<string, string> parsed) {
+			if (JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(file, Encoding.UTF8)) is Dictionary<string, string> parsed) {
 				SubLocaleData[code] = parsed;
 				SubLocaleNames[code] = parsed["ThisLanguage"];
 				// tracking locale usage:
@@ -1034,7 +1036,7 @@ internal static class StaticCore {
 		_ = Directory.CreateDirectory(localesPath);
 		foreach (var file in Directory.GetFiles(localesPath, "*.json")) {
 			var code = Path.GetFileNameWithoutExtension(file);
-			if (JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(file)) is Dictionary<string, string> parsed) {
+			if (JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(file, Encoding.UTF8)) is Dictionary<string, string> parsed) {
 				LocaleData[code] = parsed;
 				LocaleKeys.Add(code);
 				LocaleNames.Add(parsed["ThisLanguage"]);

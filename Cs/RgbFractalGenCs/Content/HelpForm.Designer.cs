@@ -1,4 +1,6 @@
-﻿namespace RgbFractalGenCs.Content;
+﻿using System.Windows.Forms;
+
+namespace RgbFractalGenCs.Content;
 
 partial class HelpForm {
 	/// <summary>
@@ -25,8 +27,8 @@ partial class HelpForm {
 	/// </summary>
 	private void InitializeComponent() {
 		var resources = new System.ComponentModel.ComponentResourceManager(typeof(HelpForm));
-		helpLabel = new System.Windows.Forms.Label();
-		panel1 = new System.Windows.Forms.Panel();
+		helpLabel = new Label();
+		panel1 = new Panel();
 		panel1.SuspendLayout();
 		SuspendLayout();
 		// 
@@ -42,7 +44,7 @@ partial class HelpForm {
 		// 
 		// panel1
 		// 
-		panel1.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+		panel1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
 		panel1.AutoScroll = true;
 		panel1.Controls.Add(helpLabel);
 		panel1.Location = new System.Drawing.Point(12, 12);
@@ -53,13 +55,14 @@ partial class HelpForm {
 		// HelpForm
 		// 
 		AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-		AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+		AutoScaleMode = AutoScaleMode.Font;
 		AutoScroll = true;
 		AutoSize = true;
-		BackColor = System.Drawing.Color.FromArgb(32, 32, 32);
+		BackColor = RgbFractalGenCs.Core.StaticCore.Background;
 		ClientSize = new System.Drawing.Size(704, 281);
 		Controls.Add(panel1);
 		Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
+		MinimumSize = new System.Drawing.Size(720, 320);
 		Name = "HelpForm";
 		Text = "HelpForm";
 		panel1.ResumeLayout(false);
@@ -69,6 +72,6 @@ partial class HelpForm {
 
 	#endregion
 
-	private System.Windows.Forms.Label helpLabel;
-	private System.Windows.Forms.Panel panel1;
+	private Label helpLabel;
+	private Panel panel1;
 }

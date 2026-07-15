@@ -1,12 +1,16 @@
-﻿#nullable enable
-using System.Diagnostics;
+﻿
+/*using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System;
-
-public unsafe class Mp4Encoder {
+public unsafe class Mp4Encoder : IDisposable {
+#if NULLABLE
 	private Process? ffmpeg;
 	private Stream? inputStream;
+#else
+	private Process ffmpeg;
+	private Stream inputStream;
+#endif
 	//private int width;
 	private int height;
 	//private string outputPath;
@@ -69,7 +73,11 @@ public unsafe class Mp4Encoder {
 			return false;
 		}
 	}
-}
+
+	public void Dispose() {
+		throw new NotImplementedException();
+	}
+}*/
 
 /*using RgbFractalGenCs.AutoGen;
 using RgbFractalGenCs.AutoGen.Abstractions;

@@ -1,5 +1,4 @@
-﻿#nullable enable
-using ComputeSharp;
+﻿using ComputeSharp;
 namespace RgbFractalGenCs;
 
 #region Math

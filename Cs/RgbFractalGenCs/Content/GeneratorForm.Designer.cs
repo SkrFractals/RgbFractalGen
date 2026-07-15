@@ -159,10 +159,10 @@ namespace RgbFractalGenCs {
 			animBox = new CheckBox();
 			pngBox = new CheckBox();
 			gifBox = new CheckBox();
-			loadExport = new OpenFileDialog();
 			removeResolution = new Button();
 			addResolution = new Button();
 			toolGenPanel = new Panel();
+			frameLabel = new Label();
 			frameBox = new TextBox();
 			hideButton = new Button();
 			popupPanel = new Panel();
@@ -339,7 +339,7 @@ namespace RgbFractalGenCs {
 			// 
 			// prevButton
 			// 
-			prevButton.Location = new System.Drawing.Point(90, 3);
+			prevButton.Location = new System.Drawing.Point(181, 3);
 			prevButton.Margin = new Padding(4, 3, 4, 3);
 			prevButton.Name = "prevButton";
 			prevButton.Size = new System.Drawing.Size(30, 27);
@@ -350,7 +350,7 @@ namespace RgbFractalGenCs {
 			// 
 			// nextButton
 			// 
-			nextButton.Location = new System.Drawing.Point(203, 3);
+			nextButton.Location = new System.Drawing.Point(283, 2);
 			nextButton.Margin = new Padding(4, 3, 4, 3);
 			nextButton.Name = "nextButton";
 			nextButton.Size = new System.Drawing.Size(30, 27);
@@ -361,7 +361,7 @@ namespace RgbFractalGenCs {
 			// 
 			// animateButton
 			// 
-			animateButton.Location = new System.Drawing.Point(241, 3);
+			animateButton.Location = new System.Drawing.Point(321, 2);
 			animateButton.Margin = new Padding(4, 3, 4, 3);
 			animateButton.Name = "animateButton";
 			animateButton.Size = new System.Drawing.Size(30, 27);
@@ -375,7 +375,7 @@ namespace RgbFractalGenCs {
 			exportButton.Location = new System.Drawing.Point(4, 58);
 			exportButton.Margin = new Padding(4, 3, 4, 3);
 			exportButton.Name = "exportButton";
-			exportButton.Size = new System.Drawing.Size(100, 27);
+			exportButton.Size = new System.Drawing.Size(92, 27);
 			exportButton.TabIndex = 34;
 			exportButton.Text = "[ Export ]";
 			exportButton.UseVisualStyleBackColor = true;
@@ -448,7 +448,7 @@ namespace RgbFractalGenCs {
 			// 
 			infoLabel.AutoSize = true;
 			infoLabel.ForeColor = System.Drawing.Color.White;
-			infoLabel.Location = new System.Drawing.Point(128, 9);
+			infoLabel.Location = new System.Drawing.Point(99, 9);
 			infoLabel.Margin = new Padding(4, 0, 4, 0);
 			infoLabel.Name = "infoLabel";
 			infoLabel.Size = new System.Drawing.Size(28, 15);
@@ -683,7 +683,7 @@ namespace RgbFractalGenCs {
 			// restartButton
 			// 
 			restartButton.BackColor = System.Drawing.Color.FromArgb(255, 128, 128);
-			restartButton.Location = new System.Drawing.Point(278, 3);
+			restartButton.Location = new System.Drawing.Point(358, 2);
 			restartButton.Name = "restartButton";
 			restartButton.Size = new System.Drawing.Size(108, 27);
 			restartButton.TabIndex = 49;
@@ -811,10 +811,10 @@ namespace RgbFractalGenCs {
 			// 
 			exportSelect.DropDownStyle = ComboBoxStyle.DropDownList;
 			exportSelect.FormattingEnabled = true;
-			exportSelect.Items.AddRange(new object[] { "Current PNG", "PNGs", "MP4", "Selected GIF", "GIF->MP4", "Load Export", "Import Code" });
-			exportSelect.Location = new System.Drawing.Point(110, 61);
+			exportSelect.Items.AddRange(new object[] { "Current PNG", "PNGs", "MP4", "Selected GIF", "GIF->MP4", "Import Code", "Close" });
+			exportSelect.Location = new System.Drawing.Point(103, 61);
 			exportSelect.Name = "exportSelect";
-			exportSelect.Size = new System.Drawing.Size(60, 23);
+			exportSelect.Size = new System.Drawing.Size(67, 23);
 			exportSelect.TabIndex = 61;
 			exportSelect.SelectedIndexChanged += ExportSelect_SelectedIndexChanged;
 			// 
@@ -1438,7 +1438,6 @@ namespace RgbFractalGenCs {
 			pointLabel2.Size = new System.Drawing.Size(83, 15);
 			pointLabel2.TabIndex = 71;
 			pointLabel2.Text = "[point2_angle]";
-			pointLabel2.Click += pointLabel2_Click;
 			// 
 			// pointLabel1
 			// 
@@ -1486,7 +1485,7 @@ namespace RgbFractalGenCs {
 			// 
 			preButton.Location = new System.Drawing.Point(275, 3);
 			preButton.Name = "preButton";
-			preButton.Size = new System.Drawing.Size(200, 27);
+			preButton.Size = new System.Drawing.Size(282, 27);
 			preButton.TabIndex = 58;
 			preButton.Text = "[ PREVIEW MODE ]";
 			preButton.UseVisualStyleBackColor = true;
@@ -1611,12 +1610,6 @@ namespace RgbFractalGenCs {
 			gifBox.UseVisualStyleBackColor = true;
 			gifBox.CheckedChanged += DebugGifBox_CheckedChanged;
 			// 
-			// loadExport
-			// 
-			loadExport.Filter = "All files (*.*)|*.*";
-			loadExport.RestoreDirectory = true;
-			loadExport.FileOk += LoadExport_FileOk;
-			// 
 			// removeResolution
 			// 
 			removeResolution.Location = new System.Drawing.Point(241, 118);
@@ -1639,6 +1632,7 @@ namespace RgbFractalGenCs {
 			// 
 			// toolGenPanel
 			// 
+			toolGenPanel.Controls.Add(frameLabel);
 			toolGenPanel.Controls.Add(frameBox);
 			toolGenPanel.Controls.Add(hideButton);
 			toolGenPanel.Controls.Add(prevButton);
@@ -1650,21 +1644,31 @@ namespace RgbFractalGenCs {
 			toolGenPanel.Location = new System.Drawing.Point(12, 12);
 			toolGenPanel.MinimumSize = new System.Drawing.Size(480, 32);
 			toolGenPanel.Name = "toolGenPanel";
-			toolGenPanel.Size = new System.Drawing.Size(480, 32);
+			toolGenPanel.Size = new System.Drawing.Size(560, 32);
 			toolGenPanel.TabIndex = 67;
+			// 
+			// frameLabel
+			// 
+			frameLabel.AutoSize = true;
+			frameLabel.BackColor = System.Drawing.Color.White;
+			frameLabel.Location = new System.Drawing.Point(216, 9);
+			frameLabel.Name = "frameLabel";
+			frameLabel.Size = new System.Drawing.Size(46, 15);
+			frameLabel.TabIndex = 70;
+			frameLabel.Text = "[frame]";
 			// 
 			// frameBox
 			// 
-			frameBox.Location = new System.Drawing.Point(127, 5);
+			frameBox.Location = new System.Drawing.Point(218, 5);
 			frameBox.Name = "frameBox";
-			frameBox.Size = new System.Drawing.Size(69, 23);
+			frameBox.Size = new System.Drawing.Size(58, 23);
 			frameBox.TabIndex = 68;
 			frameBox.Text = "0";
 			frameBox.TextChanged += FrameBox_TextChanged;
 			// 
 			// hideButton
 			// 
-			hideButton.Location = new System.Drawing.Point(393, 3);
+			hideButton.Location = new System.Drawing.Point(473, 2);
 			hideButton.Margin = new Padding(4, 3, 4, 3);
 			hideButton.Name = "hideButton";
 			hideButton.Size = new System.Drawing.Size(83, 27);
@@ -1698,6 +1702,7 @@ namespace RgbFractalGenCs {
 			popupPanel.Controls.Add(resSelect);
 			popupPanel.Controls.Add(generatorPanel);
 			popupPanel.Location = new System.Drawing.Point(12, 88);
+			popupPanel.MinimumSize = new System.Drawing.Size(293, 400);
 			popupPanel.Name = "popupPanel";
 			popupPanel.Size = new System.Drawing.Size(293, 1117);
 			popupPanel.TabIndex = 68;
@@ -1724,27 +1729,23 @@ namespace RgbFractalGenCs {
 			toolEditPanel.Location = new System.Drawing.Point(12, 50);
 			toolEditPanel.MinimumSize = new System.Drawing.Size(480, 32);
 			toolEditPanel.Name = "toolEditPanel";
-			toolEditPanel.Size = new System.Drawing.Size(480, 32);
+			toolEditPanel.Size = new System.Drawing.Size(560, 32);
 			toolEditPanel.TabIndex = 69;
 			// 
 			// GeneratorForm
 			// 
 			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 			AutoScaleMode = AutoScaleMode.Font;
-			BackColor = System.Drawing.Color.FromArgb(32, 32, 32);
-			ClientSize = new System.Drawing.Size(500, 1216);
+			ClientSize = new System.Drawing.Size(584, 1216);
 			Controls.Add(toolEditPanel);
 			Controls.Add(popupPanel);
 			Controls.Add(toolGenPanel);
 			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 			Margin = new Padding(4, 3, 4, 3);
-			MinimumSize = new System.Drawing.Size(512, 480);
+			MinimumSize = new System.Drawing.Size(600, 480);
 			Name = "GeneratorForm";
 			Text = "[ GeneratorForm ]";
 			FormClosing += GeneratorForm_FormClosing;
-			MouseEnter += GeneratorForm_MouseEnter;
-			MouseLeave += GeneratorForm_MouseLeave;
-			MouseMove += GeneratorForm_MouseMove;
 			generatorPanel.ResumeLayout(false);
 			genControlPanel.ResumeLayout(false);
 			genControlPanel.PerformLayout();
@@ -1765,100 +1766,100 @@ namespace RgbFractalGenCs {
 			ResumeLayout(false);
 		}
 		#endregion
-		private System.Windows.Forms.Label fractalLabel;
-		private System.Windows.Forms.ComboBox fractalSelect;
-		private System.Windows.Forms.Label angleLabel;
-		private System.Windows.Forms.ComboBox angleSelect;
-		private System.Windows.Forms.Label colorLabel;
-		private System.Windows.Forms.ComboBox colorSelect;
-		private System.Windows.Forms.Label cutLabel;
-		private System.Windows.Forms.ComboBox cutSelect;
-		private System.Windows.Forms.TextBox cutparamBox;
-		private System.Windows.Forms.TextBox resX;
-		private System.Windows.Forms.TextBox resY;
-		private System.Windows.Forms.ComboBox resSelect;
-		private System.Windows.Forms.ToolTip toolTips;
-		private System.Windows.Forms.Timer timer;
-		private System.Windows.Forms.SaveFileDialog savePng;
-		private System.Windows.Forms.SaveFileDialog saveGif;
-		private System.Windows.Forms.SaveFileDialog saveFractal;
-		private System.Windows.Forms.OpenFileDialog loadFractal;
-		private System.Windows.Forms.TextBox periodBox;
-		private System.Windows.Forms.TextBox timingBox;
-		private System.Windows.Forms.Button prevButton;
-		private System.Windows.Forms.Button nextButton;
-		private System.Windows.Forms.Button animateButton;
-		private System.Windows.Forms.Label statusLabel;
-		private System.Windows.Forms.Label infoLabel;
-		private System.Windows.Forms.Button exportButton;
-		private System.Windows.Forms.Label saturateLabel;
-		private System.Windows.Forms.Label voidAmbientLabel;
-		private System.Windows.Forms.Label bloomLabel;
-		private System.Windows.Forms.TextBox defaultZoomBox;
-		private System.Windows.Forms.TextBox defaultAngleBox;
-		private System.Windows.Forms.TextBox defaultHue;
-		private System.Windows.Forms.TextBox periodMultiplierBox;
-		private System.Windows.Forms.Label periodLabel;
-		private System.Windows.Forms.ComboBox spinSelect;
-		private System.Windows.Forms.Label zoomLabel;
-		private System.Windows.Forms.ComboBox hueSelect;
-		private System.Windows.Forms.Label spinLabel0;
-		private System.Windows.Forms.Label hueLabel;
-		private System.Windows.Forms.TextBox spinSpeedBox;
-		private System.Windows.Forms.TextBox hueSpeedBox;
-		private System.Windows.Forms.ComboBox parallelTypeSelect;
-		private System.Windows.Forms.TextBox ambBox;
-		private System.Windows.Forms.TextBox noiseBox;
-		private System.Windows.Forms.TextBox saturateBox;
-		private System.Windows.Forms.TextBox detailBox;
-		private System.Windows.Forms.TextBox blurBox;
-		private System.Windows.Forms.TextBox bloomBox;
-		private System.Windows.Forms.TextBox abortBox;
-		private System.Windows.Forms.TextBox brightnessBox;
-		private System.Windows.Forms.ComboBox zoomSelect;
-		private System.Windows.Forms.Button restartButton;
-		private System.Windows.Forms.ComboBox generationSelect;
-		private System.Windows.Forms.CheckBox debugBox;
-		private System.Windows.Forms.Label debugLabel;
-		private System.Windows.Forms.Panel generatorPanel;
-		private System.Windows.Forms.Panel editorPanel;
-		private System.Windows.Forms.Button saveButton;
-		private System.Windows.Forms.Button loadButton;
-		private System.Windows.Forms.Panel pointPanel;
-		private System.Windows.Forms.Button addColorButton;
-		private System.Windows.Forms.Button addAngleButton;
-		private System.Windows.Forms.Button removeColorButton;
-		private System.Windows.Forms.Button removeAngleButton;
-		private System.Windows.Forms.Button addPointButton;
-		private System.Windows.Forms.TextBox sizeBox;
-		private System.Windows.Forms.TextBox cutBox;
-		private System.Windows.Forms.TextBox minBox;
-		private System.Windows.Forms.TextBox maxBox;
-		private System.Windows.Forms.ComboBox addCut;
-		private System.Windows.Forms.Label addCutLabel;
-		private System.Windows.Forms.TextBox angleBox;
-		private System.Windows.Forms.TextBox colorBox;
-		private System.Windows.Forms.Label pointLabel0;
-		private System.Windows.Forms.TextBox voidBox;
-		private System.Windows.Forms.Label sizeLabel0;
-		private System.Windows.Forms.SaveFileDialog saveMp4;
-		private System.Windows.Forms.Button preButton;
-		private System.Windows.Forms.Panel fractalSettingsPanel;
-		private System.Windows.Forms.Label voidNoiseLabel;
-		private System.Windows.Forms.Label detailLabel;
-		private System.Windows.Forms.Label voidScaleLabel;
-		private System.Windows.Forms.Label brightnessLabel;
-		private System.Windows.Forms.Label blurLabel;
-		private System.Windows.Forms.Label parallelLabel;
-		private System.Windows.Forms.Label zoomChildLabel;
-		private System.Windows.Forms.TextBox zoomChildBox;
-		private System.Windows.Forms.Label abortDelayLabel;
-		private System.Windows.Forms.Label timingLabel;
-		private System.Windows.Forms.ComboBox paletteSelect;
-		private System.Windows.Forms.Label paletteLabel;
-		private System.Windows.Forms.Button addPalette;
-		private System.Windows.Forms.Button removePalette;
-		private System.Windows.Forms.ColorDialog paletteDialog;
+		private Label fractalLabel;
+		private ComboBox fractalSelect;
+		private Label angleLabel;
+		private ComboBox angleSelect;
+		private Label colorLabel;
+		private ComboBox colorSelect;
+		private Label cutLabel;
+		private ComboBox cutSelect;
+		private TextBox cutparamBox;
+		private TextBox resX;
+		private TextBox resY;
+		private ComboBox resSelect;
+		private ToolTip toolTips;
+		private Timer timer;
+		private SaveFileDialog savePng;
+		private SaveFileDialog saveGif;
+		private SaveFileDialog saveFractal;
+		private OpenFileDialog loadFractal;
+		private TextBox periodBox;
+		private TextBox timingBox;
+		private Button prevButton;
+		private Button nextButton;
+		private Button animateButton;
+		private Label statusLabel;
+		private Label infoLabel;
+		private Button exportButton;
+		private Label saturateLabel;
+		private Label voidAmbientLabel;
+		private Label bloomLabel;
+		private TextBox defaultZoomBox;
+		private TextBox defaultAngleBox;
+		private TextBox defaultHue;
+		private TextBox periodMultiplierBox;
+		private Label periodLabel;
+		private ComboBox spinSelect;
+		private Label zoomLabel;
+		private ComboBox hueSelect;
+		private Label spinLabel0;
+		private Label hueLabel;
+		private TextBox spinSpeedBox;
+		private TextBox hueSpeedBox;
+		private ComboBox parallelTypeSelect;
+		private TextBox ambBox;
+		private TextBox noiseBox;
+		private TextBox saturateBox;
+		private TextBox detailBox;
+		private TextBox blurBox;
+		private TextBox bloomBox;
+		private TextBox abortBox;
+		private TextBox brightnessBox;
+		private ComboBox zoomSelect;
+		private Button restartButton;
+		private ComboBox generationSelect;
+		private CheckBox debugBox;
+		private Label debugLabel;
+		private Panel generatorPanel;
+		private Panel editorPanel;
+		private Button saveButton;
+		private Button loadButton;
+		private Panel pointPanel;
+		private Button addColorButton;
+		private Button addAngleButton;
+		private Button removeColorButton;
+		private Button removeAngleButton;
+		private Button addPointButton;
+		private TextBox sizeBox;
+		private TextBox cutBox;
+		private TextBox minBox;
+		private TextBox maxBox;
+		private ComboBox addCut;
+		private Label addCutLabel;
+		private TextBox angleBox;
+		private TextBox colorBox;
+		private Label pointLabel0;
+		private TextBox voidBox;
+		private Label sizeLabel0;
+		private SaveFileDialog saveMp4;
+		private Button preButton;
+		private Panel fractalSettingsPanel;
+		private Label voidNoiseLabel;
+		private Label detailLabel;
+		private Label voidScaleLabel;
+		private Label brightnessLabel;
+		private Label blurLabel;
+		private Label parallelLabel;
+		private Label zoomChildLabel;
+		private TextBox zoomChildBox;
+		private Label abortDelayLabel;
+		private Label timingLabel;
+		private ComboBox paletteSelect;
+		private Label paletteLabel;
+		private Button addPalette;
+		private Button removePalette;
+		private ColorDialog paletteDialog;
 		private ComboBox exportSelect;
 		private ComboBox timingSelect;
 		private Label generationModeLabel;
@@ -1874,7 +1875,6 @@ namespace RgbFractalGenCs {
 		private Label ditherLabel;
 		private Label fileLabel;
 		private ComboBox fileSelect;
-		private OpenFileDialog loadExport;
 		private TextBox stripeBox;
 		private TextBox binBox;
 		private ComboBox voidSelect;
@@ -1906,6 +1906,7 @@ namespace RgbFractalGenCs {
 		private Panel fractalEditorPanel;
 		private Panel toolEditPanel;
 		private Panel debugPanel;
+		private Label frameLabel;
 	}
 }
 

@@ -50,44 +50,45 @@ partial class SettingsForm {
 		// localeLabel
 		// 
 		localeLabel.AutoSize = true;
+		localeLabel.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
 		localeLabel.Location = new System.Drawing.Point(12, 15);
 		localeLabel.Name = "localeLabel";
 		localeLabel.Size = new System.Drawing.Size(46, 15);
 		localeLabel.TabIndex = 1;
 		localeLabel.Text = "[locale]";
-		localeLabel.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
 		// 
 		// threadsLabel
 		// 
 		threadsLabel.AutoSize = true;
+		threadsLabel.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
 		threadsLabel.Location = new System.Drawing.Point(12, 41);
 		threadsLabel.Name = "threadsLabel";
 		threadsLabel.Size = new System.Drawing.Size(54, 15);
 		threadsLabel.TabIndex = 2;
 		threadsLabel.Text = "[threads]";
-		threadsLabel.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
 		// 
 		// cacheBox
 		// 
 		cacheBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 		cacheBox.AutoSize = true;
+		cacheBox.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
 		cacheBox.Location = new System.Drawing.Point(130, 72);
 		cacheBox.Name = "cacheBox";
 		cacheBox.Size = new System.Drawing.Size(65, 19);
 		cacheBox.TabIndex = 3;
 		cacheBox.Text = "[cache]";
 		cacheBox.UseVisualStyleBackColor = true;
-		cacheBox.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
 		// 
 		// cacheLabel
 		// 
 		cacheLabel.AutoSize = true;
+		cacheLabel.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
 		cacheLabel.Location = new System.Drawing.Point(12, 71);
 		cacheLabel.Name = "cacheLabel";
 		cacheLabel.Size = new System.Drawing.Size(46, 15);
 		cacheLabel.TabIndex = 4;
 		cacheLabel.Text = "[cache]";
-		cacheLabel.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
+		cacheBox.CheckedChanged += CacheBox_CheckedChanged;
 		// 
 		// threadsBox
 		// 
@@ -102,7 +103,7 @@ partial class SettingsForm {
 		// 
 		AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 		AutoScaleMode = AutoScaleMode.Font;
-		BackColor = System.Drawing.Color.FromArgb(32, 32, 32);
+		BackColor = RgbFractalGenCs.Core.StaticCore.Background;
 		ClientSize = new System.Drawing.Size(271, 104);
 		Controls.Add(localeLabel);
 		Controls.Add(cacheLabel);
@@ -113,7 +114,7 @@ partial class SettingsForm {
 		Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 		Margin = new Padding(4, 3, 4, 3);
 		MaximumSize = new System.Drawing.Size(1920, 143);
-		MinimumSize = new System.Drawing.Size(287, 0);
+		MinimumSize = new System.Drawing.Size(287, 143);
 		Name = "SettingsForm";
 		Text = "[ Settings ]";
 		FormClosing += SettingsForm_FormClosing;

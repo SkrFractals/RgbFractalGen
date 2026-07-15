@@ -2,6 +2,17 @@ Known issues:
 -Rare crashes
 -ZoomChild is be buggy for some indices (not centering properly, jumping, and CutSize cutting off parts of the fractal too soon)
 
+1.14.0:
+-various bugfixes
+-code cleanup
+-Rework of the GUI, now a multi-window app with Main Manu and separated AppSettings/Editor/GeneratorList/Multi-Generators
+-Generators can now be listed and saved as multiple instances that generate their animation as a batch (replacing the unfinished batching mechanic)
+-Export scheduling - you can preselect what exports you want to happen automatically after generation is complete
+-With the GenList and Scheduling, you can initially setup generation or many fractals, and have it generate and export them one-by-one automatically without any further input.
+-Separated settings.txt file into multiple save files: fractals.txt, palettes.txt, gen/X.txt
+-Localizations
+-Generator settings only show up when you hover cursor over the window. Or can be hidden permanently, but clicking the window will prioritize unlocking them again.
+
 1.13.4
 -Fixed an occasional crash in GifEncoder, when GPU Draw was enabled
 -Added Impode Code feature (like Load Export, but from a clipboard)

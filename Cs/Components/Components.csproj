@@ -56,5 +56,6 @@
   <PropertyGroup>
     <AssemblyVersion>0.0.0.1</AssemblyVersion>
     <AssemblyTitle>Gif Animate</AssemblyTitle>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
 </Project>

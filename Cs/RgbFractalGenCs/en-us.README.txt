@@ -32,10 +32,12 @@ Terminology:
 TODO:
 
 Known bugs, issues, and plans for new fearutes to be added/fixed later:
-BUGS: Rarelly the program crashes for various reasons, it's probably more bugs in one, and I'll try to keep fixing these as I figure out what's causing these. It's not that bad though.
+BUGS: Rarely the program crashes for various reasons, it's probably more bugs in one, and I'll try to keep fixing these as I figure out what's causing these. It's not that bad though.
+-maybe fixed already?
 BUG: When PNG encoding is selected, the preview screen sometimes goes blank until it's refresh with a new frame. Possibly trying to display a bitmap that is activelly written to a file, but I thought I accounted for that.
 -maybe fixed already?
 BUG: Some zoom child choices might be broken and not zoom/loop correctly (this is new and complex feature, so it still has some work to do on it)
+FAEATURE: complex fractals - per-child scale, per-child fractal definition link
 FEATURE: turning on a gif encoder or changing gif encoder type or delay shouldn't need to restart the whole animation generation from scratch, but if I do that it will crash, so it's restarting for now.
 FEATURE: Draw direction arrows for children angles in editor preview more
 FEATURE: Finish implementing the batching feature

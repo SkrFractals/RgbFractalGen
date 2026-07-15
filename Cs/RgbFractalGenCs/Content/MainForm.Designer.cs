@@ -31,9 +31,9 @@ partial class MainForm {
 		setBut = new Button();
 		genBut = new Button();
 		editBut = new Button();
-		helpBut = new Button();
 		toolTips = new ToolTip(components);
 		updateTimer = new Timer(components);
+		helpBut = new Button();
 		SuspendLayout();
 		// 
 		// setBut
@@ -43,7 +43,7 @@ partial class MainForm {
 		setBut.Name = "setBut";
 		setBut.Size = new System.Drawing.Size(240, 23);
 		setBut.TabIndex = 0;
-		setBut.Text = "SETTINGS";
+		setBut.Text = "[ Seetings ]";
 		setBut.UseVisualStyleBackColor = true;
 		setBut.Click += SetBut_Click;
 		// 
@@ -54,7 +54,7 @@ partial class MainForm {
 		genBut.Name = "genBut";
 		genBut.Size = new System.Drawing.Size(240, 23);
 		genBut.TabIndex = 1;
-		genBut.Text = "GENERATORS";
+		genBut.Text = "[ Generator ]";
 		genBut.UseVisualStyleBackColor = true;
 		genBut.Click += GenBut_Click;
 		// 
@@ -65,50 +65,53 @@ partial class MainForm {
 		editBut.Name = "editBut";
 		editBut.Size = new System.Drawing.Size(240, 23);
 		editBut.TabIndex = 2;
-		editBut.Text = "EDITOR";
+		editBut.Text = "[ Editor]";
 		editBut.UseVisualStyleBackColor = true;
 		editBut.Click += EditBut_Click;
-		// 
-		// helpBut
-		// 
-		helpBut.Location = new System.Drawing.Point(12, 99);
-		helpBut.Name = "helpBut";
-		helpBut.Size = new System.Drawing.Size(240, 23);
-		helpBut.TabIndex = 2;
-		helpBut.Text = "HELP";
-		helpBut.UseVisualStyleBackColor = true;
-		helpBut.Click += EditBut_Click;
 		// 
 		// updateTimer
 		// 
 		updateTimer.Enabled = true;
+		updateTimer.Interval = 40;
 		updateTimer.Tick += UpdateTimer_Tick;
+		// 
+		// helpBut
+		// 
+		helpBut.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+		helpBut.Location = new System.Drawing.Point(12, 99);
+		helpBut.Name = "helpBut";
+		helpBut.Size = new System.Drawing.Size(240, 23);
+		helpBut.TabIndex = 3;
+		helpBut.Text = "[ Help ]";
+		helpBut.UseVisualStyleBackColor = true;
+		helpBut.Click += HelpBut_Click;
 		// 
 		// MainForm
 		// 
 		AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 		AutoScaleMode = AutoScaleMode.Font;
-		BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
-		ClientSize = new System.Drawing.Size(264, 105);
+		BackColor = RgbFractalGenCs.Core.StaticCore.Background;
+		ClientSize = new System.Drawing.Size(264, 134);
+		Controls.Add(helpBut);
 		Controls.Add(editBut);
 		Controls.Add(genBut);
 		Controls.Add(setBut);
+		Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 238);
 		Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 		Margin = new Padding(4, 3, 4, 3);
-		MinimumSize = new System.Drawing.Size(280, 144);
+		MinimumSize = new System.Drawing.Size(280, 173);
 		Name = "MainForm";
 		Text = "[ RGB Fractal Animation Generator - <version> ]";
 		FormClosing += MainForm_FormClosing;
-		Load += MainForm_Load;
 		ResumeLayout(false);
 	}
 
 	#endregion
 
-	private System.Windows.Forms.Button setBut;
-	private System.Windows.Forms.Button genBut;
-	private System.Windows.Forms.Button editBut;
-	private System.Windows.Forms.Button helpBut;
-	private System.Windows.Forms.ToolTip toolTips;
+	private Button setBut;
+	private Button genBut;
+	private Button editBut;
+	private ToolTip toolTips;
 	private Timer updateTimer;
+	private Button helpBut;
 }

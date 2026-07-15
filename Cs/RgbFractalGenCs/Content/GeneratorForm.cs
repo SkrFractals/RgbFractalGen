@@ -1,7 +1,10 @@
-﻿#nullable enable
-// Starts the generator with special testing settings
+﻿// Starts the generator with special testing settings
 //#define CustomDebugTest
 
+using ComputeSharp;
+using RgbFractalGenCs.Content;
+using RgbFractalGenCs.Content.Basic;
+using RgbFractalGenCs.Core;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -14,39 +17,28 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using ComputeSharp;
-using RgbFractalGenCs.Content;
-using RgbFractalGenCs.Content.Basic;
-using RgbFractalGenCs.Core;
-using static RgbFractalGenCs.Core.StaticCore;
 using static RgbFractalGenCs.Content.Static.StaticContent;
+using static RgbFractalGenCs.Core.FractalGenerator;
+using static RgbFractalGenCs.Core.StaticCore;
 
 namespace RgbFractalGenCs;
 
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public partial class GeneratorForm : Form {
 
-	internal enum ExportType : byte {
-		Png = 0,
-		Pngs = 1,
-		PngToMp4 = 2,
-		Gif = 3,
-		GifToMp4 = 4,
-		ImportFile = 5,
-		ImportCode = 6,
-		Close = 7
-	}
-	internal struct Schedule {
-		internal string Filename;
-		internal ExportType Type;
+	internal struct Schedule(ScheduledTask type, string filename) {
+		internal string Filename = filename;
+		internal ScheduledTask Type = type;
 	}
 
-	private readonly MainForm root;
-	private readonly GeneratorsForm gens;
 
 	#region Designer
-	public GeneratorForm(MainForm source, GeneratorsForm sourceGens, uint index, GeneratorForm? from = null) {
-		InitializeComponent();
+	public GeneratorForm(MainForm source, GeneratorsForm sourceGens, uint index, GeneratorForm
+#if NULLABLE
+?
+#endif
+	from = null) {
+			InitializeComponent();
 		fromGen = from;
 		root = source;
 		gens = sourceGens;
@@ -62,48 +54,54 @@ public partial class GeneratorForm : Form {
 		Controls.Add(screenPanel);
 		//MouseDown += Control_MouseDown; // Detect clicks on empty form space
 		//RegisterMouseDownRecursive(this); // Detect clicks on all controls
-		importForm = new ImportForm(this);
+		importForm = new(this);
+		scheduler = new(this);
 		generator = new(Index = index);
 	}
 	#endregion
 
+	private readonly MainForm root;
+	private readonly GeneratorsForm gens;
+	private readonly SchedulerForm scheduler;
+
 	//public const string charOn = "✓ ";
 	//public const string charOff = "✕ ";
-
 	//public const string charOn = "[■]";
 	//public const string charOff = "[□]";
-
 	public const string charOn = "[⬛] ";
 	public const string charOff = "[⬜] ";
 	private readonly List<string> filePostfix = [];
 
 	internal bool SetWorking(bool working) => generator.Working = Working = working;
-	internal void OpenTasks() {
-		// TOOD open my Task Scheduler
-	}
+	internal void OpenTasks() { scheduler.Show(); scheduler.Location = Location; }
 
 	#region Variables
 	// Threading
 	internal string MyName = "";    // Name of this generator (how do you see it in the list and window header)
 	private bool shown = true;
 	private bool bInit = true;
-	private readonly List<Control>
-		myControls = [];            // All persistent interactive controls (Generator)
-	private readonly List<string>
-		myTips = [];                // Locale codes (Generator)
-	private readonly List<Control>
-		myEditControls = [];        // All persistent interactive controls (Editor)
-	private readonly List<string>
-		myEditTips = [];            // Locale codes (Editor)
-	private readonly List<bool>
+	private readonly Dictionary<Control, string> myControls = [];
+	private readonly Dictionary<Control, string> myEditControls = [];
+	//private readonly List<Control>
+	//	myControls = [];            // All persistent interactive controls (Generator)
+	//private readonly List<string>
+	//	myTips = [];                // Locale codes (Generator)
+	//private readonly List<Control>
+	//	myEditControls = [];        // All persistent interactive controls (Editor)
+	//private readonly List<string>
+	//	myEditTips = [];            // Locale codes (Editor)
+	private readonly Dictionary<Control, bool>
 		myControlsEnabled = [];     // Memory of which controls were enabled after we disabled all of them temporairly, to recover that alter
 	internal readonly FractalGenerator
 		generator;                  // The core of the app, the generator the generates the fractal animations
 	private CancellationTokenSource
 		xCancel = new(),
 		aCancel = new();            // Cancellation Token Sources
-	private Task? xTask;            // Export tasks
-	private Task? aTask;            // Abort Task
+	private Task
+#if NULLABLE
+?
+#endif
+		xTask, aTask;					// Export Task / Abort Task
 	private bool queueAbort;        // Generator abortion queued
 	private short queueReset;       // Counting time until generator Restart
 	private int isGifReady;
@@ -113,7 +111,11 @@ public partial class GeneratorForm : Form {
 	internal List<Schedule> Scheduled { get; private set; } = [];
 
 	// Settings
-	private readonly GeneratorForm? fromGen;
+	private readonly GeneratorForm
+#if NULLABLE
+? 
+#endif
+		fromGen;
 	private bool editorVisible = false;
 	private bool animated = true;   // Animating preview or paused? (default animating)
 	private bool
@@ -129,7 +131,10 @@ public partial class GeneratorForm : Form {
 	// Display Variables
 	private readonly DoubleBufferedPanel
 		screenPanel;                // Display panel
-	private Bitmap?
+	private Bitmap
+#if NULLABLE
+? 
+#endif
 		currentBitmap;              // Displayed Bitmap
 	private int currentBitmapIndex; // Play frame index
 	private int fx, fy;             // Memory of window size
@@ -159,8 +164,8 @@ public partial class GeneratorForm : Form {
 	// Config
 	private ushort fileMask = 0;
 	internal uint Index = 0;
-	internal string statusText = "";
-	internal string infoText = "";
+	internal string statusText = "", infoText = "", tasksText = "";
+	private bool frameLabelUpdate = true;
 	//private string loadedBatch;
 	//private string[] runningBatch;
 	//private int batchIndex;
@@ -173,7 +178,11 @@ public partial class GeneratorForm : Form {
 		generator.StartGenerate();
 		SwitchChildColor();
 	}
-	private void UpdateBitmap(Bitmap? bitmap) {
+	private void UpdateBitmap(Bitmap
+#if NULLABLE
+?
+#endif
+		bitmap) {
 		if (currentBitmap == bitmap || bitmap == null)
 			return;
 		// Update the display with the bitmap when it's not loaded
@@ -194,6 +203,7 @@ public partial class GeneratorForm : Form {
 					(animated ? currentBitmapIndex + 1 : currentBitmapIndex) % bitmapsFinished) // Make sure the index is in range
 				: generator.GetPreviewBitmap() // Try preview bitmap if none of the main ones are generated yet
 			);
+			frameLabelUpdate = true;
 		} finally { Monitor.Exit(this); }
 	}
 	private void UpdateCache() {
@@ -201,10 +211,9 @@ public partial class GeneratorForm : Form {
 	}
 	private void SetupEditControl(Control control, string tip) {
 		// Add tooltip and set the next tabIndex
+		myEditControls.Add(control, tip);
 		toolTips.SetToolTip(control, L(tip));
 		control.TabIndex = ++pointTabIndex;
-		myEditControls.Add(control);
-		myEditTips.Add(tip);
 	}
 	/// <summary>
 	/// Refreshing and preview animation
@@ -263,7 +272,7 @@ public partial class GeneratorForm : Form {
 			generator.UpdateCache += UpdateCache;
 
 			myControls.Clear();
-			myTips.Clear();
+			//myTips.Clear();
 			// Setup interactable controls (tooltips + tabIndex):
 
 			// Editor Bottom
@@ -346,7 +355,7 @@ public partial class GeneratorForm : Form {
 			SetupControl(generationSelect, "generationSelect");
 			SetupControl(exportButton, "exportButton");
 			SetupControl(exportSelect, "exportSelect");
-			SetupControl(tasksButton, "tasksButton");
+			SetupControl(tasksButton, "tasksTip");
 			SetupControl(fileSelect, "fileSelect");
 
 			// Debugs
@@ -354,6 +363,10 @@ public partial class GeneratorForm : Form {
 			SetupControl(animBox, "debugAnimBox");
 			SetupControl(pngBox, "debugPngBox");
 			SetupControl(gifBox, "debugGifBox");
+
+			// Editor Point List
+			SetupControl(addPointButton, "addPoint");
+
 			UpdateLocale();
 
 			// Update Input fields to default values - modifySettings is true from constructor so that it doesn't abort and restart the generator over and over
@@ -424,8 +437,9 @@ public partial class GeneratorForm : Form {
 			var appDirectory = AppDomain.CurrentDomain.BaseDirectory; // Get the app's directory
 			const string searchPattern = "*.fractal"; // Change to your desired file type
 			var files = Directory.GetFiles(appDirectory, searchPattern);
-			foreach (var file in files)
-				_ = LoadFractal(gens, file, null);
+			if(gens != null)
+				foreach (var file in files)
+					_ = LoadFractal(gens, file, null);
 
 			// List all cutFunction to add in the editor
 			addCut.Items.Add(L("selectCutFunctionAdd"));
@@ -440,26 +454,32 @@ public partial class GeneratorForm : Form {
 		#endregion
 
 		#region Size
-		void SetMinimumSize() {
+		/*void SetMinimumSize() {
 			// bw = Width - ClientWidth = 16
 			// bh = Height - ClientHeight = 39
-			const int bw = 16, bh = 39; // Have to do this because for some reason ClientSize was returning bullshit values all of a sudden
-			MinimumSize = new(
-				Math.Max(640, bw + width + 284),
-				Math.Max(Math.Max(640, debugLabel.Bounds.Bottom + bh), bh + Math.Max(460, height + 8))
-			);
+			//const int bw = 16, bh = 39; // Have to do this because for some reason ClientSize was returning bullshit values all of a sudden
+			int bw = Width - ClientRectangle.Width, bh = Height - ClientRectangle.Height;
 			//debugLabel.Text = debugLabel.Text + " " + MinimumSize.Height.ToString();
+		}*/
+		void ResizeScreen() {
+			//const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
+			int bw = Width - ClientRectangle.Width, bh = Height - ClientRectangle.Height;
+			var screenHeight = Math.Max(height, Math.Min(Height - bh, (Width - bw) * height / width));
+			screenPanel.SetBounds(/*305,4*/0, 0, screenHeight * width / height, screenHeight);
+			//helpPanel.SetBounds(305, 4, Width - bw - 314, Height - bh - 8);
+			screenPanel?.Invalidate();
 		}
 		void WindowSizeRefresh() {
-			if (fx == Width && fy == Height)
+			if (fx == ClientRectangle.Width && fy == ClientRectangle.Height)
 				return;
 			// User has manually resized the window - stretch the display
 			ResizeScreen();
-			SetMinimumSize();
-			const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
+			//SetMinimumSize();
+			//const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
+			//int bw = Width - ClientRectangle.Width, bh = Height - ClientRectangle.Height;
 			SetClientSizeCore(
-				Math.Max(Width - bw, /*314 +*/ Math.Max(screenPanel.Width, width)),
-				Math.Max(Height - bh, /*8 +*/ Math.Max(screenPanel.Height, height))
+				Math.Max(ClientRectangle.Width,/*Width - bw, 314 +*/ Math.Max(screenPanel.Width, width)),
+				Math.Max(ClientRectangle.Height,/*Height - bh, 8 +*/ Math.Max(screenPanel.Height, height))
 			);
 			SizeAdapt();
 		}
@@ -468,7 +488,7 @@ public partial class GeneratorForm : Form {
 			generator.SelectedHeight = (ushort)height;
 			generator.SetMaxIterations();
 			// Update the size of the window and display
-			SetMinimumSize();
+			//SetMinimumSize();
 			SetClientSizeCore(width + 314, Math.Max(height + 8, 300));
 			ResizeScreen();
 			WindowSizeRefresh();
@@ -483,18 +503,12 @@ public partial class GeneratorForm : Form {
 			//gifButton.Enabled = false;
 			isGifReady = 0;
 			currentBitmapIndex = 0;
+			frameLabelUpdate = true;
 			SizeAdapt();
 		}
-		void ResizeScreen() {
-			const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
-			var screenHeight = Math.Max(height, Math.Min(Height - bh - 8, (Width - bw - /*314*/8) * height / width));
-			screenPanel.SetBounds(/*305,4*/0, 0, screenHeight * width / height, screenHeight);
-			//helpPanel.SetBounds(305, 4, Width - bw - 314, Height - bh - 8);
-			screenPanel?.Invalidate();
-		}
 		void SizeAdapt() {
-			fx = Width;
-			fy = Height;
+			fx = ClientRectangle.Width;
+			fy = ClientRectangle.Height;
 		}
 		#endregion
 
@@ -504,10 +518,10 @@ public partial class GeneratorForm : Form {
 			Init();
 		if (generator.DebugTasks || generator.DebugAnim || generator.DebugPng || generator.DebugGif) {
 			debugLabel.Text = generator.DebugString;
-			SetMinimumSize();
+			//SetMinimumSize();
 		}
 
-		return;
+		//return;
 
 		// Window Size Update
 		WindowSizeRefresh();
@@ -567,8 +581,8 @@ public partial class GeneratorForm : Form {
 				generator.SelectedGenerationType = mg;
 				generator.SelectedWidth = mw; generator.SelectedHeight = mh;
 				// Restore enables
-				for (i = myControls.Count; 0 <= --i; myControls[i].Enabled = myControlsEnabled[i]) {
-				}
+				foreach (var c in myControls) 
+					c.Key.Enabled = myControlsEnabled[c.Key];
 
 				// restart generator
 				performHash = false;
@@ -586,54 +600,57 @@ public partial class GeneratorForm : Form {
 		if (bitmapsTotal <= 0)
 			return;
 		if (bitmapsFinished < bitmapsTotal) {
-			BackColor = Color.FromArgb(64, 64, 64);
+			BackColor = Background;
 			notify = true;
 		}
 		if (bitmapsFinished == bitmapsTotal && notify && !generator.IsCancelRequested()) {
-			BackColor = Color.FromArgb(128, 128, 64);
+			BackColor = Color.FromArgb(128, 128, 32);
 			notify = false;
 			isPngsSaved = false;
+			FinishedTask();
 			//	or FractalGenerator.GenerationType.AllSeedsPng;
 			// If we're runnig batches, export immediately
-			/*if (runningBatch.Length > 0) {
+				/*if (runningBatch.Length > 0) {
 
-				switch (exportSelect.SelectedIndex) {
-					case 0: // PNG 
-						savePng.FileName = batchFolder + batchIndex + ".png";
-						SavePng_FileOk(savePng, null);
-						break;
-					case 1: // PNGs
-						saveMp4.DefaultExt = "png";
-						saveMp4.Filter = "PNG video (*.png)|*.png";
-						saveMp4.FileName = batchFolder + batchIndex + ".png";
-						SaveMp4_FileOk(saveMp4, null);
-						break;
-					case 2: // MP4
-						saveMp4.DefaultExt = "mp4";
-						saveMp4.Filter = "MP4 video (*.mp4)|*.mp4";
-						saveMp4.FileName = batchFolder + batchIndex + ".mp4";
-						SaveMp4_FileOk(saveMp4, null);
-						break;
-					case 3: // GIF
-						saveGif.DefaultExt = "gif";
-						saveGif.Filter = "GIF video (*.gif)|*.gif";
-						saveGif.FileName = batchFolder + batchIndex + ".gif";
-						SaveGif_FileOk(saveGif, null);
-						break;
-					case 4: // GIF->Mp4
-						saveGif.DefaultExt = "mp4";
-						saveGif.Filter = "MP4 video (*.mp4)|*.mp4";
-						saveGif.FileName = batchFolder + batchIndex + ".mp4";
-						SaveGif_FileOk(saveGif, null);
-						break;
-				}
-			}*/
+					switch (exportSelect.SelectedIndex) {
+						case 0: // PNG 
+							savePng.FileName = batchFolder + batchIndex + ".png";
+							SavePng_FileOk(savePng, null);
+							break;
+						case 1: // PNGs
+							saveMp4.DefaultExt = "png";
+							saveMp4.Filter = "PNG video (*.png)|*.png";
+							saveMp4.FileName = batchFolder + batchIndex + ".png";
+							SaveMp4_FileOk(saveMp4, null);
+							break;
+						case 2: // MP4
+							saveMp4.DefaultExt = "mp4";
+							saveMp4.Filter = "MP4 video (*.mp4)|*.mp4";
+							saveMp4.FileName = batchFolder + batchIndex + ".mp4";
+							SaveMp4_FileOk(saveMp4, null);
+							break;
+						case 3: // GIF
+							saveGif.DefaultExt = "gif";
+							saveGif.Filter = "GIF video (*.gif)|*.gif";
+							saveGif.FileName = batchFolder + batchIndex + ".gif";
+							SaveGif_FileOk(saveGif, null);
+							break;
+						case 4: // GIF->Mp4
+							saveGif.DefaultExt = "mp4";
+							saveGif.Filter = "MP4 video (*.mp4)|*.mp4";
+							saveGif.FileName = batchFolder + batchIndex + ".mp4";
+							SaveGif_FileOk(saveGif, null);
+							break;
+					}
+				}*/
 		}
 		if (notifyExp) {
+			// TODO rewrite this into the GeneratorsForm scheduling somehow?
 			notifyExp = false;
-			FinishedExporting();
+			FinishedTask();
 		}
-
+		if (scheduler.Running)
+			scheduler.UpdateRunning();
 		// Only Allow GIF Export when generation is finished
 		//string v = generator.selectGenerationType == FractalGenerator.GenerationType.Mp4 ? "Mp4" : "Gif";
 		isGifReady = generator.IsGifReady();
@@ -652,10 +669,14 @@ public partial class GeneratorForm : Form {
 			UpdateCacheLocale();
 			cacheLabelUpdate = false;
 		}
+		if (frameLabelUpdate) {
+			frameLabel.Text = currentBitmapIndex.ToString();
+			frameLabelUpdate = false;
+		}
 		// Info text refresh
 		infoText = " / " + bitmapsTotal;
 		if (bitmapsFinished < bitmapsTotal) {
-			statusLabel.Tag = "generating";
+			statusLabel.Tag = Working ? "generating" : "notWorking";
 			infoText = bitmapsFinished + infoText;
 		} else {
 			if (xTask != null) {
@@ -663,7 +684,7 @@ public partial class GeneratorForm : Form {
 				infoText = generator.GetCompleted() + infoText;
 				//infoText = generator.GetPngFinished() + infoText;
 			} else {
-				statusLabel.Tag = "finished";
+				statusLabel.Tag = generator.SelectedGenerationType == FractalGenerator.GenerationType.OnlyImage ? "generationSelect0" : "finished";
 				infoText = currentBitmapIndex + infoText;
 			}
 		}
@@ -692,14 +713,14 @@ public partial class GeneratorForm : Form {
 			+ "|parallel|" + parallelTypeSelect.SelectedIndex + "|cachestripe|" + stripeBox.Text + "|cachebin|" + binBox.Text + "|cachesize|" + l2Box.Text
 			+ "|gpuvoid|" + voidSelect.SelectedIndex + "|gpudraw|" + drawSelect.SelectedIndex
 			+ "|png|" + encodePngSelect.SelectedIndex + "|gif|" + encodeGifSelect.SelectedIndex + "|gen|" + generationSelect.SelectedIndex
-			+ "|ani|" + (animated ? 1 : 0) + "|exp|" + exportSelect.SelectedIndex + "|file|" + fileMask + "|name|" + MyName 
-			+ "|shown|" + (shown ? "1" : "0") + "|working|" + (Working ? "1" : "0");
+			+ "|ani|" + (animated ? 1 : 0) + "|exp|" + exportSelect.SelectedIndex + "|file|" + fileMask + "|name|" + MyName
+			+ "|shown|" + (shown ? "1" : "0");// + "|working|" + (Working ? "1" : "0");
 	}
 	private void SaveSettings() 
-		=> File.WriteAllText(Path.Combine(GetGensSaveDir(), Index.ToString() + ".txt"), ExportSettings());
+		=> File.WriteAllText(Path.Combine(GetGensSaveDir(), Index.ToString() + GeneratorsForm.genExtension), ExportSettings());
 	private void LoadSettings() {
 		//gifButton.Enabled = false;
-		var name = Index.ToString() + ".txt";
+		var name = Index.ToString() + GeneratorsForm.genExtension;
 		var file = Path.Combine(GetGensSaveDir(), name);
 		if (!File.Exists(file) && File.Exists("settings.txt"))
 			File.Copy("settings.txt", file);
@@ -740,6 +761,7 @@ public partial class GeneratorForm : Form {
 		for (var i = 0; i < s.Length - 1; i += 2) {
 			var v = s[i + 1];
 			var p = int.TryParse(v, out var n);
+			if(gens != null)
 			switch (s[i]) {
 				case "path": if (v != "" && File.Exists(v)) _ = LoadFractal(gens, v, this); break;
 				case "fractal": if (fractalSelect.Items.Contains(v)) fractalSelect.SelectedItem = v; break;
@@ -842,7 +864,7 @@ public partial class GeneratorForm : Form {
 					break;
 				case "name": MyName = v; break;
 				case "shown": if (p) shown = n > 0; break;
-				case "working": if (p) _ = SetWorking(n > 0); break;
+				//case "working": if (p) _ = SetWorking(n > 0); break;
 			}
 		}
 		_ = BitmaskComboBox_MinimumSelection();
@@ -900,10 +922,10 @@ public partial class GeneratorForm : Form {
 		var rxy = resSelect.SelectedIndex is 1 or < 0
 			? (resSelect.Items[1]?.ToString() ?? "").Split(':')[1].Split('x')
 			: (resSelect.Items[resSelect.SelectedIndex]?.ToString() ?? "").Split('x');
-		if (!short.TryParse(rxy[0], out width))
-			width = 80;
-		if (!short.TryParse(rxy[1], out height))
-			height = 80;
+		if (!short.TryParse(rxy[0], out width) || width <= 8)
+			width = 8;
+		if (!short.TryParse(rxy[1], out height) || height <= 8)
+			height = 8;
 		if (generator.SelectedWidth != width || generator.SelectedHeight != height) {
 			// Number of threads can change the maximum of these:
 			BloomBox();
@@ -916,32 +938,49 @@ public partial class GeneratorForm : Form {
 		e.Cancel = true;
 		Hide();
 	}
-	internal bool TryClose() {
+	internal bool TryClose(bool scheduled = false) {
+		void ResetSchedule() {
+			if (scheduled) {
+				var result = MessageBox.Show(L("moveCloseTask"), L("moveClose"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+				if (result == DialogResult.Yes)
+					AddScheduled(new(ScheduledTask.Close, ""));
+			}
+		}
 		if (xTask != null) {
 			var result = MessageBox.Show(L("exportStillSaving"), L("confirmExit"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 			// Cancel closing if the user clicks "No"
+			ResetSchedule();
 			return result == DialogResult.No;
 		}
+		if (Scheduled.Count > 0) {
+			var result = MessageBox.Show(L("resetSchedule"), L("confirmResetSchedule"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+			// Cancel close if the user clicks "Yes"
+			ResetSchedule();
+			if (result == DialogResult.Yes)
+				return false;
+		}
 		if (isGifReady > 80) {
-			var result = MessageBox.Show("gifAvailable", "Confirm Save", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+			var result = MessageBox.Show(L("gifAvailable"), L("confirmSave"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 			// Save if the user clicks "Yes"
 			if (result == DialogResult.Yes) {
 				saveGif.DefaultExt = "gif";
 				saveGif.Filter = ("gifVideo") + " (*.gif)|*.gif|MP4 video (*.mp4)|*.mp4";
 				_ = saveGif.ShowDialog();
+				ResetSchedule();
 				return true;
 			}
 		}
 		if (!isPngsSaved && generator.SelectedPngType == FractalGenerator.PngType.Yes && generator.GetBitmapsFinished() >= generator.GetFrames()) {
-			var result = MessageBox.Show(L("pngsAvailable"), L("confirmSave"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+			var result = MessageBox.Show(L("pngsAvailable"), L("confirmSave"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 			if (result == DialogResult.Yes) { // Save if the user clicks "Yes"
 				saveMp4.DefaultExt = "mp4";
 				saveMp4.Filter = L("mp4Video") + " (*.mp4)|*.mp4|PNG video (*.png)|*.png";
 				_ = saveMp4.ShowDialog();
+				ResetSchedule();
 				return true;
 			}
 		}
-		// TODO if schedule: Want to keep waiting? YES NO 
+
 		var saved = false;
 		foreach (var f in Fractals) {
 			if (!f.Edit)
@@ -983,6 +1022,7 @@ public partial class GeneratorForm : Form {
 		// Cancel FractalGenerator threads
 		generator.RequestCancel();
 		isGifReady = 0;
+		frameLabelUpdate = true;
 		currentBitmapIndex = 0;
 		aTask = null;
 	}
@@ -1020,20 +1060,16 @@ public partial class GeneratorForm : Form {
 		modifySettings = m;
 		return false;
 	}
-	/*internal bool QueueResetBitmask<T>() where T : notnull {
-		if (TryQueueReset(true, true))
-			return true;
-		//var m = modifySettings;
-		//modifySettings = true;
-		//to.SelectedIndex = cancel;
-		//modifySettings = m;
-		// TODO restore bitmask to previous
-		return false;
-	}*/
 	private bool TryQueueReset(bool allow = true, bool returnTrue = false) {
 		if (modifySettings || !allow || bInit)
 			return returnTrue;
 		if (queueReset <= 0) {
+			if (Scheduled.Count > 0) {
+				var result = MessageBox.Show(L("resetSchedule"), L("confirmResetSchedule"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+				// Cancel reset if the user clicks "Yes"
+				if (result == DialogResult.Yes)
+					return false;
+			}
 			if (isGifReady > 80
 				&& xTask == null) {
 				using AvailableQuestion mes = new(L(""), L("gifAvailable") + L("gifAvailableAbort"),
@@ -1074,11 +1110,11 @@ public partial class GeneratorForm : Form {
 						break;
 				}
 			}
-			// TODO tasks.Count > 0. YES = reschedule (opens new savefile dialogs), NO = unschedule, CANCEL = revert
+
 			//gifButton.Enabled = false;
 			isGifReady = 0;
+			frameLabelUpdate = true;
 			currentBitmapIndex = 0;
-
 			if (TasksNotRunning())
 				aTask = Task.Run(Abort, (aCancel = new()).Token);
 			else queueAbort = true;
@@ -1097,8 +1133,8 @@ public partial class GeneratorForm : Form {
 	/*private void NextBatch() {
 		if (batchIndex >= runningBatch.Length) {
 			// All batches complete, unlock the controls, and stop the batching
-			for (var i = myControls.Count; 0 <= --i; myControls[i].Enabled = myControlsEnabled[i]) {
-			}
+			foreach (var c in myControls) 
+					c.Key.Enabled = myControlsEnabled[c.Key];
 			return;
 		}
 		isGifReady = 0;
@@ -1173,8 +1209,11 @@ public partial class GeneratorForm : Form {
 	private bool CutSelectEnabled(List<(int, int[])> cf)
 	=> cutSelect.Enabled = cf is { Count: > 0 };
 	// Query the number of seeds from the CutFunction
-	private bool CutSeedBoxEnabled(Fractal.CutFunction? cf)
-		=> cutparamBox.Enabled = 0 < (generator.CutSeed_Max = (int)(cf == null || cf(0, -1, generator.GetFractal()) <= 0 ? 0 : (cf(0, 1 - (1 << 30), generator.GetFractal()) + 1) / cf(0, -1, generator.GetFractal())));
+	private bool CutSeedBoxEnabled(Fractal.CutFunction
+#if NULLABLE
+?
+#endif
+	cf) => cutparamBox.Enabled = 0 < (generator.CutSeed_Max = (int)(cf == null || cf(0, -1, generator.GetFractal()) <= 0 ? 0 : (cf(0, 1 - (1 << 30), generator.GetFractal()) + 1) / cf(0, -1, generator.GetFractal())));
 	/// <summary>
 	/// Fill the cutFunction seed parameter comboBox with available options for the selected CutFunction
 	/// </summary>
@@ -1192,28 +1231,30 @@ public partial class GeneratorForm : Form {
 		return r;
 	}
 	private void MoveFrame(int move) {
-		animated = false;
+		animated = true; AnimateButton();
 		var b = generator.GetBitmapsFinished();
-		currentBitmapIndex = b == 0 ? -1 : (b + move) % b;
-		modifySettings = true;
+		(currentBitmapIndex = b == 0 ? -1 : (b + move) % b).ToString();
+		frameLabelUpdate = modifySettings = true;
 		frameBox.Text = currentBitmapIndex.ToString();
 		modifySettings = false;
 	}
 	private void UpdateAnimateLocale() {
-		animateButton.Text = L(animated ? "playing" : "paused");
+		animateButton.Text = L(animated ? "▶︎" : "||");
 		animateButton.BackColor = animated ? Color.FromArgb(128, 255, 128) : Color.FromArgb(255, 128, 128);
 	}
-	#endregion
+#endregion
 
 	#region Input_ToolGen
 
 	private void PrevButton_Click(object sender, EventArgs e) => MoveFrame(currentBitmapIndex - 1);
 	private void FrameBox_TextChanged(object sender, EventArgs e) => MoveFrame(int.TryParse(frameBox.Text, out int f) ? f : 0);
 	private void NextButton_Click(object sender, EventArgs e) => MoveFrame(currentBitmapIndex + 1);
-	private void AnimateButton_Click(object? sender, EventArgs e) => AnimateButton();
+	private void AnimateButton_Click(object sender, EventArgs e) => AnimateButton();
 	private void AnimateButton() {
-		if (shown) { // toggle animation if GUI not hidden
-			infoLabel.Visible = animated = !(frameBox.Visible = animated);
+		// Toggle animation if GUI not hidden
+		if (shown) {
+			//infoLabel.Visible = animated = !(frameBox.Visible = animated);
+			frameLabel.Visible = animated = !(frameBox.Visible = animated);
 			UpdateAnimateLocale();
 		} else shown = true; // unhide GUI if hidden
 	}
@@ -1232,7 +1273,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void HideButton_Click(object sender, EventArgs e) => shown = false;
 
-	private static void ComboBox_MouseWheel(object? sender, MouseEventArgs e) {
+	private static void ComboBox_MouseWheel(object sender, MouseEventArgs e) {
 		((HandledMouseEventArgs)e).Handled = true;
 	}
 	#endregion
@@ -1264,7 +1305,7 @@ public partial class GeneratorForm : Form {
 		}
 		return b;
 	}
-	private static void BitmaskComboBox_DrawItem(object? sender, DrawItemEventArgs e) {
+	private static void BitmaskComboBox_DrawItem(object sender, DrawItemEventArgs e) {
 		if (e.Index < 0 || sender is not ComboBox combo)
 			return;
 		e.DrawBackground();
@@ -1406,7 +1447,7 @@ public partial class GeneratorForm : Form {
 				name = dlg.GetText();
 		}
 		if (name == "") {
-			_ = Error(L("cancelled"), L("cancelledText"));
+			_ = Error("cancelled", "cancelledText");
 			return;
 		}
 		Colors.Add((name, p));
@@ -1558,7 +1599,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void TimingBox_TextChanged(object sender, EventArgs e) => TimingBox();
 	private void TimingBox() {
-		// TODO try to remove the GIF restart (was bugged the last time I tried)
+		// TODO LATER try to remove the GIF restart (was bugged the last time I tried)
 		switch (timingSelect.SelectedIndex) {
 			case 0:
 				var newDelay = ParseClampReText(timingBox, (ushort)1, (ushort)500);
@@ -1622,7 +1663,7 @@ public partial class GeneratorForm : Form {
 		if (generator.SelectedGifType == now)
 			return;
 		generator.SelectedGifType = now;
-		// TODO remove reset, but the last time I tried it wasw bugged
+		// TODO LATER remove reset, but the last time I tried it was bugged
 		if (now != FractalGenerator.GifType.No && now != prev)
 			_ = QueueResetCombo<int>(encodeGifSelect, (int)prev);
 	}
@@ -1665,9 +1706,10 @@ public partial class GeneratorForm : Form {
 	private void L2Box_TextChanged(object sender, EventArgs e) => L2Box();
 
 	private void NameBox_TextChanged(object sender, EventArgs e) {
+		_ = Clean(nameBox);
+		MyName = nameBox.Text;
 		UpdateName();
 		importForm.UpdateName();
-		// TODO rename in GeneratorsForm's list
 	}
 
 	private void GenerationSelect_SelectedIndexChanged(object sender, EventArgs e) => GenerationSelect();
@@ -1682,62 +1724,55 @@ public partial class GeneratorForm : Form {
 	private void ExportButton_Click(object sender, EventArgs e) => _ = ExportButton();
 	private bool ExportButton() {
 
-		// TODO put any action other than single PNG export, into task scheduler!
-		// Also make sure the GeneratorsForm also manages the tasks and only does them one by one
-
 		// somehow this being checked was messing with my dialog focus:
 		debugBox.Checked = animBox.Checked = pngBox.Checked = gifBox.Checked = false;
 		var b = generator.GetBitmapsFinished();
 		var ffmpegPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 
-		if (xTask != null) {
-			var result = MessageBox.Show(L("cancelSavingText"), L("cancelSaving"), MessageBoxButtons.YesNo);
-			if (result == DialogResult.Yes)
-				xCancel?.Cancel();
+		if (IsExporting())
+			return CancelExport() && false;
+
+		bool StayedOnlyImage() {
+			if (generator.SelectedGenerationType == GenerationType.OnlyImage) {
+				var result = MessageBox.Show(L("cantExportOnlyImage"), L("switchtoAnimation"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+				if (result == DialogResult.No)
+					return true;
+				generationSelect.SelectedIndex = 1;
+			}
 			return false;
 		}
-
-		switch ((ExportType)exportSelect.SelectedIndex) {
-			case ExportType.Png:
+		switch ((ScheduledTask)exportSelect.SelectedIndex) {
+			case ScheduledTask.Png:
 				if (b < 1)
-					return Error(L("onlyPreview"), L("pleaseWait"));
+					return Error("onlyPreview", "pleaseWait");
 				// Make sure the bitmap is actually loaded
 				UpdateBitmap(generator.GetBitmap(currentBitmapIndex %= b));
 				SetFileName(savePng, "png");
 				_ = savePng.ShowDialog();
 				break;
-			case ExportType.Pngs:
-
-				// TODO make this scheduled
-
-				if (b < generator.GetFrames())
-					return Error(L("notFinishedGenerating"), L("pleaseWait"));
+			case ScheduledTask.Pngs:
+				if (StayedOnlyImage())
+					return false;
 				SetFileName(saveMp4, "png");
 				saveMp4.DefaultExt = "png";
 				saveMp4.Filter = L("pngImage") + " (*.png)|*.png";
 				_ = saveMp4.ShowDialog();
 				break;
-			case ExportType.PngToMp4:
-
-				// TODO make this scheduled
-
+			case ScheduledTask.PngsToMp4:
 				if (NoFfmpeg(ffmpegPath))
 					return false;
-				if (b < generator.GetFrames())
-					return Error(L("notFinishedGenerating"), L("pleaseWait"));
+				if (StayedOnlyImage())
+					return false;
 				SetFileName(saveMp4, "mp4");
 				saveMp4.DefaultExt = "mp4";
 				saveMp4.Filter = L("mp4Video") + " (*.mp4)|*.mp4";
 				_ = saveMp4.ShowDialog();
 				break;
-			case ExportType.Gif:
-
-				// TODO make this scheduled
-
+			case ScheduledTask.Gif:
 				if (generator.SelectedGifType == FractalGenerator.GifType.No)
-					return Error(L("gifDisabled"), L("notSelected"));
-				if (b < generator.GetFrames())
-					return Error(L("notFinishedGenerating"), L("pleaseWait"));
+					return Error("gifDisabled", "notSelected");
+				if (StayedOnlyImage())
+					return false;
 				if (isGifReady == 0)
 					return Error(L("encodedGifNa"), L("notAvailable"));
 				SetFileName(saveGif, "gif");
@@ -1745,55 +1780,120 @@ public partial class GeneratorForm : Form {
 				saveGif.Filter = L("gifVideo") + " (*.gif)|*.gif";
 				_ = saveGif.ShowDialog();
 				break;
-			case ExportType.GifToMp4:
-
-				// TODO make this scheduled
-
+			case ScheduledTask.GifToMp4:
 				if (NoFfmpeg(ffmpegPath))
 					return false;
 				if (generator.SelectedGifType == FractalGenerator.GifType.No)
-					return Error(L("gifDisabled"), L("notSelected"));
-				if (b < generator.GetFrames())
-					return Error(L("notFinishedGenerating"), L("pleaseWait"));
-				if (isGifReady == 0 || gifPath == "")
-					return Error("Encoded GIF is not available.", L("notAvailable"));
+					return Error("gifDisabled", "notSelected");
+				if (StayedOnlyImage())
+					return false;
+				//if (isGifReady == 0 || gifPath == "")
+				//	return Error("encodedGifNa", "notAvailable");
 				SetFileName(saveGif, "mp4");
 				saveGif.DefaultExt = "mp4";
 				saveGif.Filter = L("mp4Video") + " (*.mp4)|*.mp4";
 				_ = saveGif.ShowDialog();
 				break;
-			case ExportType.ImportFile:
-				loadExport.DefaultExt = "";
-				loadExport.Filter = L("allFiles") + " (*.*)|*.*";
-				_ = loadExport.ShowDialog();
-				break;
-			case ExportType.ImportCode:
-				importForm.SetUp(GetFileName());
+			case ScheduledTask.ImportCode:
+				importForm.Update(GetFileName());
 				importForm.Show();
 				importForm.Location = Location;
 				break;
-			case ExportType.Close:
-
-				// TODO schedule
-
-				if (TryClose())
-					break;
-				PerformClose();
+			case ScheduledTask.Close:
+				if (Scheduled.Count == 0)
+					return Error("noScheduleClose", "noSchedule");
+				AddScheduled(new(ScheduledTask.Close, ""));
 				break;
 		}
 		return true;
 	}
+	private void UpdateTasks() 
+		=> tasksButton.Text = tasksText = L("tasks") + ": " + Scheduled.Count.ToString();
+	internal void AddScheduled(Schedule schedule) {
+		Scheduled.Add(schedule);
+		scheduler.AddListEntry(schedule);
+		UpdateTasks();
+	}
+	internal bool PerformSchedule() {
+		UpdateTasks();
+		if (Scheduled.Count <= 0) {
+			scheduler.FillListEntries();
+			return true;
+		}
+		void UpdateRunning() {
+			BackColor = Background;
+			scheduler.Running = true;
+			scheduler.UpdateRunning();
+		}
+		switch (Scheduled[0].Type) {
+			case ScheduledTask.Close:
+				RemoveSchedule();
+				UpdateTasks();
+				if (TryClose(true))
+					break;
+				PerformClose();
+				break;
+			case ScheduledTask.Pngs:
+				mp4Path = Scheduled[0].Filename;
+				UpdateRunning();
+				xTask = Task.Run(ExportPngs, (xCancel = new()).Token);
+				break;
+			case ScheduledTask.PngsToMp4:
+				mp4Path = Scheduled[0].Filename;
+				UpdateRunning();
+				xTask = Task.Run(ExportMp4, (xCancel = new()).Token);
+				
+				break;
+			case ScheduledTask.Gif:
+				// save gif:
+				UpdateRunning();
+				gifPath = Scheduled[0].Filename;
+				// Gif Export Task
+				//foreach (var c in MyControls)c.Enabled = false;
+				xTask = Task.Run(ExportGif, (xCancel = new()).Token);
+				break;
+				case ScheduledTask.GifToMp4:
+				// convert gif->mp4
+				if (isGifReady > 0)
+					gifPath = generator.GifTempPath;
+				if (gifPath == "") {
+					// TODO LATER maybe give the user some choices to cancel the schedule if it failed like this...?
+					_ = Error("encodedGifNa", "notAvailable");
+					FinishScheduled();
+					notifyExp = true;
+					return false;
+				}
+				mp4Path = Scheduled[0].Filename;
+				UpdateRunning();
+				xTask = Task.Run(ConvertMp4, (xCancel = new()).Token);
+				break;
+		}
+		return false;
+	}
+	private void RemoveSchedule() {
+		Scheduled.RemoveAt(0);
+		scheduler.FillListEntries();
+		scheduler.Running = false;
+	}
+	private void FinishScheduled() {
+		RemoveSchedule();
+		notifyExp = true;
+		xTask = null;
+	}
+	private void CancelSchedule() {
+		RemoveSchedule();
+		UpdateTasks();
+		xTask = null;
+	}
 	private void ExportSelect_SelectedIndexChanged(object sender, EventArgs e) => _ = ExportSelect();
 	private bool ExportSelect() {
-		// TODO fix this
+		// TODO LATER fix this
 		if (exportSelect.SelectedIndex == 4)
-			return Error(L("gifToMp4Unavailable"), L("notAvailable"));
+			return Error("gifToMp4Unavailable", "notAvailable");
 		UpdateExportTipLocale();
 		return true;
 	}
-	private void TasksButton_Click(object sender, EventArgs e) {
-		// TODO open task window
-	}
+	private void TasksButton_Click(object sender, EventArgs e) => OpenTasks();
 	private void FileSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		if (fileSelect.SelectedIndex <= 0)
 			return;
@@ -1814,7 +1914,7 @@ public partial class GeneratorForm : Form {
 		string f = "Fractal_";
 		while (s < fileSelect.Items.Count) {
 			if ((a & 1) == 1) {
-				f += filePostfix[s].ToString()[0];
+				f += filePostfix[s].ToString()[1];
 				fileSelect.Items[s] = charOn + filePostfix[s];
 			} else {
 				fileSelect.Items[s] = charOff + filePostfix[s];
@@ -1854,7 +1954,7 @@ public partial class GeneratorForm : Form {
 	/// </summary>
 	/// <param name="sender"></param>
 	/// <param name="e"></param>
-	private void ScreenPanel_Paint(object? sender, PaintEventArgs e) {
+	private void ScreenPanel_Paint(object sender, PaintEventArgs e) {
 		if (currentBitmap == null)
 			return;
 		// Faster rendering with crisp pixels
@@ -1878,17 +1978,15 @@ public partial class GeneratorForm : Form {
 	/// <param name="e"></param>
 	/// <returns></returns>
 	private void SavePng_FileOk(object sender, CancelEventArgs e) {
-		BackColor = Color.FromArgb(64, 64, 64);
+		BackColor = Background;
 		using var myStream = savePng.OpenFile();
 		currentBitmap?.Save(myStream, System.Drawing.Imaging.ImageFormat.Png);
 		myStream.Close();
-		FinishedExporting();
+		FinishedTask();
 	}
-	private void FinishedExporting() {
-		BackColor = Color.FromArgb(64, 64, 128);
-
-		// TODO try next scheduled export
-
+	private void FinishedTask() {
+		if (PerformSchedule())
+			BackColor = Color.FromArgb(32, 32, 128);
 		//if (runningBatch.Length > 0)
 		//	NextBatch();
 	}
@@ -1900,40 +1998,26 @@ public partial class GeneratorForm : Form {
 	/// <returns></returns>
 	private void SaveGif_FileOk(object sender, CancelEventArgs e) {
 		if (xTask != null) {
-			_ = Error(L("gifStillSaving"), L("pleaseWait"));
+			_ = Error("gifStillSaving", "pleaseWait");
 			return;
 		}
 		if (sender is not SaveFileDialog s)
 			return;
 		string ext = saveGif.FileName[^3..];
 		if (ext == "gif") {
-			// save gif:
-			BackColor = Color.FromArgb(64, 64, 64);
-			gifPath = s.FileName;
-			// Gif Export Task
-			//foreach (var c in MyControls)c.Enabled = false;
-			xTask = Task.Run(ExportGif, (xCancel = new()).Token);
+			AddScheduled(new(ScheduledTask.Gif, s.FileName));
 			return;
 		}
 		// convert gif->mp4
 		if (NoFfmpeg())
 			return;
-		mp4Path = s.FileName;
-		if (isGifReady > 0) {
-			BackColor = Color.FromArgb(64, 64, 64);
-			gifPath = generator.GifTempPath;
-			xTask = Task.Run(ConvertMp4, (xCancel = new()).Token);
-			return;
-		}
-		if (gifPath == "")
-			return;
-		BackColor = Color.FromArgb(64, 64, 64);
-		xTask = Task.Run(ConvertMp4, (xCancel = new()).Token);
+		AddScheduled(new(ScheduledTask.GifToMp4, s.FileName));
 	}
+
 	private static bool NoFfmpeg() => NoFfmpeg(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe"));
 	private static bool NoFfmpeg(string ffmpegPath) {
 		if (!File.Exists(ffmpegPath)) {
-			_ = Error(L("ffmpeg"), L("notAvailable"));
+			_ = Error("ffmpeg", "notAvailable");
 			return true;
 		}
 		return false;
@@ -1946,7 +2030,7 @@ public partial class GeneratorForm : Form {
 	/// <returns></returns>
 	private void SaveMp4_FileOk(object sender, CancelEventArgs e) {
 		if (xTask != null) {
-			_ = Error(L("mp4stillSaving"), L("pleaseWait"));
+			_ = Error("mp4stillSaving", "pleaseWait");
 			return;
 		}
 		if (sender is not SaveFileDialog s)
@@ -1955,22 +2039,17 @@ public partial class GeneratorForm : Form {
 			encodePngSelect.SelectedIndex = 1;
 		}
 		string ext = saveMp4.FileName[^3..];
-		if (ext == "png") {
-			// save pngs:
-			BackColor = Color.FromArgb(64, 64, 64);
-			mp4Path = s.FileName;
-			xTask = Task.Run(ExportPngs, (xCancel = new()).Token);
+		if (ext == "png") { // save pngs:
+			AddScheduled(new(ScheduledTask.Pngs, s.FileName));
 			return;
 		}
 		// Save mp4:
 		if (NoFfmpeg())
 			return;
-		BackColor = Color.FromArgb(64, 64, 64);
-		mp4Path = s.FileName;
-		xTask = Task.Run(ExportMp4, (xCancel = new()).Token);
+		AddScheduled(new(ScheduledTask.PngsToMp4, s.FileName));
 	}
-	private void LoadExport_FileOk(object sender, CancelEventArgs e)
-		=> LoadCodeName(Path.GetFileNameWithoutExtension(loadExport.FileName));
+
+
 	public bool LoadCodeName(string codeName) {
 		var s = codeName.Split(['_', '(', ')']);
 		var f = Fractals;
@@ -2166,10 +2245,10 @@ public partial class GeneratorForm : Form {
 		var attempt = 0;
 		while (++attempt <= 10 && !xCancel.Token.IsCancellationRequested && generator.SaveGif(gifPath) > 0)
 			Thread.Sleep(10 + 10 * attempt * attempt);
-		if (!xCancel.Token.IsCancellationRequested)
+		if (!xCancel.Token.IsCancellationRequested) {
 			isGifReady = 0;
-		notifyExp = true;
-		xTask = null;
+			FinishScheduled();
+		} else CancelSchedule();
 	}
 	/// <summary>
 	/// Exports the animation into a MP4 file
@@ -2178,19 +2257,19 @@ public partial class GeneratorForm : Form {
 	/// <returns></returns>
 	private void ConvertMp4() {
 		string result = generator.SaveGifToMp4(gifPath, mp4Path);
-		if (!xCancel.Token.IsCancellationRequested) {
+		if (xCancel.Token.IsCancellationRequested) {
+			CancelSchedule();
 			xTask = null;
 			return;
 		}
 		if (result == "") {
 			isGifReady = 0;
-			notifyExp = true;
 			gifPath = "";
 			mp4Path = "";
-			xTask = null;
+			FinishScheduled();
 			return;
 		}
-		_ = Error(result, L("failedGif"));
+		_ = Error(result, "failedGif");
 	}
 	/// <summary>
 	/// Exports the animation into a MP4 file
@@ -2199,18 +2278,18 @@ public partial class GeneratorForm : Form {
 	/// <returns></returns>
 	private void ExportPngs() {
 		string result = generator.SavePngs(mp4Path);
-		if (!xCancel.Token.IsCancellationRequested) {
+		if (xCancel.Token.IsCancellationRequested) {
+			CancelSchedule();
 			xTask = null;
 			return;
 		}
 		if (result == "") {
-			notifyExp = true;
 			mp4Path = "";
 			isPngsSaved = true;
-			xTask = null;
+			FinishScheduled();
 			return;
 		}
-		_ = Error(result, L("failedPng"));
+		_ = Error(result, "failedPng");
 	}
 	/// <summary>
 	/// Exports the animation into a MP4 file
@@ -2219,18 +2298,18 @@ public partial class GeneratorForm : Form {
 	/// <returns></returns>
 	private void ExportMp4() {
 		string result = generator.SavePngsToMp4(mp4Path);
-		if (!xCancel.Token.IsCancellationRequested) {
+		if (xCancel.Token.IsCancellationRequested) {
+			CancelSchedule();
 			xTask = null;
 			return;
 		}
 		if (result == "") {
-			notifyExp = true;
 			mp4Path = "";
 			isPngsSaved = true;
-			xTask = null;
+			FinishScheduled();
 			return;
 		}
-		_ = Error(result, L("failedMp4"));
+		_ = Error(result, "failedMp4");
 	}
 	string GetFileName() {
 		string f = "";
@@ -2259,43 +2338,36 @@ public partial class GeneratorForm : Form {
 			f += "_D(" + (ditherBox.Checked ? "1" : "0") + "_" + detailBox.Text + ")";
 		return f;
 	}
-	void SetFileName(SaveFileDialog dialog, string extension) {
-		//var prev = dialog.FileName;
-
-		dialog.FileName = GetFileName() + "." + extension;
-	}
+	void SetFileName(SaveFileDialog dialog, string extension) 
+		=> dialog.FileName = GetFileName() + "." + extension;
 	#endregion
 
 	#region Editor
 	private void SetPreviewMode(bool newPreviewMode)
-		=> preButton.Text = L((generator.SelectedPreviewMode = previewMode = newPreviewMode) ? "structureMode" : "previewMode");
+		=> preButton.Text = L((generator.SelectedPreviewMode = previewMode = newPreviewMode) ? "structureModeText" : "previewModeText");
 	private void FillListEntries() {
 		pointPanel.SuspendLayout();
 		UnFillListEntries();
 		var f = generator.GetFractal();
 		for (var i = 0; i < f.ChildCount; ++i)
 			ReAddExistingListEntry(f.ChildX, f.ChildY, f.ChildAngle[generator.SelectedChildAngle].Item2, f.ChildColor[generator.SelectedChildColor].Item2, false);
-		//var e = f.Edit;
 		modifySettings = true;
 		sizeBox.Text = f.ChildSize.ToString(CultureInfo.InvariantCulture);
 		cutBox.Text = f.CutSize.ToString(CultureInfo.InvariantCulture);
 		minBox.Text = f.MinSize.ToString(CultureInfo.InvariantCulture);
 		maxBox.Text = f.MaxSize.ToString(CultureInfo.InvariantCulture);
-		//f.Edit = e;
 		modifySettings = false;
 		pointPanel.ResumeLayout(false);
 		pointPanel.PerformLayout();
 	}
 	private void UnFillListEntries() {
 		addPointButton.Location = new(10, 10);
-
 		foreach (var s in lineListSwitch) {
 			pointPanel.Controls.Remove(s);
-			_ = myControls.Remove(s);
+			s.Dispose();
 		}
 		void R(Control _c) {
 			pointPanel.Controls.Remove(_c);
-			_ = myControls.Remove(_c);
 			_c.Dispose();
 		}
 		foreach (var (x, y, a, c, d) in lineList) {
@@ -2305,20 +2377,16 @@ public partial class GeneratorForm : Form {
 		lineList.Clear();
 		pointTabIndex = controlTabIndex;
 		myEditControls.Clear();
-		myEditTips.Clear();
 	}
 	private void SwitchChildAngle() {
 		var f = generator.GetFractal();
-		//var e = f.Edit;
 		modifySettings = true;
 		for (var i = 0; i < f.ChildCount; ++i)
 			lineList[i].Item3.Text = f.ChildAngle[generator.SelectedChildAngle].Item2[i].ToString(CultureInfo.InvariantCulture);
 		modifySettings = false;
-		//f.Edit = e;
 	}
 	private void SwitchChildColor() {
 		var f = generator.GetFractal();
-		//var e = f.Edit;
 		modifySettings = true;
 		var set = generator.GetAllocPalette();
 		if (set != null)
@@ -2330,7 +2398,6 @@ public partial class GeneratorForm : Form {
 				item.Text = f.ChildColor[generator.SelectedChildColor].Item2[i].ToString();
 			}
 		modifySettings = false;
-		//f.Edit = e;
 	}
 	private void ReAddExistingListEntry(double[] cx, double[] cy, double[] ca, byte[] cc, bool single = true) {
 		var i = lineList.Count;
@@ -2340,15 +2407,14 @@ public partial class GeneratorForm : Form {
 		y.Text = cy[i].ToString(CultureInfo.InvariantCulture);
 		a.Text = ca[i].ToString(CultureInfo.InvariantCulture);
 		c.Text = cc[i].ToString(CultureInfo.InvariantCulture);
-		d.Text = "X";
-		BindListEntry(x, y, a, c, d, i, single);
+		BindListEntry((x, y, a, c, d), i, single);
 	}
-	private void BindListEntry(TextBox x, TextBox y, TextBox a, TextBox c, Button r, int i, bool single = true) {
+	private void BindListEntry((TextBox x, TextBox y, TextBox a, TextBox c, Button r) l, int i, bool single = true) {
 		const int textSize = 53;
 		const int buttonSize = 23;
 		if (single)
 			pointPanel.SuspendLayout();
-		var hor = -buttonSize;
+		var hor = 0;
 		void NewControl(Control _c, int size, string name, string tool) {
 			_c.Location = new Point(2 + hor, 2 + i * (buttonSize+4));
 			_c.Margin = new Padding(4, 3, 4, 3);
@@ -2358,7 +2424,6 @@ public partial class GeneratorForm : Form {
 			_c.BackColor = Color.FromArgb(192, 192, 192);
 			pointPanel.Controls.Add(_c);
 			SetupEditControl(_c, tool);
-			//myControls.Add(_c);
 			hor += size + 4;
 		}
 		TextBox NewText(TextBox _t, string name, string tool, int size = textSize) {
@@ -2370,14 +2435,13 @@ public partial class GeneratorForm : Form {
 			return _b;
 		}
 
-		// Switch
+		// Swap
 		if (i > 0) {
 			lineListSwitch.Add(new());
 			var s = lineListSwitch[^1];
 			s.Text = "⇕";
 			NewButton(s, "s" + i.ToString(), "editSwitch").Click += (_, _) => {
 				var f = generator.GetFractal();
-				//var ni = f.ChildCount;
 				var cx = f.ChildX;
 				var cy = f.ChildY;
 				(cx[i], cx[i - 1], cy[i], cy[i - 1])
@@ -2404,30 +2468,31 @@ public partial class GeneratorForm : Form {
 			};
 			s.Location = new(3 * (textSize + 4) + 2 * (buttonSize + 4), 2 + (i * 2 - 1) * (buttonSize + 4) / 2);
 		}
+		hor = 0;
 
 		// (x, y, angle, color):
-		NewText(x, "x" + i.ToString(), "editX").TextChanged += (sender, _) => {
-			if (!ParseDiffApply((TextBox?)sender, ref generator.GetFractal().ChildX[i], out var _))
+		NewText(l.x, "x" + i.ToString(), "editX").TextChanged += (sender, e) => {
+			if (sender is TextBox s && !ParseDiffApply(s, ref generator.GetFractal().ChildX[i], out var _))
 				EditFractal();
 		};
-		NewText(y, "y" + i.ToString(), "editY").TextChanged += (sender, _) => {
-			if (!ParseDiffApply((TextBox?)sender, ref generator.GetFractal().ChildY[i], out var _))
+		NewText(l.y, "y" + i.ToString(), "editY").TextChanged += (sender, e) => {
+			if (sender is TextBox s && !ParseDiffApply(s, ref generator.GetFractal().ChildY[i], out var _))
 				EditFractal();
 		};
-		NewText(a, "a" + i.ToString(), "editA").TextChanged += (sender, _) => {
-			if (!ParseDiffApply((TextBox?)sender, ref generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item2[i], out var _))
+		NewText(l.a, "a" + i.ToString(), "editA").TextChanged += (sender, e) => {
+			if (sender is TextBox s && !ParseDiffApply(s, ref generator.GetFractal().ChildAngle[generator.SelectedChildAngle].Item2[i], out var _))
 				EditFractal();
 		};
-		NewText(c, "c" + i.ToString(), "editC", buttonSize).TextChanged += (sender, _) => {
-			if (!DiffApply(ReText((TextBox?)sender, ParseValue<byte>((TextBox?)sender)), ref generator.GetFractal().ChildColor[generator.SelectedChildColor].Item2[i], out var _))
+		NewText(l.c, "c" + i.ToString(), "editC", buttonSize).TextChanged += (sender, _) => {
+			if (sender is TextBox s && !DiffApply(ReText(s, ParseValue<byte>(s)), ref generator.GetFractal().ChildColor[generator.SelectedChildColor].Item2[i], out var _))
 				EditFractal();
 		};
 		
 		// Remove:
-		NewButton(r, "r" + i.ToString(), "editR").Click += (sender, _) => {
+		NewButton(l.r, "r" + i.ToString(), "editR").Click += (sender, e) => {
 			var f = generator.GetFractal();
 			if (f.ChildCount <= 1) {
-				Error(L("cannotRemoveLast"), L("cannotRemove"));
+				_ = Error("cannotRemoveLast", "cannotRemove");
 				return;
 			}
 			var ni = --f.ChildCount;
@@ -2484,7 +2549,7 @@ public partial class GeneratorForm : Form {
 			// Finish edit
 			EditFractal();
 		};
-		r.BackColor = Color.FromArgb(192, 192, 192);
+		l.r.BackColor = Color.FromArgb(192, 192, 192);
 		if (single) {
 			pointPanel.ResumeLayout(false);
 			pointPanel.PerformLayout();
@@ -2563,44 +2628,10 @@ public partial class GeneratorForm : Form {
 			fractalName = fractalName[(i + 1)..];
 		fractalName = fractalName.Replace('|', '.').Replace(':', '.').Replace(';', '.');
 		if (FractalSelection.Contains(fractalName)) {
-			_ = Error(L("alreadyFractal"), L("alreadyExists"));
+			_ = Error("alreadyFractal", "alreadyExists");
 			fractalSelect.SelectedIndex = fractalSelect.Items.IndexOf(fractalName);
-		} else if (File.Exists(filename))
+		} else if (File.Exists(filename) && gens != null)
 			_ = LoadFractal(gens, filename, this);
-	}
-
-	private void ModeButton_Click(object sender, EventArgs e) {
-		/*if (editorPanel.Visible) {
-			// SelectParallelMode();
-			generator.SelectedBlur = memBlur;
-			generator.SelectedBloom = memBloom;
-			generator.SelectedGenerationType = memGenerate;
-			generator.SelectedPngType = memPng;
-			generator.SelectedGifType = memGif;
-			//generator.selectHue = mem_hue;
-			generator.SelectedDefaultHue = memDefaultHue;
-			abortDelay = memAbort;
-			generator.SelectedPreviewMode = false;
-
-		} else {
-			memBlur = generator.SelectedBlur;
-			memBloom = generator.SelectedBloom;
-			memPng = generator.SelectedPngType;
-			memGif = generator.SelectedGifType;
-			memGenerate = generator.SelectedGenerationType;
-			//mem_hue = generator.selectHue;
-			memDefaultHue = generator.SelectedDefaultHue;
-			memAbort = abortDelay;
-			abortDelay = 10;
-			generator.SelectedPngType = FractalGenerator.PngType.No;
-			generator.SelectedGifType = FractalGenerator.GifType.No;
-			generator.SelectedGenerationType = FractalGenerator.GenerationType.Animation;
-			generator.SelectedBlur = 0;
-			generator.SelectedBloom = generator.SelectedHue = 0;// generator.selectDefaultHue = 0;
-			SetPreviewMode(previewMode);
-		}
-		SetEditor(!editorPanel.Visible);
-		QR();*/
 	}
 	internal void SetEditor(bool editor)
 		=> toolGenPanel.Visible = generatorPanel.Visible = !(
@@ -2651,7 +2682,7 @@ public partial class GeneratorForm : Form {
 			ncl[ni] = 0;
 			f.ChildColor[l] = (ccn, ncl);
 		}
-		BindListEntry(x, y, a, c, d, i);
+		BindListEntry((x, y, a, c, d), i);
 		EditFractal();
 	}
 	private void SizeBox_TextChanged(object sender, EventArgs e) {
@@ -2663,7 +2694,7 @@ public partial class GeneratorForm : Form {
 			EditFractal();
 	}
 	private void MinBox_TextChanged(object sender, EventArgs e) {
-		if (!ParseDiffApply(minBox, ref generator.GetFractal().MinSize, out var _))
+		if (!ParseClampReTextDiffApply(minBox, ref generator.GetFractal().MinSize, 0.05, 128, out var _))
 			EditFractal();
 	}
 	private void CutBox_TextChanged(object sender, EventArgs e) {
@@ -2673,10 +2704,10 @@ public partial class GeneratorForm : Form {
 	private void AddAngleButton_Click(object sender, EventArgs e) => AddAngleButton();
 	private bool AddAngleButton() {
 		if (angleBox.Text == "")
-			return Error(L("noAngles"), L("cannotAdd"));
+			return Error("noAngles", "cannotAdd");
 		foreach (var (n, _) in generator.GetFractal().ChildColor)
 			if (n == angleBox.Text)
-				return Error(L("uniqueAngles"), L("cannotAdd"));
+				return Error("uniqueAngles", "cannotAdd");
 		generator.GetFractal().ChildAngle.Add((angleBox.Text, new double[generator.GetFractal().ChildCount]));
 		//SetupSelects();
 		angleSelect.SelectedIndex = angleSelect.Items.Add(charOff + angleBox.Text);
@@ -2686,7 +2717,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void RemoveAngleButton_Click(object sender, EventArgs e) {
 		if (generator.GetFractal().ChildAngle.Count <= 1) {
-			_ = Error(L("cannotRemoveLast"), L("cannotRemove"));
+			_ = Error("cannotRemoveLast", "cannotRemove");
 			return;
 		}
 		generator.GetFractal().ChildAngle.RemoveAt(generator.SelectedChildAngle);
@@ -2699,10 +2730,10 @@ public partial class GeneratorForm : Form {
 	private void AddColorButton_Click(object sender, EventArgs e) => AddColorButton();
 	private bool AddColorButton() {
 		if (colorBox.Text == "")
-			return Error(L("noColors"), L("cannotAdd"));
+			return Error("noColors","cannotAdd");
 		foreach (var (n, _) in generator.GetFractal().ChildColor)
 			if (n == colorBox.Text)
-				return Error(L("uniqueColors"), L("cannotAdd"));
+				return Error("uniqueColors", "cannotAdd");
 		generator.GetFractal().ChildColor.Add((colorBox.Text, new byte[generator.GetFractal().ChildCount]));
 		//SetupSelects();
 		colorSelect.SelectedIndex = colorSelect.Items.Add("✕ " + colorBox.Text);
@@ -2712,7 +2743,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void RemoveColorButton_Click(object sender, EventArgs e) {
 		if (generator.GetFractal().ChildColor.Count <= 1) {
-			_ = Error(L("cannotRemoveLast"), L("cannotRemove"));
+			_ = Error("cannotRemoveLast", "cannotRemove");
 			return;
 		}
 		generator.GetFractal().ChildColor.RemoveAt(generator.SelectedChildColor);
@@ -2738,15 +2769,15 @@ public partial class GeneratorForm : Form {
 		//Remember and disable all controls
 		myControlsEnabled.Clear();
 		foreach (var c in myControls) {
-			myControlsEnabled.Add(c.Enabled);
-			c.Enabled = false;
+			myControlsEnabled.Add(c.Key, c.Key.Enabled);
+			c.Key.Enabled = false;
 		}
 		// perform hash
 		performHash = true;
 	}
 	private void RemoveCutButton_Click(object sender, EventArgs e) {
 		if (generator.GetFractal().ChildCutFunction.Count == 0) {
-			_ = Error(L("noCutFunctions"), L("cannotRemove"));
+			_ = Error("noCutFunctions", "cannotRemove");
 			return;
 		}
 		generator.GetFractal().ChildCutFunction.RemoveAt(generator.SelectedCut);
@@ -2771,8 +2802,11 @@ public partial class GeneratorForm : Form {
 	internal ComboBox GetFractalSelect() => fractalSelect;
 	internal void UpdateLocale() {
 		UpdateName();
-		for (int i = myControls.Count; 0 <= --i; toolTips.SetToolTip(myControls[i], L(myTips[i]))) { }
-		for (int i = myEditControls.Count; 0 <= --i; toolTips.SetToolTip(myEditControls[i], L(myEditTips[i]))) { }
+
+		foreach (var c in myControls)
+			toolTips.SetToolTip(c.Key, L(c.Value));
+		foreach (var c in myEditControls)
+			toolTips.SetToolTip(c.Key, L(c.Value));
 		UpdateTimeLocale();
 		UpdateExportLocale();
 		UpdateExportTipLocale();
@@ -2787,6 +2821,7 @@ public partial class GeneratorForm : Form {
 		SetPreviewMode(previewMode);
 
 		importForm.UpdateLocale();
+		scheduler.UpdateLocale();
 
 		// Update Label Locale
 		if (generator.SelectedFractal >= 0)
@@ -2811,19 +2846,19 @@ public partial class GeneratorForm : Form {
 		generationModeLabel.Text = L("generationModeLabel") + ":";
 		abortDelayLabel.Text = L("abortDelayLabel") + ":";
 		timingLabel.Text = L("timingLabel") + ":";
+		UpdateTasks();
 		parallelLabel.Text = L("parallelLabel") + ":";
 		debugsLabel.Text = L("debugsLabel") + ":";
 		zoomChildLabel.Text = L("zoomChildLabel") + ":";
 		paletteLabel.Text = L("paletteLabel") + ":";
 		addCutLabel.Text = L("addcutLabel CutFunction") + ":";
 		addCut.Text = L("addCutTip");
-		hideButton.Text = L("hideButton");
-		addPointButton.Text = L("addPoint");
+		hideButton.Text = L("hideButtonText");
+		addPointButton.Text = L("addPointText");
 		saveButton.Text = L("saveButtonText");
 		loadButton.Text = L("loadButtonText");
 		addAngleButton.Text = L("addAngleButtonText");
 		addColorButton.Text = L("addColorButtonText");
-		loadExport.Filter = L("allFiles") + "(*.*)|*.*";
 		colorBox.Text = L("colorBoxText");
 		angleBox.Text = L("angleBoxText");
 		animBox.Text = L("Anim");
@@ -2863,7 +2898,20 @@ public partial class GeneratorForm : Form {
 	internal string GetName() => MyName == "" ? Index.ToString() : MyName;
 	private void UpdateName() => Text = L("appNameShort") + " - " + L("generator") + " - " + GetName();
 	private void UpdateTimeLocale() => toolTips.SetToolTip(timingBox, L("timing" + timingSelect.SelectedIndex.ToString()));
-	private void UpdateExportLocale() => exportButton.Text = xTask != null ? L("saving") : L("export" + exportSelect.SelectedIndex);
+	private bool IsExporting()
+		=> xTask != null
+		&& Scheduled.Count > 0
+		&& (byte)Scheduled[0].Type == exportSelect.SelectedIndex;
+	internal bool CancelExport() {
+		var result = MessageBox.Show(L("cancelSavingText"), L("cancelSaving"), MessageBoxButtons.YesNo);
+		if (result == DialogResult.Yes) {
+			xCancel?.Cancel();
+			return true;
+		}
+		return false;
+	}
+	private void UpdateExportLocale() 
+		=> exportButton.Text = IsExporting() ? L("saving") : L("export" + exportSelect.SelectedIndex);
 	private void UpdateExportTipLocale() => toolTips.SetToolTip(exportButton, L("exportButton" + exportSelect.SelectedIndex));
 	private void UpdateRangeLocale() {
 		voidAmbientLabel.Text = L("voidAmbientLabel") + "(0-" + voidAmbientMax + "):";
@@ -2927,59 +2975,64 @@ public partial class GeneratorForm : Form {
 
 	private void SetupControl(Control control, string tip) {
 		// Add tooltip and set the next tabIndex
+		myControls.Add(control, tip);
 		toolTips.SetToolTip(control, L(tip));
 		control.TabIndex = ++controlTabIndex;
-		myControls.Add(control);
-		myTips.Add(tip);
 	}
 
 	private void RemoveResolution_Click(object sender, EventArgs e) {
+		_ = Error("notImplemented", "notAvailable");
 		// TODO implement
 	}
 
 	private void AddResolution_Click(object sender, EventArgs e) {
+		_ = Error("notImplemented", "notAvailable");
 		// TODO implement
 	}
 
 	// Popup Animations
-	private bool showPopup = false, hoverWindow = true;
-	private float popupTransientX = 0, toolTransientY = 0;
-	private int mouseX = 0;
-	private void GeneratorForm_MouseEnter(object sender, EventArgs e) => hoverWindow = true;
-	private void GeneratorForm_MouseLeave(object sender, EventArgs e) => hoverWindow = false;
-	private void GeneratorForm_MouseMove(object sender, MouseEventArgs e) => mouseX = e.Location.X;
+	private bool showPopup = false;
+	private float popupA = 1, popupTransientX = 1000000, toolA = 1, toolTransientY = 0;
 	internal void UpdatePopups(float deltaTime) {
+		var p = PointToClient(Cursor.Position);
+		var client = ClientRectangle;
+		var inside = client.Contains(p);
+
+		static float Lerp(float a, float b, float t) => b * t + a * (1.0f - t);
+
+		deltaTime *= 4;
 		// switch which panels to animate - generator or editor?
 		(var tool, var switchable, var bottom, var scrollable) = editorVisible
-			? (toolEditPanel, generatorPanel, genControlPanel, fractalSettingsPanel)
-			: (toolGenPanel, editorPanel, fractalEditorPanel, pointPanel);
-		const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
+			? (toolEditPanel, editorPanel, fractalEditorPanel, pointPanel)
+			: (toolGenPanel, generatorPanel, genControlPanel, fractalSettingsPanel);
+		//const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
+		int bw = Width - client.Width, bh = Height - client.Height;
 		int windowWidth = Width - bw, windowHeight = Height - bh;
 		// desired X location of the popup (windowWidth - popupWidth)
+		//popupPanel.Visible = true;
 		var hysteresisOff = windowWidth - popupPanel.Width;
-		// clamp popup location to sanity range (between animation hidden and shown)
-		popupTransientX = Math.Clamp(popupTransientX, hysteresisOff, windowWidth);
 		// does toolbar want to be shown? If so, set its target Y
-		bool showTool = shown && hoverWindow;
+		bool showTool = shown && inside;
 		var toolH = tool.MinimumSize.Height;
-		var toolTargetY = showTool ? toolH : 0.0f;
 		// location in the middle of the animation
 		var popupMiddle = windowWidth - popupPanel.Width / 2;
+		// Location of the hidden popup
+		var hiddenPopup = Math.Clamp(Lerp(windowWidth, popupMiddle, (float)p.X/popupMiddle), popupMiddle, windowWidth);
 		// does popup want to be shown? (if popup visible and cursor hysteringly on the right side)
-		showPopup = showTool && mouseX > (showPopup ? hysteresisOff : popupMiddle);
-		// set popup's target X (shown=hysteresisOff or hidden=windowWidth)
-		var popupTargetX = showPopup ? hysteresisOff : windowWidth;
-		// set the speed of animation (delta time, and it's faster when it's in the middle of the animated location)
-		var popupSpeed = deltaTime * (1.0f - Math.Abs(popupTransientX - popupMiddle) / popupPanel.Width);
-		var toolSpeed = deltaTime * (1.0f - Math.Abs(toolTransientY - toolH * .5f) / toolH);
+		showPopup = showTool && p.X > (showPopup ? hysteresisOff : popupMiddle);
 		// animate toolbar's Y (along the shown/hidden axis)
-		toolTransientY = Math.Clamp(toolTargetY, toolTransientY - toolSpeed, toolTransientY + toolSpeed);
+		toolA = showTool ? Math.Min(1, toolA + deltaTime) : Math.Max(0, toolA - deltaTime);//toolA = Math.Clamp(showTool ? 1 : 0, toolA - deltaTime, toolA + deltaTime);
+		toolTransientY = (MathF.Cos(toolA * MathF.PI)*.5f + .5f) * -toolH;
 		tool.Location = new(0, (int)toolTransientY);
-		// animate popup's X (along the shown/hidden axis)
-		popupTransientX = Math.Clamp(popupTargetX, popupTransientX - popupSpeed, popupTransientX + popupSpeed);
+		// animate popup's X (along the shown/hidden axis, shown=hysteresisOff or hidden=hiddenPopup)
+		popupA = showPopup ? Math.Min(1, popupA + deltaTime) : Math.Max(0, popupA - deltaTime);//Math.Clamp(showPopup ? 1 : 0, popupA - deltaTime, popupA + deltaTime);
+		var cA = MathF.Cos(popupA * MathF.PI) * .5f + .5f;
+		// set popup's target X 
+		popupTransientX = Lerp(hysteresisOff, hiddenPopup, cA);
 		// if the toolbar's width does not fit the windowWidth-popupWidth, then it will stretch over the whole windowWidth, and the popup.Y will be under it
 		(int w, int y) = hysteresisOff < tool.MinimumSize.Width
-			? (windowWidth, tool.Location.Y + toolH) : (windowWidth - (int)popupTransientX, 0);
+			? (windowWidth, (int)toolTransientY + toolH)  // vertical (popup under tool)
+			: ((int)popupTransientX, 0); // horizontal (tool stretched to popup)
 		tool.Size = new(w, toolH);
 		// move and resize the whole popup Panel
 		popupPanel.Location = new((int)popupTransientX, y);
@@ -2996,11 +3049,18 @@ public partial class GeneratorForm : Form {
 
 		debugPanel.Location = new(debugPanel.Location.X, switchable.Location.Y + switchable.Size.Height + 2);
 		debugPanel.Size = new(debugPanel.Size.Width, popupPanel.Size.Height - debugPanel.Location.Y - 2);
+
+		Size newMin = new(
+			Math.Max(Math.Max(popupPanel.MinimumSize.Width, tool.MinimumSize.Width), width) + bw,
+			Math.Max(popupPanel.MinimumSize.Height + tool.MinimumSize.Height, height) + bh
+		//Math.Max(Math.Max(640, debugLabel.Bounds.Bottom + bh), bh + Math.Max(460, height + 8))
+		);
+		//bool changedSize = Size.Width < newMin.Width || Size.Height < newMin.Height;
+		MinimumSize = newMin;
+		//if (changedSize)
+		//	ResizeScreen();
 	}
 
-	private void pointLabel2_Click(object sender, EventArgs e) {
-
-	}
 }
 
 /* Batching: (obsolete)
@@ -3155,12 +3215,8 @@ private void RunBatch_FileOk(object sender, CancelEventArgs e) {
 	// Lock All Controls
 	myControlsEnabled.Clear();
 	foreach (var c in myControls) {
-		myControlsEnabled.Add(c.Enabled);
+		myControlsEnabled.Add(c.Key.Enabled);
 		c.Enabled = false;
 	}
 	NextBatch();
-}
-private void HelpButton_Click(object sender, EventArgs e) {
-	helpPanel.Visible = screenPanel.Visible;
-	screenPanel.Visible = !screenPanel.Visible;
 }*/

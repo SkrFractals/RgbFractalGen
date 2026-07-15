@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System;
+﻿using System;
 using System.Numerics;
 using System.Windows.Forms;
 using static RgbFractalGenCs.Core.StaticCore;
@@ -9,29 +8,36 @@ namespace RgbFractalGenCs.Content.Static;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal static class StaticContent {
 
-	//internal static MainForm? Main;
-	internal static bool Error(string text, string caption) {
-		_ = MessageBox.Show(text, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+	internal static bool Error(string text, string caption, MessageBoxIcon ico = MessageBoxIcon.Error) {
+		_ = MessageBox.Show(L(text), L(caption), MessageBoxButtons.OK, ico);
 		return false;
 	}
 
 	internal static void LocComb(ComboBox o, string name, int n) {
 		var c = o.Items; c.Clear();
-		for (int i = 0; i < n; _ = c.Add(L(name) + i++.ToString())) { }
+		for (int i = 0; i < n; _ = c.Add(L(name + i++.ToString()))) { }
 	}
 
-	internal static bool Clean(TextBox? box) {
+	internal static bool Clean(TextBox
+#if NULLABLE
+		?
+#endif       
+		box) {
 		if (box == null)
 			return false;
 		var s = box.Text;
-		s = s.Replace(';', ' ').Replace('|', ' ').Replace(':', ' ');
+		s = s.Replace(';', ' ').Replace('|', ' ').Replace(':', ' ').Replace(',', '.');
 		if (s == box.Text)
 			return false;
 		box.Text = s;
 		return true;
 	}
 
-	internal static T ParseValue<T>(TextBox? box) where T : struct, IParsable<T> {
+	internal static T ParseValue<T>(TextBox
+#if NULLABLE
+		?
+#endif
+		box) where T : struct, IParsable<T> {
 		if (box == null)
 			return default;
 		_ = Clean(box);
@@ -46,7 +52,11 @@ internal static class StaticContent {
 	internal static T Clamp<T>(T n, T min, T max) where T : struct, IComparable<T>
 		=> n.CompareTo(min) < 0 ? min : n.CompareTo(max) > 0 ? max : n;
 
-	internal static T ReText<T>(TextBox? box, T n) where T : struct, IComparable<T>, IParsable<T> {
+	internal static T ReText<T>(TextBox
+#if NULLABLE
+		?
+#endif       
+		box, T n) where T : struct, IComparable<T>, IParsable<T> {
 		if (box == null)
 			return default;
 		if (n.CompareTo(default) == 0) {
@@ -67,7 +77,11 @@ internal static class StaticContent {
 		//QueueReset();
 		return false;
 	}
-	internal static T ParseClampReText<T>(TextBox? box, T min, T max) where T : struct, IComparable<T>, IParsable<T>
+	internal static T ParseClampReText<T>(TextBox
+#if NULLABLE
+		?
+#endif
+		box, T min, T max) where T : struct, IComparable<T>, IParsable<T>
 		=> ReText(box, Clamp(ParseValue<T>(box), min, max));
 	
 	internal static bool DiffApply<T>(T n, ref T gen, out T prev) where T : struct, IComparable<T> {
@@ -84,12 +98,28 @@ internal static class StaticContent {
 	}
 	internal static bool ClampDiffApply<T>(T n, ref T gen, T min, T max, out T prev) where T : struct, IComparable<T> 
 		=> DiffApply(Clamp(n, min, max), ref gen, out prev);
-	internal static bool ParseDiffApply<T>(TextBox? box, ref T gen, out T prev) where T : struct, IComparable<T>, IParsable<T> 
+	internal static bool ParseDiffApply<T>(TextBox
+#if NULLABLE
+		?
+#endif
+		box, ref T gen, out T prev) where T : struct, IComparable<T>, IParsable<T> 
 		=> DiffApply(ParseValue<T>(box), ref gen, out prev);
-	internal static bool ParseModDiffApply<T>(TextBox? box, ref T gen, T min, T max, out T prev) where T : struct, IComparable<T>, IParsable<T> 
+	internal static bool ParseModDiffApply<T>(TextBox
+#if NULLABLE
+		?
+#endif
+		box, ref T gen, T min, T max, out T prev) where T : struct, IComparable<T>, IParsable<T> 
 		=> DiffApply(Mod(ParseValue<T>(box), min, max), ref gen, out prev);
-	internal static bool ParseClampReTextDiffApply<T>(TextBox? box, ref T gen, T min, T max, out T prev) where T : struct, IComparable<T>, IParsable<T> 
+	internal static bool ParseClampReTextDiffApply<T>(TextBox
+#if NULLABLE
+		?
+#endif
+		box, ref T gen, T min, T max, out T prev) where T : struct, IComparable<T>, IParsable<T> 
 		=> DiffApply(ParseClampReText(box, min, max), ref gen, out prev); 
-	internal static bool ParseClampReTextMulDiffApply<T>(TextBox? box, ref T gen, T min, T max, T mul, out T prev) where T : struct, INumber<T> 
+	internal static bool ParseClampReTextMulDiffApply<T>(TextBox
+#if NULLABLE
+		?
+#endif
+		box, ref T gen, T min, T max, T mul, out T prev) where T : struct, INumber<T> 
 		=> DiffApply(ParseClampReText(box, min, max) * mul, ref gen, out prev);
 }

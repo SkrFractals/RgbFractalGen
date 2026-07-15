@@ -1,5 +1,4 @@
-﻿#nullable enable
-using RgbFractalGenCs.Core;
+﻿using RgbFractalGenCs.Core;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -13,22 +12,26 @@ namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public partial class GeneratorsForm : Form {
 
+	internal const string genExtension = ".txt";
+
+	const int buttonSize = 23;
+
 	private readonly MainForm root;
 	private int controlTabIndex = 0, pointTabIndex;
-	private readonly List<Control>
+	private readonly Dictionary<Control, string>
 		myControls = [];            // All persistent interactive controls (Generator)
-	private readonly List<string>
-		myTips = [];                // Locale codes (Generator)
-	private readonly List<Control>
+	private readonly Dictionary<Control, string>
 		myEditControls = [];        // All persistent interactive controls (Editor)
-	private readonly List<string>
-		myEditTips = [];            // Locale codes (Editor)
 
 	internal Dictionary<uint, GeneratorForm> Gen = [];
 	internal Dictionary<int, uint> GenLineToKey = [];
-	internal static FractalGenerator? Priority = null;
-	internal List<(Button, Button, Button, Label, Button, Button)>
-		lineList = [];              // delete tasks state of duplicate name : generator line buttons
+	internal static FractalGenerator
+#if NULLABLE
+?
+#endif
+		 Priority = null;
+	internal List<(Button, Button, Button, Label, Button, Button)>  // delete tasks state of duplicate name : generator line buttons
+		lineList = [];
 	//private readonly List<Button>
 	//	lineListSwitch = [];        // switch: Switch buttons, not implemented becaues it's a dictionary, not a list
 
@@ -41,50 +44,50 @@ public partial class GeneratorsForm : Form {
 		pointPanel.SuspendLayout();
 		foreach (var f in files)
 			if (uint.TryParse(Path.GetFileNameWithoutExtension(f), out uint i))
-				_ = GetGen(i, false); // load all saved gens
+				if(i > 0)
+					_ = GetGen(i, false); // load all saved gens
+		void SetupControl(Control control, string tip) {
+			//toolTips.SetToolTip(control, L(tip));
+			control.TabIndex = ++controlTabIndex;
+			myControls.Add(control, tip);
+		}
 		SetupControl(addButton, "addGenerator");
+		SetMinimumSize();
 		pointPanel.ResumeLayout(false);
 		pointPanel.PerformLayout();
 	}
-	internal void Update(int Interval) {
 
-		//return;
-
-		FractalGenerator? priority = null;
-		foreach (var g in Gen) {
-			var form = g.Value;
-			FractalGenerator gen;
-			if (form == null)
-				continue;
-			if (form.Visible) // Animate popup/toolbar of that generator
-				form.UpdatePopups(1.0f / Interval);
-			if ((gen = form.generator).mainTask == null)
-				continue; // not generating at all or finished - do not count
-			if (gen.GetGenerateAnimation())
-				priority = gen; // is running and wants to generate animation
-			if (gen.GetBitmapsFinished() < 1)
-				break; // preview/first frames have forced priority (no animation get will be active if any active generator dones't have a first frame yet)
-		}
-		UpdateLines(false);
-		Priority = priority;
-	}
-	private GeneratorForm NewGen(GeneratorForm? from = null) {
+	#region Generators
+	private GeneratorForm NewGen(GeneratorForm
+#if NULLABLE
+?
+#endif
+		from  = null) {
 		uint i = 1;
 		while (IsGen(i))
 			++i;
-		return GetGen(i, true, from);
+		var g = GetGen(i, true, from);
+		SetMinimumSize();
+		return g;
 	}
 	private static bool IsGen(uint index) {
 		var dir = GetGensSaveDir();
-		var file = Path.Combine(dir, index.ToString() + ".gen");
+		var file = Path.Combine(dir, index.ToString() + genExtension);
 		return File.Exists(file);
 	}
-	internal GeneratorForm GetGen(uint index, bool single = true, GeneratorForm? from = null) {
+	internal GeneratorForm GetGen(uint index, bool single = true, GeneratorForm
+#if NULLABLE
+?
+#endif
+	from = null) {
 		if (!Gen.TryGetValue(index, out var gen)) {
 			Gen.Add(index, gen = new(root, this, index, from));
-			gen.SetEditor(index == 0);
-			AddListEntry(index, gen, single);
-			//++lines;
+			if (index == 0)
+				gen.SetEditor(true);
+			else {
+				AddListEntry(index, gen, single);
+				gen.SetEditor(false);
+			}
 		}
 		return gen;
 	}
@@ -94,37 +97,25 @@ public partial class GeneratorsForm : Form {
 		gen.PerformClose();
 		_ = Gen.Remove(key);
 		var dir = GetGensSaveDir();
-		var file = Path.Combine(dir, key.ToString() + ".gen");
+		var file = Path.Combine(dir, key.ToString() + genExtension);
 		if (File.Exists(file))
 			File.Delete(file);
 		FillListEntries(); // refill the lines
 	}
+	#endregion
+
+	#region List
 	internal void UpdateLines(bool genFormsToo) {
 		for(int i = 0; i < lineList.Count; ++i)
 			if (GenLineToKey.TryGetValue(i, out var key) && Gen.TryGetValue(key, out var gen))
 				LabelLine(gen, lineList[i], genFormsToo);
 	}
-	internal void UpdateLocale() {
-		UpdateName();
-		addButton.Text = L("addGenerator");
-		for (int i = myControls.Count; 0 <= --i; toolTips.SetToolTip(myControls[i], L(myTips[i]))) { }
-		for (int i = myEditControls.Count; 0 <= --i; toolTips.SetToolTip(myEditControls[i], L(myEditTips[i]))) { }
-		UpdateLines(true);
-	}
-	private void UpdateName() => Text = L("appNameShort") + " - " + L("generators");
-	private void SetupControl(Control control, string tip) {
-		// Add tooltip and set the next tabIndex
-		toolTips.SetToolTip(control, L(tip));
-		control.TabIndex = ++controlTabIndex;
-		myControls.Add(control);
-		myTips.Add(tip);
-	}
+
 	private void SetupEditControl(Control control, string tip) {
 		// Add tooltip and set the next tabIndex
+		myEditControls.Add(control, tip);
 		toolTips.SetToolTip(control, L(tip));
 		control.TabIndex = ++pointTabIndex;
-		myEditControls.Add(control);
-		myEditTips.Add(tip);
 	}
 	private void FillListEntries() {
 		pointPanel.SuspendLayout();
@@ -133,9 +124,12 @@ public partial class GeneratorsForm : Form {
 		foreach(var dirGen in Gen)
 			if(dirGen.Key != 0) // don't count Editor
 				AddListEntry(dirGen.Key, dirGen.Value, false);
+		SetMinimumSize();
 		pointPanel.ResumeLayout(false);
 		pointPanel.PerformLayout();
 	}
+	private void SetMinimumSize() => MinimumSize = 
+		new(MinimumSize.Width, addButton.Location.Y + addButton.Size.Height + 8 + lineList.Count * buttonSize + Height - ClientRectangle.Height);
 	private void UnFillListEntries() {
 
 		// switch not implemented because it's a dictionary, not a list
@@ -154,10 +148,9 @@ public partial class GeneratorsForm : Form {
 		lineList.Clear();
 		pointTabIndex = controlTabIndex;
 		myEditControls.Clear();
-		myEditTips.Clear();
 	}
 	private static void LabelLine(GeneratorForm gen, (Button r, Button t, Button s, Label o, Button d, Button g) l, bool genFormsToo = false) {
-		l.t.Text = L("tasks") + ": " + gen.Scheduled.Count.ToString();
+		l.t.Text = gen.tasksText;
 		l.s.Text = gen.statusText;
 		l.s.BackColor = gen.Working ? Color.FromArgb(0, 255, 0) : Color.FromArgb(255, 0, 0);
 		l.o.Text = gen.infoText; // how many frames are proicessed in the current generator/scheduled task?
@@ -176,7 +169,7 @@ public partial class GeneratorsForm : Form {
 	}
 	private void BindListEntry((Button r, Button t, Button s, Label o, Button d, Button g) l, int i, uint key, GeneratorForm gen, bool single = true) {
 		//const int textSize = 53;
-		const int buttonSize = 23;
+		
 		if (single)
 			pointPanel.SuspendLayout();
 		int hor = 0;
@@ -198,6 +191,7 @@ public partial class GeneratorsForm : Form {
 		}
 		Label NewLabel(Label _l, int size, string name) {
 			NewControl(_l, size, name);
+			_l.ForeColor = Color.White;
 			return _l;
 		}
 		// Switch: // cannot swtich generators, they are dictionaries
@@ -209,15 +203,20 @@ public partial class GeneratorsForm : Form {
 		} hor = 0;*/
 
 		// (remove, tasks, status, of, duplicate, generator):
-		NewButton(l.r, buttonSize, "r" + i.ToString(), "removeGenerator").Click += (_, _) => RemoveGen(key, gen);
+		NewButton(l.r, buttonSize, "r" + i.ToString(), "removeGeneratorTip").Click += (_, _) => RemoveGen(key, gen);
 		l.r.Text = "X";
 		NewButton(l.t, 128, "t" + i.ToString(), "tasksTip").Click += (_, _) => gen.OpenTasks();
-		l.t.Text = L("tasks");
+		l.t.Text = gen.tasksText;
 		NewButton(l.s, 128, "s" + i.ToString(), "pauseGeneratorTip").Click += (_, _) => gen.SetWorking(!gen.Working);
 		_ = NewLabel(l.o, 64, "o" + i.ToString());
-		NewButton(l.d, buttonSize, "d" + i.ToString(), "duplicateGeneratorTip").Click += (_, _) => NewGen(gen);
+		NewButton(l.d, buttonSize, "d" + i.ToString(), "duplicateGenerator").Click += (_, _) => NewGen(gen);
 		l.d.Text = "⧉";
-		NewButton(l.g, pointPanel.Width - (4 + hor), "g" + i.ToString(), "openGeneratorTip").Click += (_, _) => { gen.SetWorking(true); gen.Show(); };
+		NewButton(l.g, pointPanel.Width - (4 + hor), "g" + i.ToString(), "openGeneratorTip").Click += (_, _) => { 
+			_ = gen.SetWorking(true); 
+			gen.Show();
+			gen.Location = Location;
+			//gen.SizeChanged();
+		};
 		l.g.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right; // stretching to the rest ofthe window
 
 		if (single) {
@@ -225,13 +224,50 @@ public partial class GeneratorsForm : Form {
 			pointPanel.PerformLayout();
 		}
 	}
-	private void GeneratorsForm_FormClosing(object sender, FormClosingEventArgs e) {
+	#endregion
+
+	#region Update
+	internal void Update(int Interval) {
+		FractalGenerator
+#if NULLABLE
+?
+#endif
+		priority = null;
+		foreach (var g in Gen) {
+			var form = g.Value;
+			FractalGenerator gen;
+			if (form == null)
+				continue;
+			if (form.Visible) // Animate popup/toolbar of that generator
+				form.UpdatePopups(1.0f / Interval);
+			if ((gen = form.generator).mainTask == null || gen.GetNoPriority(out _, true))
+				continue; // not generating at all or finished - do not count
+			if (gen.GetGenerateAnimation())
+				priority = gen; // is running and wants to generate animation
+			if (gen.GetBitmapsFinished() < 1)
+				break; // preview/first frames have forced priority (no animation get will be active if any active generator dones't have a first frame yet)
+		}
+		UpdateLines(false);
+		Priority = priority;
+	}
+	internal void UpdateLocale() {
+		Text = L("appNameShort") + " - " + L("generators");
+		//addButton.Text = L("addGeneratorText");
+		foreach (var c in myControls) {
+			toolTips.SetToolTip(c.Key, c.Value);
+			c.Key.Text = L(c.Value + "Text");
+		}
+		foreach (var c in myEditControls) 
+			toolTips.SetToolTip(c.Key, c.Value);
+		UpdateLines(true);
+	}
+	#endregion
+
+	#region Events
+	private void AddButton_Click(object s, EventArgs e) => _ = NewGen();
+	private void GeneratorsForm_FormClosing(object s, FormClosingEventArgs e) {
 		e.Cancel = true;
 		Hide();
 	}
-
-	private void AddButton_Click(object sender, EventArgs e) => _ = NewGen();
-
-	//private void GeneratorsForm_SizeChanged(object sender, EventArgs e) 
-	//	=> pointPanel.Size = new(Width - 16 - 8, Height - 39 - 8);
+	#endregion
 }

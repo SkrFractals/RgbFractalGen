@@ -1,8 +1,8 @@
 ﻿using System.Windows.Forms;
 
-namespace RgbFractalGenCs;
+namespace RgbFractalGenCs.Content;
 
-partial class GeneratorsForm {
+partial class SchedulerForm {
 	/// <summary>
 	/// Required designer variable.
 	/// </summary>
@@ -27,53 +27,34 @@ partial class GeneratorsForm {
 	/// </summary>
 	private void InitializeComponent() {
 		components = new System.ComponentModel.Container();
-		var resources = new System.ComponentModel.ComponentResourceManager(typeof(GeneratorsForm));
+		var resources = new System.ComponentModel.ComponentResourceManager(typeof(SchedulerForm));
 		toolTips = new ToolTip(components);
-		addButton = new Button();
 		pointPanel = new Panel();
-		pointPanel.SuspendLayout();
 		SuspendLayout();
-		// 
-		// addButton
-		// 
-		addButton.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-		addButton.Location = new System.Drawing.Point(3, 3);
-		addButton.Name = "addButton";
-		addButton.Size = new System.Drawing.Size(570, 23);
-		addButton.TabIndex = 0;
-		addButton.Text = "[Add]";
-		addButton.UseVisualStyleBackColor = true;
-		addButton.Click += AddButton_Click;
 		// 
 		// pointPanel
 		// 
 		pointPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-		pointPanel.Controls.Add(addButton);
-		pointPanel.Location = new System.Drawing.Point(4, 4);
+		pointPanel.Location = new System.Drawing.Point(12, 12);
 		pointPanel.Name = "pointPanel";
-		pointPanel.Size = new System.Drawing.Size(576, 373);
-		pointPanel.TabIndex = 1;
+		pointPanel.Size = new System.Drawing.Size(380, 57);
+		pointPanel.TabIndex = 0;
 		// 
-		// GeneratorsForm
+		// SchedulerForm
 		// 
 		AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 		AutoScaleMode = AutoScaleMode.Font;
 		BackColor = RgbFractalGenCs.Core.StaticCore.Background;
-		ClientSize = new System.Drawing.Size(584, 381);
+		ClientSize = new System.Drawing.Size(404, 81);
 		Controls.Add(pointPanel);
 		Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
-		Margin = new Padding(4, 3, 4, 3);
-		MinimumSize = new System.Drawing.Size(600, 80);
-		Name = "GeneratorsForm";
-		Text = "[ GeneratorsForm ]";
-		FormClosing += GeneratorsForm_FormClosing;
-		pointPanel.ResumeLayout(false);
+		MinimumSize = new System.Drawing.Size(420, 120);
+		Name = "SchedulerForm";
+		Text = "SchedulerForm";
 		ResumeLayout(false);
 	}
 
 	#endregion
-
 	private ToolTip toolTips;
-	private Button addButton;
 	private Panel pointPanel;
 }

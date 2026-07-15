@@ -81,7 +81,7 @@ partial class InputDialog {
 		// 
 		AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
 		AutoScaleMode = AutoScaleMode.Font;
-		BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
+		BackColor = RgbFractalGenCs.Core.StaticCore.Background;
 		ClientSize = new System.Drawing.Size(319, 76);
 		Controls.Add(cancelButton);
 		Controls.Add(pasteButton);
@@ -89,6 +89,8 @@ partial class InputDialog {
 		Controls.Add(textBox);
 		Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
 		Margin = new Padding(4, 3, 4, 3);
+		MaximumSize = new System.Drawing.Size(1920, 115);
+		MinimumSize = new System.Drawing.Size(335, 115);
 		Name = "InputDialog";
 		Text = "[ Input ]";
 		ResumeLayout(false);
@@ -97,9 +99,9 @@ partial class InputDialog {
 
 	#endregion
 
-	private System.Windows.Forms.TextBox textBox;
-	private System.Windows.Forms.Button cancelButton;
-	private System.Windows.Forms.Button pasteButton;
-	private System.Windows.Forms.Button okButton;
-	private System.Windows.Forms.ToolTip toolTips;
+	private TextBox textBox;
+	private Button cancelButton;
+	private Button pasteButton;
+	private Button okButton;
+	private ToolTip toolTips;
 }

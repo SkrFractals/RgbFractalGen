@@ -1,0 +1,451 @@
+{
+  "ThisLanguage": "Čeština",
+
+  "_Titles-": "-------------------------------------------",
+
+  "appName": "RGB Generátor Animací Fraktálů",
+  "appNameShort": "RGB GAF",
+  "settings": "Nastavení",
+  "generator": "Generátor",
+  "editor": "Editor",
+  "help": "Nápověda / O aplikaci",
+
+
+  "-Words-": "---------------------------------------------",
+
+  "cancelBox": "ZRUŠIT",
+  "copyBox": "KOPÍROVAT",
+  "pasteBox": "VLOŽIT",
+  "saveButtonText": "ULOŽIT",
+  "loadButtonText": "NAČÍST",
+  "okBox": "OK",
+  "saving": "UKLÁDÁNÍ",
+  "generating": "GENEROVÁNÍ",
+  "notWorking": "POZASTAVENO",
+  "finished": "DOKONČENO",
+  "selected": "Vybráno",
+  "enabled": "Povoleno",
+  "disabled": "Zakázáno",
+  "areYouSure": "OPRAVDU?",
+  "random": "Náhodně",
+  "tasks": "Úlohy",
+  "cancelling": "RUŠENÍ",
+
+  "-MainMenu-": "------------------------------------------",
+
+  "setButText": "NASTAVENÍ",
+  "setBut": "Otevře globální nastavení aplikace. Výkon, jazyk a další možnosti.",
+
+  "genButText": "GENERÁTORY",
+  "genBut": "Správce plánování generátorů animací fraktálů.\nZde vytvářejte své animace.\nNaplánujte dávkové generování a exporty nastavením jejich vlastností, poté zvolte generování animací a naplánujte exporty.\nVše pak proběhne automaticky bez dalšího zásahu.",
+  
+  "editButText": "EDITOR",
+  "editBut": "Editor fraktálů – vytvořte si vlastní pravidla fraktálů!",
+
+  "helpButText": "NÁPOVĚDA",
+  "helpBut": "Jak aplikaci používat a další informace.",
+
+
+  "-Settings-": "----------------------------------------------",
+
+  "localeLabel": "Jazyk aplikace",
+  "localeBox": "Vyberte jazyk uživatelského rozhraní aplikace.",
+
+  "threadsLabel": "Maximální počet vláken",
+  "threadsBox": "Maximální povolený počet paralelních vláken procesoru pro generování nebo vykreslování.\nAby se toto nastavení uplatnilo, musí být zaškrtnuta alespoň jedna z možností paralelního zpracování níže.\nPokud je váš systém vytížen jinými úlohami nebo chcete ponechat část výkonu pro jiné programy, snižte tuto hodnotu.\nNejvyšší výkon obvykle získáte nastavením přesného počtu aktuálně volných vláken CPU.\nMaximum na tomto posuvníku odpovídá celkovému počtu vláken procesoru, nikoli pouze volným.",
+
+  "cacheLabel": "Optimalizace mezipaměti",
+  "cacheBox": "Má být fraktál generován novým algoritmem navrženým pro lepší využití procesorové mezipaměti?\nVe skutečnosti se nezdá, že by zvyšoval výkon. Spíše bývá pomalejší, proto doporučuji tuto možnost ponechat vypnutou.",
+
+
+  "-Generators-": "----------------------------------------------",
+
+  "addGeneratorText": "Přidat Nový Generátor",
+  "addGenerator": "Vytvoří nový pozastavený generátor s výchozím nastavením a přidá jej do seznamu.",
+
+  "removeGeneratorTip": "Odstraní tento generátor ze seznamu.",
+  "tasksTip": "Otevře plánovač dokončovacích úloh tohoto generátoru.\nObsahuje naplánované exporty nebo uzavření, které se provedou po dokončení animace.",
+  "pauseGeneratorTip": "Stav generátoru.\nKliknutím pozastavíte nebo obnovíte jeho pracovní vlákna.",
+  "duplicateGeneratorTip": "Vytvoří kopii tohoto generátoru a přidá ji jako nový generátor.",
+  "openGeneratorTip": "Název generátoru.\nKliknutím otevřete generátor.",
+
+
+  "-InputDialog-": "-------------------------------------------------",
+
+  "namePalette": "Pojmenujte paletu",
+  "inputPaletteTextBox": "Zadejte název palety",
+
+
+  "-ImportCode-": "-----------------------------------------------",
+
+  "importCodeTextBox": "Importovat kód nastavení fraktálu",
+  "importFileButtonText": "Z názvu exportovaného souboru",
+  "importFileButton": "Místo toho importuje fraktál.\nPokud vyberete libovolný exportovaný fraktál, aplikace se pokusí načíst všechny dostupné informace potřebné k jeho co nejvěrnější rekonstrukci.\nExport musí mít původní doporučený název souboru.",
+
+
+  "-Generator-": "-----------------------------------------------------",
+
+  "prevButton": "Zastaví animaci a přejde na předchozí snímek.\nUžitečné pro výběr přesného snímku, který chcete exportovat jako PNG.",
+  "nextButton": "Zastaví animaci a přejde na následující snímek.\nUžitečné pro výběr přesného snímku, který chcete exportovat jako PNG.",
+  "animateButton": "Zapne nebo vypne náhled animace.\nPo dokončení generování fraktálu se bude plynule opakovat.\nStejnou akci provedete také kliknutím na obrázek.",
+
+  "restart": "RESTARTOVAT",
+  "restartButton": "Restartuje generátor. Může být užitečné u náhodných nastavení, ale pro jistotu je potřeba kliknout dvakrát za sebou.",
+
+  "hideButtonText": "SKRÝT",
+  "hideButton": "Skryje uživatelské rozhraní a ponechá viditelný pouze náhled fraktálu.\nPro opětovné zobrazení rozhraní klikněte kamkoliv do náhledu fraktálu.",
+
+  "fractalSelectLabel": "Fraktál",
+  "fractalSelect": "Vyberte typ generovaného fraktálu.",
+  "fractalSelectTip": "-Vyberte fraktál-",
+
+  "angleLabel": "Úhly",
+  "angleSelect": "Vyberte definici úhlů potomků.",
+
+  "colorLabel": "Barvy",
+  "colorSelect": "Vyberte definici barev potomků.",
+
+  "cutLabel": "Funkce ořezu",
+  "cutSelect": "Vyberte definici funkce ořezu.",
+  "cutparamBox": "Zadejte seed funkce ořezu. (-1 = náhodný)",
+
+  "resX": "Zadejte vodorovné rozlišení vykreslování (šířku).",
+  "resY": "Zadejte svislé rozlišení vykreslování (výšku).",
+  "resSelect": "Vyberte rozlišení vykreslování. Druhá možnost představuje vlastní rozlišení, které můžete zadat do polí vlevo.",
+  "removeResolution": "Odstraní vybrané rozlišení. První dvě položky jsou speciální a nelze je odstranit.",
+  "addResolution": "Přidá rozlišení zadané v polích do seznamu.",
+
+  "paletteLabel": "Paleta",
+  "paletteSelect": "Vyberte barevnou paletu. Nastavení barev potomků následně určí, jak se budou barvy této palety měnit v průběhu iterací.",
+  "removePalette": "Odstraní vybranou paletu.\nPokud jde o výchozí paletu, při příštím spuštění aplikace bude obnovena.",
+  "addPalette": "Přidá vlastní barevnou paletu do seznamu. Postupně se zobrazí dialogy pro výběr barev. Zrušením dalšího výběru bude vytváření palety ukončeno.",
+  "defaultHue": "Zadejte počáteční odstín prvního snímku (ve stupních).",
+
+  "encodePngLabel": "Kódování PNG",
+  "encodePngSelect": "Ano: Animace bude průběžně ukládána jako série PNG obrázků. Díky tomu bude následný export PNG nebo MP4 po dokončení rychlejší, celková doba generování se však výrazně nezkrátí.",
+  "encodePngSelect0": "Ne",
+  "encodePngSelect1": "Ano",
+
+  "encodeGifLabel": "Kódování GIF",
+  "encodeGifSelect": "Ne: GIF se nebude vytvářet. Později jej nebude možné exportovat, ale můžete přepnout na Místní nebo Globální paletu a generátor nebude kompletně restartován – pouze dopočítá chybějící snímky.\nMístní: GIF se kóduje průběžně během generování s lokální paletou pro každý snímek. Vyšší barevná přesnost, pomalejší kódování a větší velikost souboru.\nGlobální: GIF se také kóduje průběžně, ale používá jednu globální paletu vytvořenou z prvního snímku. Nedoporučuje se pro animace s měnícími se barvami. Nabízí výrazně rychlejší kódování a menší velikost výsledného souboru.",
+  "encodeGifSelect0": "Ne",
+  "encodeGifSelect1": "Lokální",
+  "encodeGifSelect2": "Globální",
+
+  "gpuVLabel": "Výpočet prázdnot",
+  "voidSelect": "Vyberte způsob vykreslování hloubky prázdného prostoru – klasické CPU nebo některou z GPU variant.\nBFS by mělo poskytovat stejnou kvalitu jako CPU, Fast Flood je nejrychlejší a Jump Flood představuje kompromis mezi nimi.",
+  "voidSelect0": "CPU",
+  "voidSelect1": "GPU BFS",
+  "voidSelect2": "GPU JumpFlood",
+  "voidSelect3": "GPU FastFlood",
+
+  "gpuDLabel": "Vykreslování",
+  "drawSelect": "Vyberte způsob vykreslování výsledného obrázku – klasické CPU nebo některou z GPU variant. GPU varianty jsou doporučené pro vyšší výkon.",
+  "drawSelect0": "CPU",
+  "drawSelect1": "GPU Funkce",
+  "drawSelect2": "GPU Potrubí",
+
+  "ditherLabel": "Dithering",
+  "ditherBox": "Časový dithering: pokud skutečná hodnota barvy leží mezi dvěma osmibitovými hodnotami, bude náhodně zaokrouhlena nahoru nebo dolů podle odpovídající pravděpodobnosti.",
+
+  "periodLabel": "Počet snímků periody",
+  "periodBox": "Určuje počet snímků potřebných k tomu, aby se středový samopodobný potomek při přibližování zvětšil na velikost rodiče.\nPři oddalování naopak určuje počet snímků, za které se rodič zmenší na velikost potomka.\nPokud má středový potomek stejnou barvu jako rodič, bude to zároveň počet snímků celé animace.\nPokud má jinou barvu, bude celkový počet snímků trojnásobný.",
+  "periodMultiplierBox": "Násobí počet snímků, čímž zpomaluje rotaci i posun odstínů.",
+
+  "zoomLabel": "Přiblížení",
+  "zoomSelect": "Vyberte směr přibližování fraktálu.",
+  "defaultZoomBox": "Zadejte počáteční přiblížení prvního snímku jako počet přeskočených snímků. (-1 = náhodné)",
+
+  "hueLabel": "Posun odstínu",
+  "hueSelect": "Vyberte barevné schéma fraktálu.\nMůžete také nastavit plynulé cyklování odstínů během přibližování.",
+  "hueSpeedBox": "Zadejte dodatečnou rychlost posunu odstínů z hodnot umožňujících plynulé opakování.\nFunguje pouze při zapnutém cyklování barev.",
+
+  "spinLabel0": "Směr otáčení",
+  "spinSelect": "Vyberte směr otáčení animace přiblížení nebo možnost bez otáčení.",
+  "spinSelect0": "Náhodně",
+  "spinSelect1": "Po-směru",
+  "spinSelect2": "Bez",
+  "spinSelect3": "Proti-směru",
+  "spinSelect4": "Střídavý",
+  "spinSelect5": "Peri-střídavý",
+  "spinLabel1": "Výchozí",
+  "defaultAngleBox": "Zadejte počáteční úhel prvního snímku (ve stupních).",
+  "spinLabel2": "Rychlost",
+  "spinSpeedBox": "Zadejte dodatečnou rychlost otáčení z hodnot umožňujících plynulé opakování.",
+
+  "voidAmbientLabel": "Světlost prázdnot",
+  "ambBox": "Síla šedého osvětlení v prázdnotách mezi body fraktálu.\n-1 = průhledné",
+
+  "voidNoiseLabel": "Šum prázdnoty",
+  "noiseBox": "Síla náhodného šumu v prázdnotách mezi body fraktálu.",
+
+  "voidScaleLabel": "Měřítko šumu",
+  "voidBox": "Měřítko šumu v prázdnotách, aby byl lépe viditelný a lépe komprimovatelný při vyšších rozlišeních.",
+
+  "detailLabel": "Detail",
+  "detailBox": "Úroveň detailů (čím nižší hodnota, tím jemnější vykreslení).",
+
+  "saturateLabel": "Sytost",
+  "saturateBox": "Zvýší sytost barev bodů fraktálu.\nUžitečné například tehdy, když je fraktál příliš šedý, jako například Sierpińského trojúhelník (TriFlake).",
+
+  "brightnessLabel": "Jas",
+  "brightnessBox": "Úroveň jasu: 0 % = černá, 100 % = normalizované maximum, 300 % = trojnásobně přeexponovaný jas.",
+
+  "bloomLabel": "Bloom",
+  "bloomBox": "Bloom: hodnota 0 poskytuje maximálně ostrý obraz, ale u hustých fraktálů může být příliš tmavý. Vyšší hodnoty rozostří a zvýrazní záři bodů fraktálu.",
+
+  "blurLabel": "Pohybové rozmazání",
+  "blurBox": "Pohybové rozmazání: nejnižší hodnota znamená žádné rozmazání a nejrychlejší generování, nejvyšší hodnota kombinuje 10 rozmazaných snímků, takže generování je přibližně 10× pomalejší.",
+
+  "zoomChildLabel": "Cílový potomek",
+  "zoomChildBox": "Do kterého potomka se má přibližovat? Hodnota 0 označuje středového potomka.",
+
+  "abortDelayLabel": "Prodleva restartu",
+  "abortBox": "Kolik milisekund po poslední změně nastavení má generátor čekat, než se restartuje?",
+
+  "timingLabel": "Časování",
+  "timingSelect": "Vyberte, zda chcete zadávat prodlevu mezi snímky, nebo snímkovou frekvenci. Prodleva se přesně používá při exportu GIF, zatímco snímková frekvence při exportu MP4.",
+  "timingSelect0": "Zpoždění",
+  "timingSelect1": "Frekvence",
+  "timing0": "Prodleva mezi snímky v setinách sekundy pro náhled i exportovaný GIF. Pokud plánujete export do GIF, používejte toto nastavení místo snímkové frekvence, aby nedocházelo k chybám zaokrouhlení.\nSnímková frekvence bude přibližně 100/prodleva.",
+  "timing1": "Počet snímků za sekundu (přibližně 100/prodleva). Používá se při exportu MP4. Pokud plánujete export do MP4, nastavujte raději tuto hodnotu než prodlevu, aby nedocházelo k chybám zaokrouhlení.",
+
+  "parallelLabel": "Paralelizace",
+  "parallelTypeSelect": "Vyberte způsob paralelizace, který se použije při zapnuté volbě vlevo.\nAnimace = paralelní zpracování jednotlivých snímků, doporučeno pro animace s dokonale přesnými pixely.\nHloubka = paralelní generování jednoho obrázku, vhodné pro rychlé vykreslení jednotlivých snímků. Ve výjimečných případech může být přibližně 1 pixel z milionu mírně nepřesný.",
+  "parallelTypeSelect0": "Animace",
+  "parallelTypeSelect1": "Hloubka",
+
+  "binLabel": "Velikost binu",
+  "binBox": "Parametr optimalizace mezipaměti: Kolik stovek bodů se vejde do jednoho binu v každém pruhu, než se vytvoří další? (Jeden bod zabírá přibližně 18 bajtů.)\nPokud ponecháte velikost binu nebo výšku pruhu na nule, aplikace se pokusí obě hodnoty automaticky odhadnout.",
+
+  "l2Label": "Velikost L2 cache",
+  "l2Box": "Parametr optimalizace mezipaměti: Jak velká je L2 cache jednoho vlákna vašeho procesoru? (v kilobajtech)\nTuto hodnotu aplikace obvykle nedokáže zjistit, proto při hodnotě 0 použije kvalifikovaný odhad.",
+
+  "stripeLabel": "Výška pruhu",
+  "stripeBox": "Parametr optimalizace mezipaměti: Na jak vysoké vodorovné pruhy má být obraz rozdělen a podle nich seřazen při vykreslování?\nDo výšky obrazu by se měly vejít alespoň dva pruhy a zároveň by měly být dostatečně malé, aby se vešly do mezipaměti.\nPokud ponecháte velikost binu nebo výšku pruhu na nule, aplikace se pokusí obě hodnoty automaticky odhadnout.",
+
+  "genNameLabel": "Název generátoru",
+  "nameBox": "Pojmenujte tento generátor. Název slouží pouze pro přehlednost v seznamu generátorů.",
+
+  "generationModeLabel": "Režim generování",
+  "generationSelect": "Pouze Obrázek: Vygeneruje pouze jeden statický obrázek. Nelze exportovat animaci PNG ani GIF, pouze první snímek přibližovací animace.\nAnimace: Vygeneruje animaci podle aktuálního nastavení.\nVšechny Seedy: Nebude přibližovat, otáčet ani posouvat odstíny, ale postupně projde všechny dostupné seedy funkce ořezu.",
+  "generationSelect0": "Pouze Obrázek",
+  "generationSelect1": "Animace",
+  "generationSelect2": "Všechny Seedy",
+
+  "export0": "Export PNG",
+  "export1": "PNG Animace",
+  "export2": "Export MP4",
+  "export3": "Export GIF",
+  "export4": "Export MP4",
+  "export5": "Importovat Kód",
+  "export6": "Zavřít",
+  "exportButton0": "Exportuje aktuálně zobrazený snímek do souboru PNG.\nZastavte animaci a pomocí tlačítek výše vyberte snímek, který chcete exportovat.",
+  "exportButton1": "Exportuje celou animaci jako sérii souborů PNG.",
+  "exportButton2": "Exportuje celou animaci jako video MP4.",
+  "exportButton3": "Exportuje celou animaci jako soubor GIF.\nMusí být povoleno kódování GIF.",
+  "exportButton4": "Převede soubor GIF na MP4.\nMusí být povoleno kódování GIF.",
+  "exportButton5": "Importuje fraktál.\nPokud máte v schránce nebo v názvu exportovaného souboru importovací kód, budou podle něj automaticky vybrány všechny definice a nastavení fraktálu.",
+  "exportButton6": "Po dokončení všech předchozích úloh tento generátor zavře a odstraní.",
+  "exportSelect": "Vyberte, co chcete uložit pomocí tlačítka vlevo.\nPro více informací o vybrané možnosti na tlačítko najeďte myší.",
+  "exportSelect0": "Aktuální PNG",
+  "exportSelect1": "PNG Animace",
+  "exportSelect2": "MP4",
+  "exportSelect3": "Vybraný GIF",
+  "exportSelect4": "GIF → MP4",
+  "exportSelect5": "Importovat kód",
+  "exportSelect6": "Zavřít",
+
+  "fileLabel": "Soubor",
+  "fileSelect": "Vyberte, které vlastnosti budou použity při vytváření výchozího názvu exportovaného souboru.",
+  "fileSelect0": "(F)Fraktál",
+  "fileSelect1": "(A)Úhly – (Bitová maska)",
+  "fileSelect2": "(C)Barvy – (Bitová maska)",
+  "fileSelect3": "(F)Funkce – (Typ_Seed)",
+  "fileSelect4": "(R)Rozlišení – (Šířka_Výška)",
+  "fileSelect5": "(H)Odstíny – (Paleta_Odstín_Posun_Rychlost)",
+  "fileSelect6": "(P)Perioda – (Snímky_Násobitel)",
+  "fileSelect7": "(Z)Přiblížení – (Směr_Potomek)",
+  "fileSelect8": "(S)Otáčení – (Směr_Výchozí_Rychlost)",
+  "fileSelect9": "(V)Prázdný prostor – (Ambient_Šum_Měřítko)",
+  "fileSelect10": "(I)Obraz – (Sytost_Jas_Bloom_Rozmazání)",
+  "fileSelect11": "(D)Detail – (Dithering_Detail)",
+
+  "debugsLabel": "Ladění",
+  "debugBox": "Zobrazuje protokol úloh a stavů obrázků, abyste viděli, co generátor právě provádí.",
+
+  "debugAnimBoxText": "Anim",
+  "debugAnimBox": "Protokol ladění animace",
+
+  "debugPngBoxText": "PNG",
+  "debugPngBox": "Protokol ladění kódování PNG",
+
+  "debugGifBoxText": "GIF",
+  "debugGifBox": "Protokol ladění kódování GIF",
+
+  "debugCounter": "POČÍTADLO",
+  "debugState": "STAVY",
+  "debugPreview": "náhled",
+  "debugQueued": "VE FRONTĚ",
+  "debugExpPng": "EXPORT PNG",
+  "debugFinishing": "DOKONČOVÁNÍ",
+  "debugWriting": "ZÁPIS",
+  "debugEncGif": "KÓDOVÁNÍ GIF",
+  "debugwriteGif": "ZÁPIS GIF",
+  "debugEncPng": "KÓDOVÁNÍ PNG",
+
+  "debugBmpState0": "VE FRONTĚ (NESPUŠTĚNO)",
+  "debugBmpState1": "GENEROVÁNÍ BODŮ FRAKTÁLU",
+  "debugBmpState2": "GENEROVÁNÍ DIJKSTROVÝCH PRÁZDNOT",
+  "debugBmpState3": "VYKRESLOVÁNÍ BITMAPY (UZAMČENO)",
+  "debugBmpState4": "VYKRESLENO (UZAMČENO)",
+  "debugBmpState5": "ODEMČENO",
+  "debugBmpState6": "CHYBA! (NEMĚLO BY NASTAT)",
+
+  "debugEncState0": "VE FRONTĚ",
+  "debugEncState1": "KÓDOVÁNÍ",
+  "debugEncState2": "ZAKÓDOVÁNO",
+  "debugEncState3": "DOKONČENO",
+  "debugEncState4": "CHYBA! (NEMĚLO BY NASTAT)",
+
+
+  "-Scheduler-": "------------------------------------------------",
+
+  "swapScheduled": "Prohodit pořadí těchto 2 naplánovaných úkolů.",
+  "removeScheduled": "Odstranit toto naplánování.",
+
+
+  "-Editor-": "--------------------------------------------------------------------",
+  
+  "loadButton": "Načte definici fraktálu ze souboru.",
+  "saveButton": "Uloží vybranou definici fraktálu do souboru.",
+
+  "structureModeText": "ZOBRAZIT STRUKTURU",
+  "previewModeText": "ZOBRAZIT NÁHLED",
+  "preButton": "Struktura jasně zobrazuje definici potomků.\nNáhled zobrazí fraktál tak, jak se normálně vykreslí.",
+
+  "sizeLabel0": "Potomci 📏",
+  "sizeBox": "Měřítko potomků uvnitř fraktálu (o kolik se obraz zvětší nebo zmenší při přechodu mezi rodičem a potomkem).",
+
+  "sizeLabel1": "Max 📏",
+  "maxBox": "Počáteční měřítko. Pokud je příliš malé, fraktál nemusí zaplnit celou obrazovku. Pokud je příliš velké, může snížit výkon.\nPokud části fraktálu mizí v ROZÍCH obrazu, hodnotu zvyšte. Jinak ji můžete zkusit mírně snížit.",
+
+  "sizeLabel2": "Min 📏",
+  "minBox": "Jak malé musí být iterace, než se začnou vykreslovat jako body. (Příliš vysoká hodnota může způsobit pád programu. Příliš nízká může vést k šedému vzhledu a horšímu výkonu.)\nNastavte parametr Detail na maximum. Pokud se při přibližování objeví dithering, hodnotu Min. velikost snižte.",
+
+  "sizeLabel3": "Řez 📏",
+  "cutBox": "Násobitel měřítka používaný při testování, zda lze vyřadit iterace, které leží zcela mimo zobrazenou oblast. (Pokud při přibližování části fraktálu mizí příliš brzy, hodnotu zvyšte. Jinak ji můžete snížit pro vyšší výkon.)\nPokud části fraktálu mizí u OKRAJŮ obrazu, hodnotu zvyšte.",
+
+  "angleBoxText": "NázevNovýchÚhlů",
+  "angleBox": "Zadejte název nové sady úhlů potomků, pokud ji chcete přidat.",
+  "addAngleButtonText": "PŘIDAT ÚHLY",
+  "addAngleButton": "Přidá novou sadu úhlů potomků.",
+  "removeAngleButton": "Odstraní vybranou sadu úhlů potomků z tohoto fraktálu.",
+  
+  "colorBoxText": "NázevNovýchBarev",
+  "colorBox": "Zadejte název nové sady barev potomků, pokud ji chcete přidat.",
+  "addColorButtonText": "PŘIDAT BARVY",
+  "addColorButton": "Přidá novou sadu barev potomků.",
+  "removeColorButton": "Odstraní vybranou sadu barev potomků z tohoto fraktálu.",
+  
+  "addCut": "Přidat funkci ořezu (zatím jsou dostupné pouze předem naprogramované).",
+  "addCutLabel": "Přidat funkci ořezu",
+  "addCutTip": "Vyberte funkci ořezu",
+  "selectCutFunctionAdd": "Vyberte funkci ořezu k přidání",
+  "removeCutButton": "Odstraní vybranou funkci ořezu z tohoto fraktálu.",
+
+  "addPoint": "CZ Add a new default child point to this fractal, and put it at the end of the list",
+  "addPointText": "CZ ADD CHILD POINT",
+
+  "pointLabel2": "Úhel",
+  "editX": "Souřadnice X potomka.",
+  "editY": "Souřadnice Y potomka.",
+  "editA": "Úhel potomka.",
+  "editC": "Posun barvy potomka po polovinách. (2 v RGB: RGB→GBR, 4 v RGB: RGB→BRG, 3 v RGB: RGB→CPY, 2 v YB: YB→BY)",
+  "editR": "Odstranit tento bod.",
+  "editSwitch": "Prohodí pořadí těchto dvou bodů v seznamu. (Má vliv pouze na funkce ořezu nebo při prohození prvního, hlavního bodu.)",
+
+
+  "-ErrorsAndDialogs-": "--------------------------------------------------------------------",
+
+  "exportStillSaving": "Export se stále ukládá!\nOpravdu chcete zavřít aplikaci a riskovat ztrátu exportu?",
+  "confirmExit": "Potvrdit ukončení",
+  "confirmSave": "Potvrdit uložení",
+  "allFiles": "Všechny soubory",
+  "gifVideo": "Video GIF",
+  "mp4Video": "Video MP4",
+  "fractal": "Fraktál",
+  "fractalEdited": "byl upraven. Chcete jej před zavřením uložit?",
+  "gifAvailable": "Máte k dispozici zakódovaný GIF k uložení.\nChcete jej uložit?",
+  "gifAvailableCancel": "\nZrušit vypne kódování GIF, takže se toto upozornění již nebude znovu zobrazovat.",
+  "saveGif": "Uložit GIF",
+  "selectDestination": "Vyberte cílové umístění exportu.",
+  "dontSave": "Zahodí dostupný export, provede změnu tohoto nastavení a restartuje generování.",
+  "abortSave": "Zahodí dostupný export, provede změnu tohoto nastavení a restartuje generování.\nSoučasně vypne kódování, aby se tato zpráva znovu nezobrazovala.",
+  "cancelSave": "Vrátí všechny změny zpět, jako byste nic nezměnili, a zachová vše beze změny.",
+  "pngsAvailable": "Máte k dispozici PNG snímky připravené k uložení nebo převodu na MP4.\nChcete je uložit?\nZrušit vypne kódování MP4, takže se toto upozornění již nebude znovu zobrazovat.",
+  "pngsAvailableCancel": "\nZrušit vypne kódování MP4, takže se toto upozornění již nebude znovu zobrazovat.",
+  "saveMp4Pngs": "Uložit MP4 / PNG",
+  "cancelled": "Zrušeno",
+  "cancelledText": "Operace byla zrušena nebo nebyl zadán název. Paleta nebyla uložena.",
+  "notForEndUser": "Tento režim není určen běžným uživatelům. Slouží pouze k vygenerování všech parametrů a exportu souboru hash.txt obsahujícího všechny jedinečné kombinace.\nPokud chcete vytvořit animaci všech seedů, použijte raději režim Všechny seedy. Ten neplýtvá výkonem na výpočet hashů a zároveň připraví animaci k exportu.",
+  "warning": "Upozornění",
+  "cancelSavingText": "Zrušit ukládání souboru (souborů)?",
+  "cancelSaving": "Zrušit ukládání?",
+  "onlyPreview": "Toto je pouze náhled v nízkém rozlišení. Počkejte prosím na dokončení vykreslení plného rozlišení, které jste vybrali.",
+  "pleaseWait": "Čekejte prosím",
+  "notAvailable": "Není k dispozici",
+  "notImplemented": "Zatím není implementováno.",
+  "notSelected": "Nevybráno",
+  "switchtoAnimation": "Přepnout na Animaci?",
+  "cantExportOnlyImage": "Máte zvolené pouye generování obrázku, chcete přepnout na generování Animace pro tento export?",
+  "pngImage": "Obrázek PNG",
+  "ffmpeg": "Soubor ffmpeg.exe nebyl nalezen. Opravdu jste stáhli kompletní vydání obsahující ffmpeg?",
+  "gifDisabled": "Kódování GIF není povoleno. Vyberte možnost Lokální nebo Globální GIF a zkuste to znovu po dokončení kódování.",
+  "encodedGifNa": "Zakódovaný GIF není k dispozici.",
+  "gifToMp4Unavailable": "Tento typ exportu je momentálně nefunkční. Bude opraven později nebo odstraněn.\nPoužijte běžný export MP4 z PNG snímků, který stejně poskytuje vyšší kvalitu.",
+  "gifStillSaving": "Export se stále ukládá. Počkejte na jeho dokončení nebo před uložením GIF klikněte na toto tlačítko.",
+  "mp4stillSaving": "Export se stále ukládá. Počkejte na jeho dokončení.",
+  "failedGif": "Export GIF se nezdařil",
+  "failedPng": "Export PNG se nezdařil",
+  "failedMp4": "Export MP4 se nezdařil",
+  "cannotRemoveLast": "Poslední položku nelze odstranit",
+  "cannotRemove": "Nelze odstranit",
+  "alreadyFractal": "Fraktál se stejným názvem je již načten. Bude vybrán.",
+  "alreadyExists": "Již existuje",
+  "noAngles": "Do pole vlevo zadejte jedinečný název nové sady úhlů potomků.",
+  "cannotAdd": "Nelze přidat",
+  "uniqueAngles": "Sada úhlů potomků s tímto názvem již existuje.\nDo pole vlevo zadejte jiný jedinečný název.",
+  "noColors": "Do pole vlevo zadejte jedinečný název nové sady barev potomků.",
+  "uniqueColors": "Sada barev potomků s tímto názvem již existuje.\nDo pole vlevo zadejte jiný jedinečný název.",
+  "noCutFunctions": "Ve fraktálu již nezbyly žádné funkce ořezu.",
+  "bloomLarge": "Bloom je příliš velký, aby se do mezipaměti vešel byť jediný ApplyDot.",
+  "bloomLarge2": "Bloom je příliš velký, takže se při vykreslování do pruhů překrývají jádra úloh.",
+  "noStripeRange": "Není k dispozici žádný rozsah pruhů",
+  "notFoundAnything": "Nic nebylo nalezeno",
+   "resetSchedule": "Stále jsou naplánovány některé nedokončené úlohy po dokončení generování.\nZrušit tuto akci a počkat na dokončení naplánovaných úloh?",
+  "confirmResetSchedule": "Počkat na naplánované úlohy?",
+  "moveClose": "Přesunout úlohu Zavřít?",
+  "moveCloseTask": "Tato úloha Zavřít byla vyvolána plánovačem a zrušena.\nChcete po dokončení všeho naplánovat novou úlohu Zavřít?",
+  "noFile": "Soubor nebyl nalezen.",
+  "noFractalName": "Chybí název fraktálu.",
+  "sameFractalName": "Fraktál se stejným názvem je již načten v seznamu.",
+  "cannotLoad": "Nelze načíst!",
+  "invalidChildCount": "Neplatný počet potomků",
+  "invalidChildSize": "Neplatná velikost potomka",
+  "invalidMaxSize": "Neplatná maximální velikost",
+  "invalidMinSize": "Neplatná minimální velikost",
+  "invalidCutSize": "Neplatná velikost ořezu",
+  "insufficientChildCount": "Nedostatečný počet potomků",
+  "invalidChild": "Neplatný potomek",
+  "noSetAngles": "Chybí sada úhlů potomků",
+  "noSetColors": "Chybí sada barev potomků",
+  "emptyAngle": "Prázdný název sady úhlů",
+  "emptyColor": "Prázdný název sady barev",
+  "insufficientChildAngle": "Nedostatečný počet úhlů potomků v sadě",
+  "insufficientChildColor": "Nedostatečný počet barev potomků v sadě",
+  "invalidAngle": "Neplatný úhel v sadě",
+  "invalidColor": "Neplatná barva v sadě",
+  "invalidCutIndex": "Neplatný index funkce ořezu",
+  "invalidCutSeed": "Neplatný seed funkce ořezu"
+}

@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace RgbFractalGenCs.Core;
 /// <summary>
@@ -103,8 +102,8 @@ internal class Fractal {
 		Fractal copy,
 		string name,
 		short childCount,
-		List<(string, double[])>? childAngle,
-		List<(string, byte[])>? childColor,
+		List<(string, double[])> childAngle,
+		List<(string, byte[])> childColor,
 		List<(int, int[])> cutFunction
 	) {
 		ChildSize = copy.ChildSize;
