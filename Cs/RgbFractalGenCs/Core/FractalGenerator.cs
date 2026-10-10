@@ -1,9 +1,8 @@
 ﻿// The defines below are for debugging, they should not be enabled to building the final product!
 
-#define CustomDebug // Will enable complex performance logging measuring the runtimes of all the processed, will slightly decrease the performance
+//#define CustomDebug // Will enable complex performance logging measuring the runtimes of all the processed, will slightly decrease the performance
 
 //#define SmoothnessDebugXy // Will disable the pre-split lerping toward the parent's XY
-
 //#define SmoothnessDebugDetail // Will make the detail parameter huge to separate the deep dots to see how they are splitting themselves 
 
 #define ENABLE_INVOKE
@@ -128,13 +127,13 @@ internal partial class FractalGenerator {
 		UpLeftStart;						// = -selectBloom;
 		internal float LightNormalizer,		// maximum brightness found in the buffer, for normalizing the final image brightness
 			VoidDepthMax;					// maximum reached void depth during the dijkstra search, for normalizing the void intensity
-		internal (double, double, (double, double)[])[]
+		internal (double size/*, double detail*/, (double, double)[] xy)[]
 			PreIterate = [];				// (childSize, childDetail, childSpread, (childX,childY)[])
 
 
 		internal ushort StripeHeight, StripeCount;
 		internal uint PredictedBinsPerStripe;
-		private List<(long, float, float, byte)[]>[]
+		private List<(/*long*/Vector3, float, float/*, byte*/)[]>[]
 #if NULLABLE
 		?
 #endif
@@ -170,21 +169,21 @@ internal partial class FractalGenerator {
 			task = null;
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		internal void AddDot((long dotsKey, float dotsX, float dotsY, byte color) dot) {
+		internal void AddDot((/*long dotsKey*/Vector3 dotColor, float dotsX, float dotsY/*, byte color*/) dot) {
 			if (bin == null)
 				throw new("bin NULL");
 			ushort s = (ushort)(dot.dotsY / StripeHeight); // find stripeId of this dot
 			if (filledStripes[s] >= BinSize) {
 				filledStripes[s] = 0; // reset to fill the new bin from zero index again
-				bin[s].Add(new (long, float, float, byte)[BinSize]); // increment binId (start new bin in this stripe)
+				bin[s].Add(new (/*long*/Vector3, float, float/*, byte*/)[BinSize]); // increment binId (start new bin in this stripe)
 				++filledBins[s];
 			}
 			bin[s][filledBins[s]][filledStripes[s]++] = dot;
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		internal void ApplyDot((long dotsKey, float dotsX, float dotsY, byte dotsColor) dot) {
+		internal void ApplyDot((/*long dotsKey*/Vector3 dotColor, float dotsX, float dotsY/*, byte dotsColor*/) dot) {
 			var xKernel = Kernel;
-			var dotColor = FinalColors[dot.dotsKey][dot.dotsColor];
+			//var dotColor = FinalColors[dot.dotsKey][dot.dotsColor];
 			float bloom0 = Bloom0, bloom1 = Bloom1;
 			int endX = Math.Min(WidthBorder, (int)Math.Ceiling(dot.dotsX + bloom0)),
 				endY = Math.Min(HeightBorder, (int)Math.Ceiling(dot.dotsY + bloom0)),
@@ -206,7 +205,7 @@ internal partial class FractalGenerator {
 						Vector3* px = rowPtr + startX, e = rowPtr + endX;
 						while (px <= e) {
 							float w = yd * *kx++;
-							*px++ += w * dotColor;
+							*px++ += w * dot.dotColor;
 						}
 					}
 				}
@@ -322,9 +321,9 @@ internal partial class FractalGenerator {
 				return; // already defined (OfDepth reuse)
 			StripeHeight = task.StripeHeight;
 			BinSize = task.BinSize;
-			bin = new List<(long, float, float, byte)[]>[StripeCount = task.StripeCount]; // allocate stripes of bins
+			bin = new List<(/*long*/Vector3, float, float/*, byte*/)[]>[StripeCount = task.StripeCount]; // allocate stripes of bins
 			for (int i = 0; i < task.StripeCount; ++i) 
-				(bin[i] = new List<(long, float, float, byte)[]>((int)PredictedBinsPerStripe)).Add(new (long, float, float, byte)[BinSize]);
+				(bin[i] = new List<(/*long*/Vector3, float, float/*, byte*/)[]>((int)PredictedBinsPerStripe)).Add(new (/*long*/Vector3, float, float/*, byte*/)[BinSize]);
 			//foreach (ref var dbin in bin) // make a fresh list with a fresh bin for each stripe
 			//	(dbin = new (long, float, float, byte)[PredictedBinsPerStripe][])[0] = new (long, float, float, byte)[task.BinSize];
 			filledBins = new ushort[task.StripeCount];
@@ -404,13 +403,13 @@ internal partial class FractalGenerator {
 			return found == true ? "" : L("notFoundAnything");
 		}
 		internal interface IDotApplier {
-			public void Apply(FractalTask task, (long dotsKey, float dotsX, float dotsY, byte dotsColor) dot);
+			public void Apply(FractalTask task, (/*long dotsKey*/Vector3 dotColor, float dotsX, float dotsY/*, byte dotsColor*/) dot);
 		}
 		internal struct ApplyDotImpl : IDotApplier {
-			public readonly void Apply(FractalTask task, (long dotsKey, float dotsX, float dotsY, byte dotsColor) dot) => task.ApplyDot(dot);
+			public readonly void Apply(FractalTask task, (/*long dotsKey*/Vector3 dotColor, float dotsX, float dotsY/*, byte dotsColor*/) dot) => task.ApplyDot(dot);
 		}
 		internal struct AddDotImpl : IDotApplier {
-			public readonly void Apply(FractalTask task, (long dotsKey, float dotsX, float dotsY, byte dotsColor) dot) => task.AddDot(dot);
+			public readonly void Apply(FractalTask task, (/*long dotsKey*/Vector3 dotColor, float dotsX, float dotsY/*, byte dotsColor*/) dot) => task.AddDot(dot);
 		}
 
 	}
@@ -530,6 +529,7 @@ internal partial class FractalGenerator {
 		allocPalette = [];
 	private readonly Random
 		random = new();         // Random generator
+	private double[] logBases;
 	private double
 		logBase,                // Size Log Base
 		allocPeriodAngle,       // Angle symmetry corrected for periodMultiplier
@@ -1287,9 +1287,6 @@ internal partial class FractalGenerator {
 		if (allocGenerationType < GenerationType.AllSeeds)
 			AverageChildCount = PreGenerateCutSeedAndBlends(0, colorBlends, out startCutSeed);
 		allocDetail = SelectedDetail;
-#if SmoothnessDebugDetail
-		applyDetail = 10.0;
-#endif
 		// Generate the images
 		while (!IsCancelRequested()) {
 			void NewCache() {
@@ -1498,7 +1495,11 @@ internal partial class FractalGenerator {
 			task.UpLeftStart = - task.Bloom0;
 			task.RightEnd = task.WidthBorder + task.Bloom0;
 			task.DownEnd = task.HeightBorder + task.Bloom0;
+#if SmoothnessDebugDetail
+			task.ApplyDetail = allocDetail * task.Bloom1 * 24;
+#else
 			task.ApplyDetail = allocDetail * task.Bloom1;
+#endif
 		}
 		float PreGenerateCutSeedAndBlends(int bitmapIndex, Dictionary<long, Vector3[]> blends, out long startSeed) {
 			int[] seeds;
@@ -1604,7 +1605,7 @@ internal partial class FractalGenerator {
 			PreviewResolution(task);
 			// Init buffer with zeroes
 			bool ofDepthCond = allocParallelType == ParallelType.OfDepth /*|| bitmapIndex < previewFrames*/;
-			var ofDepth = allocMaxTasks > MinTasks && ofDepthCond;
+			var ofDepth = allocMaxTasks > MinTasks && ofDepthCond && !f.UseChildS;
 			/*for (var y = 0; y < task.ApplyHeight; ++y) {
 				var buffY = buffT[y];
 				for (var x = 0; x < task.ApplyWidth; buffY[x++] = Vector3.Zero) {}
@@ -1658,51 +1659,52 @@ internal partial class FractalGenerator {
 					_AverageChildCount = AverageChildCount;
 				}
 				task.FinalColors.Clear();
-				// Pre-iterate values that change the same way as iteration goes deeper, so they only get calculated once
-				//var preIterateTask = task.PreIterate;
-				if (/*preIterateTask == null || */task.PreIterate.Length != allocMaxIterations) {
-					/*preIterateTask = */task.PreIterate = new (double, double, (double, double)[])[allocMaxIterations];
-					//for (var i = 0; i < allocMaxIterations; task.PreIterate[i++] = (0.0, 0.0f, [])) { }
-				}
-				var inSize = refSize;
-				// zooming into a non-center child needs to pre-iterate 6 levels deeper (or more precisely from 6 levels above)
-				int totalMaxIterations = allocMaxIterations, PreSimulatedDepth = 0;
-				//selectZoomChild > 0 ? applyMaxIterations : applyMaxIterations - 6;
-				for (var i = 0; i < totalMaxIterations; ++i) {
-					// get a new scale of the lower level, and also:
-					// get the progress between splits (so that the parent wil smoothly turn into a preparation to split into children seamlessly)
-					//var prei = preIterateTask[i];
-					//prei.Item2 = Math.Log(task.ApplyDetail / (prei.Item1 = inSize)) / logBase;
-					var inDetail = (float)Math.Log(task.ApplyDetail / inSize) / logBase;
-					var inDetailSize = -inSize * Math.Max(-1, inDetail);
-					//if (prei.Item3.Length == 0l || prei.Item3.Length < f.ChildCount)
-					//	prei.Item3 = new (double, double)[f.ChildCount];
-					// precalculate the children XY shifts, scaled with scale and collapsed into the parent's location when freshly spawned
-					var xy = task.PreIterate.Length > i && task.PreIterate[i].Item3 != null && task.PreIterate[i].Item3.Length == f.ChildCount 
-						? task.PreIterate[i].Item3 : new (double, double)[f.ChildCount];
-					
-					for (var c = 0; c < f.ChildCount; ++c)
-#if SmoothnessDebugXy
-						xy[c] = (f.ChildX[c] * inSize, f.ChildY[c] * inSize);
-#else
-						xy[c] = (f.ChildX[c] * inDetailSize, f.ChildY[c] * inDetailSize);
-#endif
-					task.PreIterate[i] = (inSize, inDetail, xy);
-					if (inSize < task.ApplyDetail) {
-						PreSimulatedDepth += i;
-						// This is the final level, interpolate the detail here:
-						foreach (var c in task.ColorBlends) {
-							var interpolated = new Vector3[c.Value.Length];
-							for (var di = 0; di < c.Value.Length; ++di) {
-								interpolated[di] = allocPreviewMode
-									? SampleColor(allocPalette, di * .5 + refHueAngle) // Preview just samples the pure palette
-									: Vector3.Lerp(SampleColor(task.ColorBlends[c.Key], di + 2 * refHueAngle), SampleColor(allocPalette, di * .5 + refHueAngle), (float)inDetail); // otherwise we transform the pure palette into the children mix as we approach getting split
-							}
-							task.FinalColors[c.Key] = interpolated;
-						}
-						break;
+				int PreSimulatedDepth = 0;
+				if (!f.UseChildS) { // Pre-iteration only works when all children are the same scale, otherwise I have to compute this stuff in the recursion leaves
+					// Pre-iterate values that change the same way as iteration goes deeper, so they only get calculated once
+					//var preIterateTask = task.PreIterate;
+					if (task.PreIterate.Length != allocMaxIterations) {
+						task.PreIterate = new (double/*, double*/, (double, double)[])[allocMaxIterations];
 					}
-					inSize /= f.ChildSize;
+					var inSize = refSize;
+					// zooming into a non-center child needs to pre-iterate 6 levels deeper (or more precisely from 6 levels above)
+					int totalMaxIterations = allocMaxIterations;
+					for (var i = 0; i < totalMaxIterations; ++i) {
+						// get a new scale of the lower level, and also:
+						// get the progress between splits (so that the parent wil smoothly turn into a preparation to split into children seamlessly)
+						var inDetail = Math.Log(task.ApplyDetail / inSize) / logBase;
+						var inDetailSize = -inSize * Math.Max(-1, inDetail);
+
+#if SmoothnessDebugXy
+						inDetailSize = (inDetailSize + inSize) * .5;
+#endif
+						// precalculate the children XY shifts, scaled with scale and collapsed into the parent's location when freshly spawned
+						var xy = task.PreIterate.Length > i && task.PreIterate[i].xy != null && task.PreIterate[i].xy.Length == f.ChildCount
+							? task.PreIterate[i].xy : new (double, double)[f.ChildCount];
+
+						for (var c = 0; c < f.ChildCount; ++c)
+							xy[c] = (f.ChildX[c] * inDetailSize, f.ChildY[c] * inDetailSize);
+
+						task.PreIterate[i] = (inSize/*, inDetail*/, xy);
+						if (inSize < task.ApplyDetail) {
+#if SmoothnessDebugDetail
+							System.Diagnostics.Debug.WriteLine("InDetail = " + inDetail);
+#endif
+							PreSimulatedDepth += i;
+							// This is the final level, interpolate the detail here:
+							foreach (var c in task.ColorBlends) {
+								var interpolated = new Vector3[c.Value.Length];
+								for (var di = 0; di < c.Value.Length; ++di) {
+									interpolated[di] = allocPreviewMode
+										? SampleColor(allocPalette, di * .5 + refHueAngle) // Preview just samples the pure palette
+										: Vector3.Lerp(SampleColor(task.ColorBlends[c.Key], di + 2 * refHueAngle), SampleColor(allocPalette, di * .5 + refHueAngle), (float)inDetail); // otherwise we transform the pure palette into the children mix as we approach getting split
+								}
+								task.FinalColors[c.Key] = interpolated;
+							}
+							break;
+						}
+						inSize /= f.ChildSize;
+					}
 				}
 				double sX, sY;
 				var zoomAngle = refAngle;
@@ -1722,7 +1724,7 @@ internal partial class FractalGenerator {
 				sX = zoomSize * (cosFinal * infiniteSum.Real - sinFinal * infiniteSum.Imaginary);
 				sY = zoomSize * (sinFinal * infiniteSum.Real + cosFinal * infiniteSum.Imaginary);
 				
-				if (allocCacheOpt) {
+				if (allocCacheOpt && !f.UseChildS) {
 					// new cache optimizing algorithm:
 
 					// TODO precompute allocs for full resolution image in GenerateAnimation:
@@ -1752,10 +1754,8 @@ internal partial class FractalGenerator {
 							var d = p.Length();
 							ss += d;
 						}
-
-
-							// Sort by X, then Y
-							pts.Sort((p1, p2) => {
+						// Sort by X, then Y
+						pts.Sort((p1, p2) => {
 							int cx = p1.X.CompareTo(p2.X);
 							return cx != 0 ? cx : p1.Y.CompareTo(p2.Y);
 						});
@@ -1855,7 +1855,10 @@ internal partial class FractalGenerator {
 						}
 					} else {
 						task.UseBuffer = buffT;
-						GenerateDotsSingleTask(task, task, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startSeed, 0, applyDot);
+						if(f.UseChildS)
+							GenerateDotsSingleTaskS(task, task, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refSize, refColor, startSeed, 0, applyDot);
+						else
+							GenerateDotsSingleTask(task, task, (task.ApplyWidth * .5 - sX, task.ApplyHeight * .5 - sY), (refAngle, Math.Abs(refSpin) > 1 ? 2 * refAngle : 0), refColor, startSeed, 0, applyDot);
 					}
 				}
 
@@ -2042,7 +2045,7 @@ internal partial class FractalGenerator {
 			) where TApplier : struct, FractalTask.IDotApplier {
 				var preIterated = mainTask.PreIterate[dotsDepth]; // PreIterate = (dotsSize, dotsDetail, f.ChildX[i] * dotsSize, f.ChildY[i] * dotsSize)
 				var newPreIterated = mainTask.PreIterate[++dotsDepth]; // the same thing, but one depth level deeper (newDotsSize, newDotsDetail, f.ChildX[i] * newDotsSize, f.ChildY[i] * newDotsSize)
-				if (newPreIterated.Item1 < mainTask.ApplyDetail) {
+				if (newPreIterated.size < mainTask.ApplyDetail) {
 					// we are deep enough that the parent is within a pixel, so just split it one last time and draw its children as dots
 					for (var i = 0; i < f.ChildCount; ++i) {
 						if (IsCancelRequested())
@@ -2052,13 +2055,16 @@ internal partial class FractalGenerator {
 						if (newFlags < 0)
 							continue;
 						// Take the pre-iterated xy offset at this depth level
-						var xy = preIterated.Item3[i];
+						var xy = preIterated.xy[i];
 						var newXy = NewXY(dotsXy, xy, dotsAngle.Item1);
 						// Outside View check, if inside view, it will continue iterating this child
-						if (TestDotSize(mainTask, newXy.Item1, newXy.Item2, preIterated.Item1))
-							applier.Apply(binTask, (i + f.ChildCount * (newFlags & (((long)1 << f.ChildCount) - 1)), (float)newXy.Item1, (float)newXy.Item2,
-								allocPreviewMode && dotsDepth > 1 ? dotsColor : (byte)((dotsColor + ChildColor[i]) % allocPalette2)));
+						if (TestDotSize(mainTask, newXy.Item1, newXy.Item2, preIterated.size)) {
+							applier.Apply(binTask, (
+								binTask.FinalColors[i + f.ChildCount * (newFlags & (((long)1 << f.ChildCount) - 1))][allocPreviewMode && dotsDepth > 1 ? dotsColor : (byte)((dotsColor + ChildColor[i]) % allocPalette2)],
+								(float)newXy.Item1, (float)newXy.Item2));
+						}
 					}
+					
 					return;
 				}
 				// Split parent deeper into new smaller parents
@@ -2070,16 +2076,65 @@ internal partial class FractalGenerator {
 					if (newFlags < 0)
 						continue;
 					// Take the pre-iterated xy offset at this depth level
-					var xy = preIterated.Item3[i];
+					var xy = preIterated.xy[i];
 					var newXy = NewXY(dotsXy, xy, dotsAngle.Item1);
 					// Outside View check, if inside view, it will continue iterating this child
-					if (TestShapeSize(mainTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+					if (TestShapeSize(mainTask, newXy.Item1, newXy.Item2, preIterated.size))
 						GenerateDotsSingleTask(mainTask, binTask, newXy,
 							i == 0
 							? (dotsAngle.Item1 + ChildAngle[i] - dotsAngle.Item2, -dotsAngle.Item2)
 							: (dotsAngle.Item1 + ChildAngle[i], SelectedSpin == 3 ? -dotsAngle.Item2 : dotsAngle.Item2),
 							//: (dotsAngle.Item1 + ChildAngle[i], dotsAngle.Item2),
 							allocPreviewMode && dotsDepth > 1 ? dotsColor : (byte)((dotsColor + ChildColor[i]) % allocPalette2), newFlags, dotsDepth, applier);
+				}
+			}
+			void GenerateDotsSingleTaskS<TApplier>(FractalTask mainTask, FractalTask binTask,
+			(double, double) dotsXy, (double, double) dotsAngle, double dotsSize, byte dotsColor, long dotsFlags, byte dotsDepth, TApplier applier
+			) where TApplier : struct, FractalTask.IDotApplier {
+				++dotsDepth;
+				// Split parent deeper into new smaller parents
+				for (var i = 0; i < f.ChildCount; ++i) {
+					if (IsCancelRequested())
+						return;
+					// Special Cutoff (uses a special algorithm to pick some children to disappear)
+					var newFlags = CalculateFlags(i, dotsFlags);
+					if (newFlags < 0)
+						continue;
+					var newSize = dotsSize / f.ChildS[i];
+					var inDetail = (float)Math.Log(task.ApplyDetail / dotsSize) / logBase;
+					var inDetailSize = -dotsSize * Math.Max(-1, inDetail);
+#if SmoothnessDebugXy
+					inDetailSize = (dotsSize + inDetailSize) * .5; // disable 50% of the split location lerping, to better see what dots does the parent split into
+#endif
+					// Take the pre-iterated xy offset at this depth level
+					var xy = (f.ChildX[i] * inDetailSize, f.ChildY[i] * inDetailSize);
+					var newXy = NewXY(dotsXy, xy, dotsAngle.Item1);
+					if (newSize < mainTask.ApplyDetail) {
+						// Outside View check, if inside view, it will continue iterating this child
+						if (TestDotSize(mainTask, newXy.Item1, newXy.Item2, dotsSize)) {
+							var cKey = i + f.ChildCount * (newFlags & (((long)1 << f.ChildCount) - 1));
+							var c = task.ColorBlends[cKey];
+							var interpolated = new Vector3[c.Length];
+							for (var di = 0; di < c.Length; ++di) {
+								interpolated[di] = allocPreviewMode
+									? SampleColor(allocPalette, di * .5 + refHueAngle) // Preview just samples the pure palette
+									: Vector3.Lerp(SampleColor(task.ColorBlends[cKey], di + 2 * refHueAngle), SampleColor(allocPalette, di * .5 + refHueAngle), (float)(Math.Log(task.ApplyDetail / newSize) / logBases[i])); // otherwise we transform the pure palette into the children mix as we approach getting split
+							}
+							applier.Apply(binTask, (
+								//Vector3.Lerp(new(255,0,0),new(0,255,0),(float)inDetail),
+								interpolated[allocPreviewMode && dotsDepth > 1 ? dotsColor : (byte)((dotsColor + ChildColor[i]) % allocPalette2)],
+								(float)newXy.Item1, (float)newXy.Item2));
+						}
+					} else {
+						// Outside View check
+						if (TestShapeSize(mainTask, newXy.Item1, newXy.Item2, dotsSize))
+							GenerateDotsSingleTaskS(mainTask, binTask, newXy,
+								i == 0
+								? (dotsAngle.Item1 + ChildAngle[i] - dotsAngle.Item2, -dotsAngle.Item2)
+								: (dotsAngle.Item1 + ChildAngle[i], SelectedSpin == 3 ? -dotsAngle.Item2 : dotsAngle.Item2), newSize,
+								//: (dotsAngle.Item1 + ChildAngle[i], dotsAngle.Item2),
+								allocPreviewMode && dotsDepth > 1 ? dotsColor : (byte)((dotsColor + ChildColor[i]) % allocPalette2), newFlags, dotsDepth, applier);
+					}
 				}
 			}
 			void GenerateBufferOfDepth(int dotsBitmapIndex) {
@@ -2113,6 +2168,7 @@ internal partial class FractalGenerator {
 					count = (max + insertTo) % max;
 				// keep splitting parents until we have a queue DivDepth * maxTasks large:
 				var tupleTask = tasks[0];
+
 				while (count > 0 && count < maxCount) {
 					// take a parent form the queue to split into move parent to put back into the queue
 					var (tupleIndex, tupleXy, tupleAngle, tupleColor, tupleFlags, tupleDepth) = tuples[index++];
@@ -2120,7 +2176,7 @@ internal partial class FractalGenerator {
 					tupleTask = tasks[tupleIndex];// tasks[tupleIndex];
 					var preIterated = tupleTask.PreIterate[tupleDepth]; // PreIterate = (dotsSize, dotsDetail, f.ChildX[i] * dotSize, f.ChildY[i] * dotsSize)
 					var newPreIterated = tupleTask.PreIterate[++tupleDepth]; // the same thing, but one depth level deeper
-					if (newPreIterated.Item1 < tupleTask.ApplyDetail) {
+					if (newPreIterated.size < tupleTask.ApplyDetail) {
 						// we are deep enough that the parent is within a pixel, so just split it one last time and draw its children as dots
 						for (var i = 0; i < f.ChildCount; ++i) {
 							if (IsCancelRequested())
@@ -2130,11 +2186,15 @@ internal partial class FractalGenerator {
 							if (newFlags < 0)
 								continue;
 							// Outside View
-							var xy = preIterated.Item3[i]; // pre-iterated (f.ChildX[i] * dotsSize, f.ChildY[i] * dotsSize), since it's preiterated
+							var xy = preIterated.xy[i]; // pre-iterated (f.ChildX[i] * dotsSize, f.ChildY[i] * dotsSize), since it's preiterated
 							var newXy = NewXY(tupleXy, xy, tupleAngle.Item1);
-							if (TestDotSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+							/*if (TestDotSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.size))
 								applier.Apply(tupleTask, (i + f.ChildCount * (newFlags & ((1 << f.ChildCount) - 1)), (float)newXy.Item1, (float)newXy.Item2,
-									allocPreviewMode && tupleDepth > 1 ? tupleColor : (byte)((tupleColor + ChildColor[i]) % allocPalette2)));
+									allocPreviewMode && tupleDepth > 1 ? tupleColor : (byte)((tupleColor + ChildColor[i]) % allocPalette2)));*/
+							if (TestDotSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.size)) 
+								applier.Apply(tupleTask, 
+									(tupleTask.FinalColors[i + f.ChildCount * (newFlags & (((long)1 << f.ChildCount) - 1))][allocPreviewMode && tupleDepth > 1 ? tupleColor : (byte)((tupleColor + ChildColor[i]) % allocPalette2)],
+									(float)newXy.Item1, (float)newXy.Item2));
 						}
 						count = (max + insertTo - index) % max;
 						continue;
@@ -2148,14 +2208,14 @@ internal partial class FractalGenerator {
 						if (newFlags < 0)
 							continue;
 						// Outside View
-						var xy = preIterated.Item3[i];
+						var xy = preIterated.xy[i];
 						var newXy = NewXY(tupleXy, xy, tupleAngle.Item1);
-						if (!TestShapeSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.Item1))
+						if (!TestShapeSize(tupleTask, newXy.Item1, newXy.Item2, preIterated.size))
 							continue;
 						tuples[insertTo++] =
 							(tupleIndex, newXy,
-							i == 0 
-							? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2) 
+							i == 0
+							? (tupleAngle.Item1 + ChildAngle[i] - tupleAngle.Item2, -tupleAngle.Item2)
 							: (tupleAngle.Item1 + ChildAngle[i], SelectedSpin == 3 ? -tupleAngle.Item2 : tupleAngle.Item2),
 							allocPreviewMode && tupleDepth > 1 ? tupleColor : (byte)((tupleColor + ChildColor[i]) % allocPalette2), newFlags, tupleDepth);
 						insertTo %= max; // we have added the new parent into the queue
@@ -2163,6 +2223,7 @@ internal partial class FractalGenerator {
 					// refresh the count before we ask if this count is enough
 					count = (max + insertTo - index) % max;
 				}
+				
 				// we now have a nice number of tasks to perform in parallel, so do that:
 				// false argument makes sure that we only finish processing these iteration tasks, we can exit if other kinds of tasks are still running as we don't need to wait for these here
 				FinishTasks(false, false, taskIndex => {
@@ -3056,7 +3117,7 @@ internal partial class FractalGenerator {
 
 #if CustomDebug
 	private void Log(ref string log, string line) {
-		Debug.WriteLine(line);
+		//Debug.WriteLine(line);
 		log += "\n" + line;
 	}
 #endif
@@ -3195,7 +3256,12 @@ internal partial class FractalGenerator {
 	}
 	internal void SetupFractal() {
 		f = new(Fractals[SelectedFractal]); // take a copy to use (to prevent crashes if the fractal gets edited while in use)
-		logBase = (float)Math.Log(f.ChildSize);
+		logBase = Math.Log(f.ChildSize);
+		if (f.UseChildS) {
+			logBases = new double[f.ChildS.Length];
+			for(int i = 0; i < f.ChildS.Length; ++i)
+				logBases[i] = Math.Log(f.ChildS[i]);
+		}
 		SetMaxIterations();
 	}
 	internal void SetMaxIterations() {

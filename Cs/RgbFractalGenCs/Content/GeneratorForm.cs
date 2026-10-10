@@ -668,6 +668,9 @@ public partial class GeneratorForm : Form {
 					}
 				}*/
 		}
+		if (bitmapsFinished == bitmapsTotal && !scheduler.Running && Scheduled.Count > 0) {
+			FinishedTask();
+		}
 		if (notifyExp) {
 			// TODO rewrite this into the GeneratorsForm scheduling somehow?
 			notifyExp = false;
@@ -1093,10 +1096,11 @@ public partial class GeneratorForm : Form {
 				// Cancel reset if the user clicks "Yes"
 				if (result == DialogResult.Yes)
 					return false;
+				else CancelSchedule();
 			}
 			if (isGifReady > 80
 				&& xTask == null) {
-				using AvailableQuestion mes = new(L(""), L("gifAvailable") + L("gifAvailableAbort"),
+				using AvailableQuestion mes = new(L(""), L("gifAvailable") + L("gifAvailableCancel"),
 					L("selectDestination"), L("dontSave"), L("abortSave"), L("cancelSave"));
 				switch (mes.ShowDialog()) {
 					case DialogResult.Yes:
@@ -1117,7 +1121,7 @@ public partial class GeneratorForm : Form {
 				&& generator.SelectedPngType == FractalGenerator.PngType.Yes
 				&& generator.GetBitmapsFinished() >= generator.GetFrames()
 				&& xTask == null) {
-				using AvailableQuestion mes = new(L("saveMp4Pngs"), L("pngsAvailable") + L("pngsAvailableAbort"),
+				using AvailableQuestion mes = new(L("saveMp4Pngs"), L("pngsAvailable") + L("pngsAvailableCancel"),
 					L("selectDestination"), L("dontSave"), L("abortSave"), L("cancelSave"));
 				switch (mes.ShowDialog()) {
 					case DialogResult.Yes:
@@ -1349,7 +1353,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void AngleSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		if (MaskApply((short)Math.Max(-1, angleSelect.SelectedIndex - 1), ref generator.SelectedChildAngle, ref generator.SelectedChildAngles)
-			|| QueueReset())
+			|| !QueueReset())
 			return;
 		// put selection back to 0, rename the selected, and change the checkmark:
 		angleSelect.SelectedIndex = 0;
@@ -1359,7 +1363,7 @@ public partial class GeneratorForm : Form {
 	}
 	private void ColorSelect_SelectedIndexChanged(object sender, EventArgs e) {
 		if (MaskApply((short)Math.Max(-1, colorSelect.SelectedIndex - 1), ref generator.SelectedChildColor, ref generator.SelectedChildColors)
-			|| QueueReset())
+			|| !QueueReset())
 			return;
 		// put selection back to 0, rename the selected, and change the checkmark:
 		colorSelect.SelectedIndex = 0;
@@ -2009,7 +2013,7 @@ public partial class GeneratorForm : Form {
 		FinishedTask();
 	}
 	private void FinishedTask() {
-		if (PerformSchedule())
+		if (PerformSchedule() && BackColor != Color.FromArgb(128, 128, 32))
 			BackColor = Color.FromArgb(32, 32, 128);
 		//if (runningBatch.Length > 0)
 		//	NextBatch();
@@ -2271,8 +2275,8 @@ public partial class GeneratorForm : Form {
 			Thread.Sleep(10 + 10 * attempt * attempt);
 		if (!xCancel.Token.IsCancellationRequested) {
 			isGifReady = 0;
-			FinishScheduled();
-		} else CancelSchedule();
+			BeginInvoke((MethodInvoker)(() => FinishScheduled()));
+		} else BeginInvoke((MethodInvoker)(() => CancelSchedule()));
 	}
 	/// <summary>
 	/// Exports the animation into a MP4 file
@@ -2282,7 +2286,7 @@ public partial class GeneratorForm : Form {
 	private void ConvertMp4() {
 		string result = generator.SaveGifToMp4(gifPath, mp4Path);
 		if (xCancel.Token.IsCancellationRequested) {
-			CancelSchedule();
+			BeginInvoke((MethodInvoker)(() => CancelSchedule()));
 			xTask = null;
 			return;
 		}
@@ -2290,7 +2294,7 @@ public partial class GeneratorForm : Form {
 			isGifReady = 0;
 			gifPath = "";
 			mp4Path = "";
-			FinishScheduled();
+			BeginInvoke((MethodInvoker)(() => FinishScheduled()));
 			return;
 		}
 		_ = Error(result, "failedGif");
@@ -2303,14 +2307,14 @@ public partial class GeneratorForm : Form {
 	private void ExportPngs() {
 		string result = generator.SavePngs(mp4Path);
 		if (xCancel.Token.IsCancellationRequested) {
-			CancelSchedule();
+			BeginInvoke((MethodInvoker)(() => CancelSchedule()));
 			xTask = null;
 			return;
 		}
 		if (result == "") {
 			mp4Path = "";
 			isPngsSaved = true;
-			FinishScheduled();
+			BeginInvoke((MethodInvoker)(() => FinishScheduled()));
 			return;
 		}
 		_ = Error(result, "failedPng");
@@ -2323,14 +2327,14 @@ public partial class GeneratorForm : Form {
 	private void ExportMp4() {
 		string result = generator.SavePngsToMp4(mp4Path);
 		if (xCancel.Token.IsCancellationRequested) {
-			CancelSchedule();
+			BeginInvoke((MethodInvoker)(() => CancelSchedule()));
 			xTask = null;
 			return;
 		}
 		if (result == "") {
 			mp4Path = "";
 			isPngsSaved = true;
-			FinishScheduled();
+			BeginInvoke((MethodInvoker)(() => FinishScheduled()));
 			return;
 		}
 		_ = Error(result, "failedMp4");
@@ -2434,7 +2438,7 @@ public partial class GeneratorForm : Form {
 		BindListEntry((x, y, a, c, d), i, single);
 	}
 	private void BindListEntry((TextBox x, TextBox y, TextBox a, TextBox c, Button r) l, int i, bool single = true) {
-		const int textSize = 53;
+		const int textSize = 42;
 		const int buttonSize = 23;
 		if (single)
 			pointPanel.SuspendLayout();
@@ -2490,7 +2494,7 @@ public partial class GeneratorForm : Form {
 				ci1.Text = f.ChildColor[generator.SelectedChildColor].Item2[i - 1].ToString(CultureInfo.InvariantCulture);
 				EditFractal();
 			};
-			s.Location = new(3 * (textSize + 4) + 2 * (buttonSize + 4), 2 + (i * 2 - 1) * (buttonSize + 4) / 2);
+			s.Location = new(4 * (textSize + 4) + (buttonSize + 4), 2 + (i * 2 - 1) * (buttonSize + 4) / 2);
 		}
 		hor = 0;
 
@@ -2511,8 +2515,9 @@ public partial class GeneratorForm : Form {
 			if (sender is TextBox s && !DiffApply(ReText(s, ParseValue<byte>(s)), ref generator.GetFractal().ChildColor[generator.SelectedChildColor].Item2[i], out var _))
 				EditFractal();
 		};
-		
+
 		// Remove:
+		l.r.Text = "X";
 		NewButton(l.r, "r" + i.ToString(), "editR").Click += (sender, e) => {
 			var f = generator.GetFractal();
 			if (f.ChildCount <= 1) {
@@ -2578,7 +2583,7 @@ public partial class GeneratorForm : Form {
 			pointPanel.ResumeLayout(false);
 			pointPanel.PerformLayout();
 		}
-		addPointButton.Location = new(10, 10 + (i + 1) * buttonSize);
+		addPointButton.Location = new(10, 10 + (i + 1) * (buttonSize + 4));
 	}
 	private void EditFractal() {
 		if (modifySettings)
@@ -2601,17 +2606,14 @@ public partial class GeneratorForm : Form {
 			fractalName = fractalName[(index + 1)..];
 		f.Name = fractalName.Replace('|', '.').Replace(':', '.').Replace(';', '.');
 		// Constants
-		string p = "|", a, s = f.Name + "|" + f.ChildCount + "|" + f.ChildSize + "|" + f.MaxSize + "|" + f.MinSize + "|" + f.CutSize;
-		// XY
-		foreach (var x in f.ChildX)
-			p += x + ";";
-		s += p[..^1];
-		p = "|";
-		foreach (var x in f.ChildY)
-			p += x + ";";
-		s += p[..^1];
+		string p = "|", a, s = "!1|" // version 1 (has childS)
+			+ f.Name + "|" + f.ChildCount + "|" + f.ChildSize + "|" + f.MaxSize + "|" + f.MinSize + "|" + f.CutSize;
+		// XYS
+		ExportDoubles(f.ChildX);
+		ExportDoubles(f.ChildY);
+		ExportDoubles(f.ChildS);
+		s += "|" + (f.UseChildS ? "1" : "0");
 		// Angles
-		p = "|";
 		foreach (var (an, ai) in f.ChildAngle) {
 			a = an + ":";
 			foreach (var i in ai)
@@ -2639,6 +2641,13 @@ public partial class GeneratorForm : Form {
 		s += p == "|" ? "|" : p[..^1];
 		File.WriteAllText(f.Path, s);
 		f.Edit = false;
+
+		void ExportDoubles(double[] a) {
+			foreach (var x in a)
+				p += x + ";";
+			s += p[..^1];
+			p = "|";
+		}
 	}
 	private void LoadFractal_FileOk(object sender, CancelEventArgs e) {
 		if (sender is not OpenFileDialog open)

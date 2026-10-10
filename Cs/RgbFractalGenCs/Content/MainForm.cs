@@ -8,8 +8,8 @@ namespace RgbFractalGenCs;
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public partial class MainForm : Form {
 
-	const string version = "1.14.0";
-	const bool allowEditor = false;
+	const string version = "1.14.1";
+	const bool allowEditor = true;
 
 	internal SettingsForm Settings;
 	internal HelpForm ReadmeHelp;

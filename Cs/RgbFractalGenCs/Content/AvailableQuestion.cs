@@ -11,7 +11,8 @@ public partial class AvailableQuestion : Form {
 		InitializeComponent();
 		controlTabIndex = 0;
 		Text = L(caption);
-		SetupControl(messageLabel, L(message));
+		SetupControl(messageLabel, ""/*L(message)*/);
+		messageLabel.Text = L(message);
 		SetupControl(yesButton, L(yes));
 		SetupControl(noButton, L(no));
 		SetupControl(abortButton, L(abort));

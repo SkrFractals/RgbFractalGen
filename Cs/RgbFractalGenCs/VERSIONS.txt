@@ -1,3 +1,12 @@
+TODO:
+-sometime changing settings would open task scheduler instead...?
+-tasks are forever queued (if created tasks when finished - blue)
+-childS feature - block or implement cache and OfDepth when UseChildS is selected
+-separate the control panels from the preview window
+-implement Comparser
+-implement Noise features (blue and Bayer noise)
+-implement fractal links
+
 Known issues:
 -Rare crashes
 -ZoomChild is be buggy for some indices (not centering properly, jumping, and CutSize cutting off parts of the fractal too soon)

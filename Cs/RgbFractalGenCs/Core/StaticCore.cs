@@ -190,11 +190,12 @@ internal static class StaticCore {
 
 		// Fractal definitions list
 		Fractals = [
-			new("Void", 1, 1000, 1, .1, 1, [0], [0], [("N",[pi])], [("N",[0])], []),
+			new("Void", 1, 1000, 1, .1, 1, [0], [0], [1000], false, [("N",[pi])], [("N",[0])], []),
 
 			new("Ladders", 3, 2, 1.1, .1, 0.8,
 				[0, 0, 0],
 				[0, 1, -1],
+				[2, 2, 2], false,
 			[
 				("BASE",	[SYMMETRIC + pi, pi2, -pi2]),
 				("180",		[-SYMMETRIC, 0, pi])
@@ -208,6 +209,7 @@ internal static class StaticCore {
 			new("V", 3, 2, 1.1, .1, 1.4,
 				[0, 1, -1],
 				[0, 1, 1],
+				[2, 2, 2], false,
 			[
 				("Claws",	[pi, pi2, -pi2]),
 				("Diamonds",[0, -pi, -pi])
@@ -220,6 +222,7 @@ internal static class StaticCore {
 			new("Vicsek", 5, 3, 1.1, .1, 1.0,
 				[0, 1, -1, 0, 0],
 				[0, 0, 0, 1, -1],
+				[3, 3, 3, 3, 3], false,
 			[
 				("BASE",	[SYMMETRIC + pi2, 0, 0, 0, 0]),
 				("180",		[pi2, 0, 0, 0, 0]),
@@ -235,6 +238,7 @@ internal static class StaticCore {
 			new("TriTree", 10, 4, .2, .1, 1.0, 
 				[0, -1.5, 0, 1.5, 1.5, 3, 1.5, -1.5, -3, -1.5], 
 				[0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt],
+				[4, 4, 4, 4, 4, 4, 4, 4, 4, 4], false,
 			[
 				("BASE: RingTree",[SYMMETRIC + pi23, pi, pi + pi23, pi + pi43, 0, 0, pi23, pi23, pi43, pi43]),
 				//("BeamTree_Beams", [pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43]),
@@ -277,6 +281,7 @@ internal static class StaticCore {
 			new("FlakeTree", 13, 4, .2, .1, .9,
 				[0, -1.5, 0, 1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 1.5, 0, -1.5], 
 				[0, -stt, 2 * stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, stt, -2 * stt, stt],
+				[4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], false,
 			[
 				("BASE", [pi / 3, 0, pi23, pi43, pi, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, 0, pi23, pi43]),
 				("RotatedCenter", [pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -310,6 +315,7 @@ internal static class StaticCore {
 			new("TriComb", 13, 5, .2, .1, .9,
 				[0, 0, 1.5, -1.5, 1.5, 3, 1.5, -1.5, -3, -1.5, 3, 0, -3], 
 				[0, 2 * stt, -stt, -stt, 3 * stt, 0, -3 * stt, -3 * stt, 0, 3 * stt, 2 * stt, -4 * stt, 2 * stt],
+				[5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], false,
 			[
 				//("Classic", [pi / 3, 0, pi23, pi43, pi, pi + pi23, pi + pi23, pi + pi43, pi + pi43, pi, pi43, 0, pi23])
 				("BASE", [pi / 3, 0, pi43, pi23, pi, pi + pi43, pi + pi43, pi + pi23, pi + pi23, pi, pi23, 0, pi43])
@@ -340,7 +346,7 @@ internal static class StaticCore {
 			[(3, [])] // TriComb_Seeds
 			),
 
-			new("TriFlake", 4, 2, 1.5, 0.5, .8, triX, triY,
+			new("TriFlake", 4, 2, 1.5, 0.5, .8, triX, triY, [2, 2, 2, 2], false,
 			[
 				("BASE", [pi / 3, SYMMETRIC, SYMMETRIC, SYMMETRIC]),
 
@@ -369,7 +375,7 @@ internal static class StaticCore {
 			]
 			),
 
-			new("TetraTriFlake", 16, 4, 1.5, .35, .8, tetraX, tetraY,
+			new("TetraTriFlake", 16, 4, 1.5, .35, .8, tetraX, tetraY, [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], false,
 			[
 				("BASE",    [SYMMETRIC + pi23, pi, pi, pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, pi, pi, pi]),
 
@@ -428,7 +434,7 @@ internal static class StaticCore {
 			),
 
 
-			new("SierpinskiCarpet", 9, 3, 1.0, .5, .9, carpetX, carpetY,
+			new("SierpinskiCarpet", 9, 3, 1.0, .5, .9, carpetX, carpetY, [3, 3, 3, 3, 3, 3, 3, 3, 3], false,
 			[
 				("BASE: Classic", [SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("BASE: Quarter", [SYMMETRIC + pi2, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -647,7 +653,7 @@ internal static class StaticCore {
 				(1, [-766])
 			]),
 
-			new("SierpinskiPentaCarpet", 25, 5, 1.0, .2, .9, carpet5X, carpet5Y,
+			new("SierpinskiPentaCarpet", 25, 5, 1.0, .2, .9, carpet5X, carpet5Y, [5, 5, 5, 5, 5,5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], false,
 			[
 				("BASE: Classic",	[SYMMETRIC + pi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
 				("BASE: Quarter",	[SYMMETRIC + pi2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -714,7 +720,7 @@ internal static class StaticCore {
 				("PlusX2_One",  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0])
 			], []),
 
-			new("PentaFlake", 6, pentaS, .2 * pentaS, .25, .9, pentaX, pentaY,
+			new("PentaFlake", 6, pentaS, .2 * pentaS, .25, .9, pentaX, pentaY, [pentaS, pentaS, pentaS, pentaS, pentaS, pentaS], false,
 			[
 				("BASE: Classic", [pi5, 0, 0, 0, 0, 0]),
 				("BASE: No Rotation", [SYMMETRIC + 2 * pi5, 0, 0, 0, 0, 0]),
@@ -754,6 +760,7 @@ internal static class StaticCore {
 			new("HexaFlake", 7, 3, .5, .2, 1,
 			[0, 0, 2 * stt, 2 * stt, 0, -2 * stt, -2 * stt],
 			[0, -2, -1, 1, 2, 1, -1],
+			[3, 3, 3, 3, 3, 3, 3], false,
 			[
 				("BASE", [SYMMETRIC + pi / 3, 0, 0, 0, 0, 0, 0]),
 
@@ -793,6 +800,49 @@ internal static class StaticCore {
 			]
 			),
 
+			new("KochFlake", 7, 3 / Math.Sqrt(3), .5, .2, 2.5,
+			[0, 0, 2 * stt, 2 * stt, 0, -2 * stt, -2 * stt],
+			[0, -2, -1, 1, 2, 1, -1],
+			[3 / Math.Sqrt(3), 3, 3, 3, 3, 3, 3], true,
+			[
+				("BASE", [/*SYMMETRIC + */pi / 6, 0, 0, 0, 0, 0, 0]),
+
+				("Rotated", [0, 0, pi3, pi23, pi, 4 * pi3, 5 * pi3])
+			],
+			[
+				("BASE",        [0, 0, 0, 0, 0, 0, 0]),
+
+				("Center",      [2, 0, 0, 0, 0, 0, 0]),
+				("Center_Neg",  [4, 0, 0, 0, 0, 0, 0]),
+				("Center_Half", [3, 0, 0, 0, 0, 0, 0]),
+				("Center_One",  [1, 0, 0, 0, 0, 0, 0]),
+
+				("Y",           [0, 0, 2, 0, 2, 0, 2]),
+				("Y_Neg",       [0, 0, 4, 0, 4, 0, 4]),
+				("Y_Half",      [0, 0, 3, 0, 3, 0, 3]),
+				("Y_One",       [0, 0, 1, 0, 1, 0, 1]),
+
+				("Top",         [0, 2, 0, 0, 0, 0, 0]),
+				("Top_Neg",     [0, 4, 0, 0, 0, 0, 0]),
+				("Top_Half",    [0, 3, 0, 0, 0, 0, 0]),
+				("Top_One",     [0, 1, 0, 0, 0, 0, 0]),
+
+				("Bottom",      [0, 0, 0, 0, 2, 0, 0]),
+				("Bottom_Neg",  [0, 0, 0, 0, 4, 0, 0]),
+				("Bottom_Half", [0, 0, 0, 0, 3, 0, 0]),
+				("Bottom_One",  [0, 0, 0, 0, 1, 0, 0])
+			], [
+				// NoChildComplex
+				(1, [-190]),
+				// NoBackDiag
+				(2, [0, 66, 129, 132, 133, 136, 137, 140, 141, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 272,
+					288, 304, 322, 336, 338, 352, 354, 368, 370, 385, 388, 389, 392, 393, 396, 397, 400, 401, 404, 405, 408, 409, 412, 413, 416, 417,
+					420, 421, 424, 425, 428, 429, 432, 433, 436, 437, 440, 441, 444, 445, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460,
+					461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 486, 487,
+					488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510])
+			]
+			),
+
 			//new("Heptaflake", 8, 1 + Math.Cos(pi / 8) / Math.Sinh(pi / 4), .5, .2, 1, ofx, ofy,
 			//[("Classic", [symmetric + pi / 4, 0, 0, 0, 0, 0, 0, 0, 0])],
 			//[("Center", [2, 0, 0, 0, 0, 0, 0, 0, 0]),], null, 1.0 / (1.0 + Math.Cosh(Math.PI / 4.0))),
@@ -800,6 +850,7 @@ internal static class StaticCore {
 			new("HexaCircular", 19, 5, .2, .05, .9,
 			[0, 2 * stt, stt, -stt, -2 * stt, -stt, stt, 4 * stt, 3 * stt, stt, -stt, -3 * stt, -4 * stt, -4 * stt, -3 * stt, -stt, stt, 3 * stt, 4 * stt],
 			[0, 0, 1.5, 1.5, 0, -1.5, -1.5, 1, 2.5, 3.5, 3.5, 2.5, 1, -1, -2.5, -3.5, -3.5, -2.5, -1],
+			[5, 5, 5, 5, 5,5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], false,
 			[
 				("BASE: 180", [pi3, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0]),
 				("BASE: Symmetric", [SYMMETRIC + pi23, 0, 0, 0, 0, 0, 0, 0, pi, pi, 0, 0, pi, pi, 0, 0, pi, pi, 0])
@@ -904,55 +955,40 @@ internal static class StaticCore {
 			return Error("noFile", E);
 		var content = File.ReadAllText(file);
 		var arr = content.Split('|');
+		var arrI = 0;
 		// Name
 		if (arr[0] == "")
 			return Error("noFractalName", E);
-		if (FractalSelection.Contains(arr[0]))
+		// save format versions:
+		int version = 0;
+		if (arr[0][0] == '!') {
+			if (!int.TryParse(arr[0][1..], out version))
+				return false;
+			++arrI;
+		}
+
+		if (FractalSelection.Contains(arr[arrI]))
 			return Error("sameFractalName", E);
 		// Constants
-		if (!short.TryParse(arr[1], out short count) || count < 1)
+		if (!short.TryParse(arr[++arrI], out short count) || count < 1)
 			return Error(L("invalidChildCount") + ": " + count, E);
-		if (!double.TryParse(arr[2], out var size) || size <= 1)
+		if (!double.TryParse(arr[++arrI], out var size) || size <= 1)
 			return Error(L("invalidChildSize") +": " + size, E);
-		if (!double.TryParse(arr[3], out var maxsize))
+		if (!double.TryParse(arr[++arrI], out var maxsize))
 			return Error(L("invalidMaxSize") + ": " + maxsize, E);
-		if (!double.TryParse(arr[4], out var minSize))
+		if (!double.TryParse(arr[++arrI], out var minSize))
 			return Error(L("invalidMinSize") + ": " + minSize, E);
-		if (!double.TryParse(arr[5], out var cutSize))
+		if (!double.TryParse(arr[++arrI], out var cutSize))
 			return Error(L("invalidCutSize") + ": " + cutSize, E);
 
 		double x;
-		// ChildX
-		var s = arr[6].Split(';');
-		if (s.Length < count)
-			return Error(L("insufficientChildCount") + " X: " + s.Length + " / " + count, E);
-		var childX = new double[count];
-		for (var i = count; --i >= 0; childX[i] = x)
-			if (!double.TryParse(s[i], out x))
-				return Error(L("invalidChild") + " X: " + s[i], E);
-		// ChildY
-		s = arr[7].Split(';');
-		if (s.Length < count)
-			return Error(L("insufficientChildCount") + " Y: " + s.Length + " / " + count, E);
-		var childY = new double[count];
-		for (var i = count; --i >= 0; childY[i] = x)
-			if (!double.TryParse(s[i], out x))
-				return Error(L("invalidChild") + " Y: " + s[i], E);
-		// if there were any ":" in the name, merge those split entries 
-		string[] MergeName(string[] set) {
-			int diff = set.Length - count - 1;
-			if (diff > 0) {
-				var newSet = new string[set.Length - diff];
-				newSet[0] = set[0];
-				for (int i = 0; i < diff; newSet[0] += ":" + set[++i]) { }
-				for (int i = 1; i < newSet.Length; ++i)
-					newSet[i] = set[i + diff];
-				return newSet;
-			}
-			return set;
-		}
+		// ChildXYS
+		string[] s;
+		if (!(LoadDoubles(out var childX, 'X') && LoadDoubles(out var childY, 'Y') && version > 0 && LoadDoubles(out var childS, 'S')))
+			return false;
+		var useChildS = version > 0 && arr[++arrI] == "1";
 		// ChildAngles
-		s = arr[8].Split(';');
+		s = arr[++arrI].Split(';');
 		if (s.Length < 1)
 			return Error("noSetAngles", E);
 		List<(string, double[])> childAngle = [];
@@ -969,7 +1005,7 @@ internal static class StaticCore {
 			childAngle.Add((angleSet[0], angle));
 		}
 		// ChildColors
-		s = arr[9].Split(';');
+		s = arr[++arrI].Split(';');
 		if (s.Length < 1)
 			return Error("noSetColors", E);
 		List<(string, byte[])> childColor = [];
@@ -987,7 +1023,7 @@ internal static class StaticCore {
 			childColor.Add((colorSet[0], color));
 		}
 		// Cuts
-		s = arr[10].Split(';');
+		s = arr[++arrI].Split(';');
 		List<(int, int[])> cutFunction = [];
 		foreach (var c in s) {
 			if (c == "")
@@ -1002,7 +1038,7 @@ internal static class StaticCore {
 					return Error(L("invalidCutSeed") + ": " + cutInt[i + 1], E);
 			cutFunction.Add((cutIndex, cutHash));
 		}
-		var f = new Fractal(arr[0], count, size, maxsize, minSize, cutSize, childX, childY, childAngle, childColor, cutFunction) {
+		var f = new Fractal(arr[0], count, size, maxsize, minSize, cutSize, childX, childY, childS, useChildS, childAngle, childColor, cutFunction) {
 			Path = file
 		};
 		Fractals.Add(f);
@@ -1014,6 +1050,30 @@ internal static class StaticCore {
 				_ = g.Value.GetFractalSelect().Items.Add(arr[0]);
 		}
 		return true;
+
+		bool LoadDoubles(out double[] o, char type) {
+			o = new double[count];
+			s = arr[++arrI].Split(';');
+			if (s.Length < count)
+				return Error(L("insufficientChildCount") + " " + type + ": " + s.Length + " / " + count, E);
+			for (var i = count; --i >= 0; o[i] = x)
+				if (!double.TryParse(s[i], out x))
+					return Error(L("invalidChild") + " " + type + ": " + s[i], E);
+			return true;
+		}
+		// if there were any ":" in the name, merge those split entries 
+		string[] MergeName(string[] set) {
+			int diff = set.Length - count - 1;
+			if (diff > 0) {
+				var newSet = new string[set.Length - diff];
+				newSet[0] = set[0];
+				for (int i = 0; i < diff; newSet[0] += ":" + set[++i]) { }
+				for (int i = 1; i < newSet.Length; ++i)
+					newSet[i] = set[i + diff];
+				return newSet;
+			}
+			return set;
+		}
 	}
 	internal static void LoadLocale() {
 

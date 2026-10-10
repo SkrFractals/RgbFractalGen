@@ -41,14 +41,15 @@ partial class AvailableQuestion {
 		// 
 		// messageLabel
 		// 
-		messageLabel.Anchor = AnchorStyles.None;
 		messageLabel.AutoSize = true;
+		messageLabel.Dock = DockStyle.Fill;
 		messageLabel.ForeColor = System.Drawing.Color.FromArgb(255, 255, 255);
-		messageLabel.Location = new System.Drawing.Point(130, 7);
+		messageLabel.Location = new System.Drawing.Point(0, 0);
 		messageLabel.Name = "messageLabel";
 		messageLabel.Size = new System.Drawing.Size(61, 15);
 		messageLabel.TabIndex = 0;
 		messageLabel.Text = "[message]";
+		messageLabel.TextAlign = System.Drawing.ContentAlignment.TopCenter;
 		// 
 		// yesButton
 		// 
@@ -110,7 +111,7 @@ partial class AvailableQuestion {
 		AutoScaleMode = AutoScaleMode.Font;
 		AutoSize = true;
 		AutoSizeMode = AutoSizeMode.GrowAndShrink;
-		BackColor = RgbFractalGenCs.Core.StaticCore.Background;
+		BackColor = System.Drawing.Color.FromArgb(64, 64, 64);
 		ClientSize = new System.Drawing.Size(342, 81);
 		Controls.Add(panel1);
 		Controls.Add(cancelButton);

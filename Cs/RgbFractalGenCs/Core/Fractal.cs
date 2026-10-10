@@ -19,7 +19,9 @@ internal class Fractal {
 		("BeamTree_OuterJoint", BeamTreeOuterJoint),			// 9
 		("BeamTree_InnerJoint", BeamTreeInnerJoint),			// 10
 		("Carpet_Symmetric",CarpetSymmetric),					// 11
-		("NoChildNoAngled", NoChildNoAngled)					// 12
+		("NoChildNoAngled", NoChildNoAngled),					// 12
+		("NoCenter", NoCenter),									// 13
+		("NoSecondCenter", NoSecondCenter)						// 14
 	];
 
 	internal delegate long CutFunction(int index, long flags, Fractal f);
@@ -34,13 +36,16 @@ internal class Fractal {
 		ChildX;                 // X coordinate shifts of children inside
 	internal double[]
 		ChildY;                 // Y coordinate shifts of children inside
+	internal double[]
+		ChildS;                 // Scales of children inside (not compatible with pre-calculation)
+	internal bool UseChildS = false;
 	internal readonly List<(string, double[])>
 		ChildAngle;             // Angle shifts of children inside
 	internal readonly List<(string, byte[])>
 		ChildColor;             // Color shifts of children inside
 	internal List<(int, int[])>
 		ChildCutFunction;            // Function that takes a bitarray transforms it and decides to cut some specific patterns of children
-	//internal double Hyperbolic;
+									 //internal double Hyperbolic;
 	internal string Path = "";  // where was it loaded from?
 	internal bool Edit = false; // is it edited?
 
@@ -58,6 +63,8 @@ internal class Fractal {
 	/// <param name="cutSize">A scaling multiplier to test cutting off iterations that are completely outside the view (if you see pieces disappearing too early when zooming in, increase it, if not you can decrease to boost performance)</param>
 	/// <param name="childX">X coordinate shifts of children Inside</param>
 	/// <param name="childY">Y coordinate shifts of children Inside</param>
+	/// <param name="childS">Scales of children Inside</param>
+	/// <param name="useChildS">Is the ChildS mode used?</param>
 	/// <param name="childAngle">Angle shifts of children Inside</param>
 	/// <param name="childColor">Color shifts of children Inside</param>
 	/// <param name="childCutFunction">Function that takes a bitarray transforms it and decides to cut some specific patterns of children</param>
@@ -70,10 +77,12 @@ internal class Fractal {
 		double cutSize,
 		double[] childX,
 		double[] childY,
+		double[] childS,
+		bool useChildS,
 		List<(string, double[])> childAngle,
 		List<(string, byte[])> childColor,
 		List<(int, int[])> childCutFunction//,
-		//double hyperbolic = 1.0f
+										   //double hyperbolic = 1.0f
 	) {
 		Name = name;
 		ChildCount = childCount;
@@ -83,6 +92,8 @@ internal class Fractal {
 		CutSize = cutSize;
 		ChildX = childX;
 		ChildY = childY;
+		ChildS = childS;
+		UseChildS = useChildS;//childS.Length == childX.Length;
 		ChildAngle = childAngle;
 		ChildColor = childColor;
 		ChildCutFunction = childCutFunction;
@@ -112,6 +123,8 @@ internal class Fractal {
 		CutSize = copy.CutSize;
 		ChildX = copy.ChildX;
 		ChildY = copy.ChildY;
+		ChildS = copy.ChildS;
+		UseChildS = copy.UseChildS;
 		Name = name;
 		ChildCount = childCount < 0 ? copy.ChildCount : childCount;
 		ChildAngle = childAngle ?? copy.ChildAngle;
@@ -127,6 +140,8 @@ internal class Fractal {
 		CutSize = copy.CutSize;
 		ChildX = copy.ChildX;
 		ChildY = copy.ChildY;
+		ChildS = copy.ChildS;
+		UseChildS = copy.UseChildS;
 		Name = copy.Name;
 		ChildCount = copy.ChildCount;
 		ChildAngle = copy.ChildAngle;
@@ -177,6 +192,8 @@ internal class Fractal {
 	) => new(this, name, ChildCount, null, null, cutFunction);
 
 	#region CutFunctions_UniversalSeeds
+	private static long NoCenter(int index, long inFlags, Fractal f) => index == 0 ? -1 : inFlags;
+	private static long NoSecondCenter(int index, long inFlags, Fractal f) => index == 0 && inFlags == 1 ? -1 : 1;
 	private static long ApplyNoChildSimple(int index, long rules, long flags) => (flags >> (index - 1) & 1) == 1 ? -1 : flags | rules;
 	private static long ApplyNoChildComplexAngle(int index, long rules, long flags, int lastRule, int lastIndex) {
 		var newFlags = flags & ((long)1 << lastIndex);
@@ -210,6 +227,11 @@ internal class Fractal {
 			inFlags & mask,                                 // flags
 			mask                                            // mask
 		);
+	}
+	private static long NoAnyChildSimple(int index, long inFlags, Fractal f) {
+		// Not a very good one...
+		var (_, _, rules, flags, _) = Param(inFlags, f.ChildCount, f.ChildCount);
+		return (flags >> index & 1) == 1 ? -1 : flags | rules;
 	}
 	private static long NoChildSimple(int index, long inFlags, Fractal f) {
 		// Not a very good one...
