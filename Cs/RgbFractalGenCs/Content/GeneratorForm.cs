@@ -498,13 +498,10 @@ public partial class GeneratorForm : Form {
 				return;
 			// User has manually resized the window - stretch the display
 			ResizeScreen();
-			//SetMinimumSize();
-			//const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
-			//int bw = Width - ClientRectangle.Width, bh = Height - ClientRectangle.Height;
-			SetClientSizeCore(
-				Math.Max(ClientRectangle.Width,/*Width - bw, 314 +*/ Math.Max(screenPanel.Width, width)),
-				Math.Max(ClientRectangle.Height,/*Height - bh, 8 +*/ Math.Max(screenPanel.Height, height))
-			);
+			/*SetClientSizeCore(
+				Math.Max(ClientRectangle.Width, Math.Max(screenPanel.Width, width)),
+				Math.Max(ClientRectangle.Height, Math.Max(screenPanel.Height, height))
+			);*/
 			SizeAdapt();
 		}
 		void ResizeAll() {
@@ -512,8 +509,7 @@ public partial class GeneratorForm : Form {
 			generator.SelectedHeight = (ushort)height;
 			generator.SetMaxIterations();
 			// Update the size of the window and display
-			//SetMinimumSize();
-			SetClientSizeCore(width/* + 314*/, height/*Math.Max(height + 8, 300)*/);
+			//SetClientSizeCore(width/* + 314*/, height/*Math.Max(height + 8, 300)*/);
 			ResizeScreen();
 			WindowSizeRefresh();
 #if CustomDebugTest
@@ -3039,7 +3035,7 @@ public partial class GeneratorForm : Form {
 			? (toolEditPanel, editorPanel, fractalEditorPanel, pointPanel)
 			: (toolGenPanel, generatorPanel, genControlPanel, fractalSettingsPanel);
 		//const int bw = 16, bh = 39; // Have to do this because for some ClientSize was returning bullshit values all of a sudden
-		int bw = Width - client.Width, bh = Height - client.Height;
+		//int bw = Width - client.Width, bh = Height - client.Height;
 		//int windowWidth = Width - bw, windowHeight = Height - bh;
 		// desired X location of the popup (windowWidth - popupWidth)
 		//popupPanel.Visible = true;
@@ -3090,10 +3086,10 @@ public partial class GeneratorForm : Form {
 		debugPanel.Location = new(debugPanel.Location.X, switchable.Location.Y + switchable.Size.Height + 2);
 		debugPanel.Size = new(debugPanel.Size.Width, popupPanel.Size.Height - debugPanel.Location.Y - 2);
 
-		MinimumSize = new(
+		/*MinimumSize = new(
 			Math.Max(Math.Max(popupPanel.MinimumSize.Width, tool.MinimumSize.Width), width) + bw,
 			Math.Max(popupPanel.MinimumSize.Height + tool.MinimumSize.Height, height) + bh
-		);
+		);*/
 	}
 
 }
