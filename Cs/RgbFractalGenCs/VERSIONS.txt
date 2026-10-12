@@ -1,6 +1,28 @@
+
+IoGUI TODO:
+-Main Menu (List)
+--Settings (Locale, Verbosity, Threads, Later Comparser page), +maybe more?
+--Gens (open GenList)
+--Editor - GenImage[0] (click to show/recall GenContext[0], click again to switch preview mode)
+--Help (message)
+-GenList +Add
+--DeleteButton - deletes line
+--TasksButton - call teh generator's open scheduler
+--AnimStateButton - unlocks generator and sets it to animation
+--LabelFrames
+--DuplicateButton - a new generator entry copied from this one
+--NameOpenButton - opens the GenImage[index]  (click to show/recall GenContent[index], click again to switch animated)
+-GenContent[editor=0]
+--Fractal - FractalSelect / AnglesMasks / ColorsMasks / CutSelect / CutSeedText / ResXText / ResYText / ResSelect / ResDelButton / ResAddButton / PaletteSelect / PaletteDelButton / PaletteAddButton / DefaultHueText
+--[edit] Properties - Load+Save / ChildSize / MaxSize / minSize / CutSize / AngleName + Add + Del / ColorName + Add + Del / AddCutSelect + Del / UseChildS+Link
+--[edit] ChildList +Add - X / Y / Angle / Color / (Size) / (Link) / Del / Swap
+--[gen] Generator - Prev+Frame+Next / Animate / Restart / GenNameText / GetTypeSelect / ExportButton+ExportSelect+Tasks / FileMask
+--[gen] Properties - PngSelect / GifSelect / GpuVoidSelect / DrawSelect / DitheringBox / 
+
+
 TODO:
--sometime changing settings would open task scheduler instead...?
--tasks are forever queued (if created tasks when finished - blue)
+-"Have PNG available" when only Image
+-Previews are zoomed wrong
 -childS feature - block or implement cache and OfDepth when UseChildS is selected
 -separate the control panels from the preview window
 -implement Comparser
